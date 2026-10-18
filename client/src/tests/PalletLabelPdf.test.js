@@ -236,7 +236,7 @@ describe('manager screen copy', () => {
 
   it('warns in plain language, with no jargon', async () => {
     const src = await pageSource();
-    const warning = src.slice(src.indexOf('These labels will only work'), src.indexOf('would not be able to open their pallet'));
+    const warning = src.slice(src.indexOf('The QR codes on these slips will only work'), src.indexOf('would not be able to open their pallet'));
 
     expect(warning).toContain('only work on this computer');
     for (const jargon of ['localhost', 'origin', 'URL', 'http', 'port', 'server', 'host']) {
@@ -251,11 +251,16 @@ describe('manager screen copy', () => {
     expect(src).toMatch(/aria-hidden="true"/);
   });
 
-  // Someone testing the flow has to be able to generate one.
+  // Someone testing the flow has to be able to generate one. The print
+  // buttons live in the slip list now (features/pickingSlips); the list
+  // is never told whether labels will scan, so it cannot disable on it.
   it('does not disable the button when labels are unreachable', async () => {
-    const src = await pageSource();
-    const button = src.slice(src.indexOf('onClick={printAllLabels}'), src.indexOf('Print pallet labels'));
-    expect(button).toContain('disabled={filteredSlips.length === 0}');
-    expect(button).not.toContain('labelsReachable');
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const list = readFileSync(
+      fileURLToPath(new URL('../features/pickingSlips/SlipList.jsx', import.meta.url)), 'utf8');
+    const button = list.slice(list.indexOf('onPrintLabels(rows)') - 200, list.indexOf('Print slips ('));
+    expect(button).toContain('disabled={rows.length === 0}');
+    expect(list).not.toContain('labelsReachable');
   });
 });

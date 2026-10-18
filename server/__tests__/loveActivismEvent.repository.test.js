@@ -72,6 +72,7 @@ describe('createEvent', () => {
     expect(insert).toBeDefined();
     expect(insert.sql).toContain('event_name, description, event_date, venue_name, address, status, created_by');
     expect(insert.sql).toContain('RETURNING');
+    expect(insert.sql).toContain('event_date::text AS event_date');
     expect(insert.params).toEqual(['Warehouse Food Drive', null, '2026-10-01', 'Warehouse', 'Cape Town', 'DRAFT', 5]);
     expect(client.calls).toHaveLength(1);
   });
@@ -107,6 +108,7 @@ describe('findById', () => {
     expect(result).toEqual(CREATED_ROW);
     const select = findCall(client, /^SELECT/i);
     expect(select.sql).toContain('FROM public.love_activism_events');
+    expect(select.sql).toContain('event_date::text AS event_date');
     expect(select.sql).toContain('WHERE event_id = $1');
     expect(select.params).toEqual(['11111111-1111-1111-1111-111111111111']);
   });

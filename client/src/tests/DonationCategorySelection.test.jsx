@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DonationItemsList } from '../features/donation/components/DonationItemsList';
+import { DonationItemsList } from '../features/donation/DonationItemsList';
 import { createPendingDonation } from '../services/donationAPI';
 
 const okResponse = () => Promise.resolve({
@@ -79,10 +79,26 @@ describe('Donation phase 1-4 intake', () => {
 
     const payload = JSON.parse(fetch.mock.calls[0][1].body);
     expect(payload.donorConsentGiven).toBe(true);
+    expect(payload.estimatedValueZar).toBe(100);
     expect(payload.donorContact).toBe('jane@example.com');
     expect(payload).not.toHaveProperty('donorTaxReference');
     expect(payload).not.toHaveProperty('donorAddress');
     expect(payload).not.toHaveProperty('donorIdNumber');
+  });
+
+  it('sends a value typed without a Section 18A request, and omits it when none was typed', async () => {
+    const fetch = vi.fn(okResponse);
+    vi.stubGlobal('fetch', fetch);
+
+    await createPendingDonation(draft({ donorConsentGiven: false, estimatedValueZar: '100' }));
+
+    const payload = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(payload.donorConsentGiven).toBe(false);
+    expect(payload.estimatedValueZar).toBe(100);
+
+    await createPendingDonation(draft({ donorConsentGiven: false, estimatedValueZar: '' }));
+    const blank = JSON.parse(fetch.mock.calls[1][1].body);
+    expect(blank).not.toHaveProperty('estimatedValueZar');
   });
 
   it('keeps unknown food products pending review', async () => {

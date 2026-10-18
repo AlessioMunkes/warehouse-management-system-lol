@@ -3,9 +3,13 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { DonationDraftContext, emptyDraft } from '../features/donation/context/DonationDraftContext';
+import { DonationDraftContext, emptyDraft } from '../features/donation/DonationDraftContext';
 import { DonationDetailsPage } from '../pages/DonationDetailsPage';
-import { EditSectionDialog, ReviewSummary } from '../features/donation/components/ReviewSummary';
+import { EditSectionDialog, ReviewSummary } from '../features/donation/ReviewSummary';
+
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 1, firstName: 'M', role: 'warehouse_worker' }, logout: vi.fn() }),
+}));
 
 const baseDraft = () => ({
   ...emptyDraft(),
@@ -20,7 +24,6 @@ const baseDraft = () => ({
     requestedCategory: '',
   }],
   estimatedValueZar: '120',
-  programmeCode: 'NOC',
   donorConsentGiven: false,
 });
 

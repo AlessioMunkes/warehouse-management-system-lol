@@ -112,6 +112,62 @@ const assignSlip = async (req, res) => {
   }
 };
 
+// ── Add a second packer ──────────────────────────────────────────
+// POST /api/picking/:id/assign-second
+// Body: { packerId } — manager only.
+// Returns: the updated slip.
+const addSecondPacker = async (req, res) => {
+  try {
+    const slip = await pickingService.addSecondPacker(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: slip });
+  } catch (err) {
+    console.error('[addSecondPacker]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to add a second packer.',
+    });
+  }
+};
+
+// ── Release a slip back to the floor ──────────────────────────────
+// POST /api/picking/:id/release
+// Manager only. Clears whoever holds the pallet and returns it to
+// 'pending' so it's spare/claimable again.
+// Returns: the updated slip.
+const releaseSlip = async (req, res) => {
+  try {
+    const slip = await pickingService.releaseSlip(req.params.id, req.user);
+    res.status(200).json({ success: true, data: slip });
+  } catch (err) {
+    console.error('[releaseSlip]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to release picking slip.',
+    });
+  }
+};
+
+// ── Edit a pending slip ────────────────────────────────────────────
+// PATCH /api/picking/:id
+// Body: { dispatchDate?, cohort?, force?, items?: [{ productId, quantity, unit }] }
+// Manager only, pending slips only.
+// Returns: the updated slip.
+const editSlip = async (req, res) => {
+  try {
+    const slip = await pickingService.editSlip(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: slip });
+  } catch (err) {
+    console.error('[editSlip]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to update picking slip.',
+    });
+  }
+};
+
 // ── Confirm a line ───────────────────────────────────────────────
 // POST /api/picking/:id/items/:itemId/confirm
 // Body: { packedQuantity }
@@ -191,6 +247,9 @@ export default {
   generateSlips,
   createSlip,
   assignSlip,
+  addSecondPacker,
+  releaseSlip,
+  editSlip,
   confirmItem,
   flagItem,
   completeSlip,

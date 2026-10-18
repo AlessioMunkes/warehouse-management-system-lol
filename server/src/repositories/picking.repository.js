@@ -1,8 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/picking.repository.js
 //
-// All SQL for the picking module.
-// No business logic here — only database queries.
+// All SQL for the picking module, from a claimed slip to a closed one.
+// No business logic here — only database queries. Making and editing
+// slips before packing is in pickingSlipSetup.repository.js and
+// re-exported below, so this stays the one file callers import.
 //
 // STOCK TIMING (changed — read this before editing completeSlip)
 // This module NO LONGER writes to stock_levels or stock_movements.
@@ -24,72 +26,15 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
-import { createNotification } from './notification.repository.js';
-
-// ── Audit helper (used inside existing transactions) ──────────
-const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
-  await client.query(
-    `INSERT INTO picking_events (picking_slip_id, event_type, actor_id, detail)
-     VALUES ($1, $2, $3, $4)`,
-    [slipId, eventType, actorId, detail]
-  );
-};
-
-// ── Who is acting: staff or a guest ───────────────────────────
-// Staff are `users` rows; guests are `volunteers` rows. Two id spaces
-// that overlap, on one cookie, distinguished only by role — so the
-// actor has to carry its own type rather than being inferred from a
-// bare number.
-//
-// { type: 'user' | 'volunteer', id }
-//
-// Callers that pass the old `actorId` keep working unchanged: they are
-// staff by definition, because until guests existed there was nothing
-// else to be.
-const asActor = (actor, actorId) => actor ?? { type: 'user', id: actorId };
-const isVolunteer = (actor) => actor.type === 'volunteer';
-
-// NEVER write a volunteer id into actor_id / confirmed_by / completed_by.
-//
-// All three are int4 with a FOREIGN KEY to users(id), and volunteers.id
-// is int8. The FK does not protect us here — it ACCEPTS the write
-// whenever the number happens to exist in users, and the ranges overlap
-// badly: users run 1-346, volunteers run 1-7, and 6 of the 7 current
-// volunteers collide with a real staff account. Volunteer 1 is users
-// row 1, which is admin001. A guest packing a pallet would be recorded,
-// permanently and plausibly, as the administrator.
-//
-// So a guest's actor column is NULL and the attribution goes in the
-// jsonb detail instead, where there is no type to collide with. If you
-// are tempted to "fix" this by casting, read the FK first.
-const actorUserId = (actor) => (isVolunteer(actor) ? null : actor.id);
-
-const actorDetail = (actor, detail = null) =>
-  (isVolunteer(actor)
-    ? { ...(detail ?? {}), actor_type: 'volunteer', volunteer_id: actor.id }
-    : detail);
-
-// node-postgres hands back int8 as a STRING and int4 as a number, so a
-// volunteer id off the JWT is '7' while a slip id is 7. Comparing those
-// with !== is always true, which would forbid every guest write with no
-// visible reason. Compare as text.
-const sameId = (a, b) => a !== null && a !== undefined && b !== null && b !== undefined && String(a) === String(b);
-
-// The owner of a slip depends on who is asking: staff hold it through
-// assigned_to, guests through assigned_volunteer_id. Two columns, never
-// interchangeable.
-const slipOwnerFor = (actor, slip) =>
-  (isVolunteer(actor) ? slip.assigned_volunteer_id : slip.assigned_to);
-
-// ── Rotation anchor ────────────────────────────────────────────
-// The Monday of a known 'week1' week — the service layer uses this
-// to compute which cohort is active for any given dispatch date.
-const getCohortAnchor = async () => {
-  const result = await pool.query(
-    `SELECT value FROM picking_settings WHERE key = 'cohort_anchor_monday'`
-  );
-  return result.rows[0]?.value ?? null;
-};
+import { toStockUnitSql, unitRatioSql } from '../features/units/unitConversion.js';
+import { recheckProducts } from './communityRequestStock.repository.js';
+import { loadShelfLots, todayInSAST } from './shelfLots.repository.js';
+import { earliestLive } from '../features/stock/shelfLots.js';
+import { logEvent } from './pickingEvents.repository.js';
+import {
+  asActor, actorUserId, actorDetail, sameId, canWorkSlip,
+} from './pickingActor.js';
+import { generateSlips, createSlip, editSlip } from './pickingSlipSetup.repository.js';
 
 // ── List slips for a dispatch day ─────────────────────────────
 // Progress is computed in SQL so the board doesn't need N+1 queries.
@@ -99,14 +44,28 @@ const getCohortAnchor = async () => {
 // 'confirmed', so without this count the board shows the pallet as
 // clean and dispatch has no reason to look twice — which is exactly
 // the Monday packing error the gate re-check exists to catch.
-const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
+const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, stillOpenOrSince }) => {
   const params = [];
   const where  = [];
 
+  // Everything not yet through the gate, whatever its date, plus what
+  // has gone out since the given day. A packer's own list uses this:
+  // without it "mine" was every pallet they had ever packed, which after
+  // three months is 800 rows on a phone for a tab that shows the last few.
+  if (stillOpenOrSince) {
+    params.push(stillOpenOrSince);
+    where.push(`(ps.status IN ('pending', 'in_progress', 'complete') OR ps.dispatch_date >= $${params.length}::date)`);
+  }
+
   if (dispatchDate) { params.push(dispatchDate); where.push(`ps.dispatch_date = $${params.length}`); }
+  // A range, for the manager's week view. Inclusive both ends.
+  if (from)         { params.push(from);         where.push(`ps.dispatch_date >= $${params.length}::date`); }
+  if (to)           { params.push(to);           where.push(`ps.dispatch_date <= $${params.length}::date`); }
   if (cohort)       { params.push(cohort);       where.push(`ps.cohort = $${params.length}`); }
   if (status)       { params.push(status);       where.push(`ps.status = $${params.length}`); }
-  if (assignedTo)   { params.push(assignedTo);   where.push(`ps.assigned_to = $${params.length}`); }
+  // Matches either slot — a worker requesting "mine" wants every slip
+  // they are on, whether they hold it alone or as the second packer.
+  if (assignedTo)   { params.push(assignedTo);   where.push(`(ps.assigned_to = $${params.length} OR ps.assigned_to_2 = $${params.length})`); }
 
   const result = await pool.query(
     `SELECT
@@ -126,24 +85,47 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
        ps.pallet_ref,
        ps.status,
        ps.assigned_to,
-       e.name       AS ecd_name,
+       ps.assigned_to_2,
+       -- A guest holds a slip through assigned_volunteer_id, never
+       -- assigned_to. Returned with their first name so the board shows
+       -- who has it instead of reading as unassigned.
+       ps.assigned_volunteer_id,
+       NULLIF(split_part(trim(v.full_name), ' ', 1), '') AS volunteer_name,
+       -- A soup or dignity kitchen's slip has no centre row; its name is
+       -- on the slip itself. Every screen reads the one column.
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
+       ps.beneficiary_kind::text AS beneficiary_kind,
        e.child_count,
        e.last_collected_date,
-       u.first_name AS packer_name,
+       u.first_name  AS packer_name,
+       u2.first_name AS packer_name_2,
        COUNT(psi.id)                                          AS total_items,
        COUNT(psi.id) FILTER (WHERE psi.status = 'confirmed')  AS confirmed_items,
        COUNT(psi.id) FILTER (WHERE psi.status = 'flagged')    AS flagged_items,
        COUNT(psi.id) FILTER (
          WHERE psi.status = 'confirmed'
            AND psi.packed_quantity IS DISTINCT FROM psi.required_quantity
-       )                                                      AS variance_items
+       )                                                      AS variance_items,
+       -- What happened at the gate: awaiting / collected /
+       -- late_collected / not_collected / cancelled, or null before a
+       -- dispatch event exists. dispatch_events is where the
+       -- not-collected cut-off writes; picking_slips.collection_status
+       -- is never written and must not be read.
+       de.status                                              AS dispatch_status,
+       -- When it was last claimed or assigned, so a packer's own list
+       -- can put the pallet they just took at the top.
+       (SELECT MAX(pe.created_at) FROM picking_events pe
+         WHERE pe.picking_slip_id = ps.id AND pe.event_type = 'assigned') AS claimed_at
      FROM picking_slips ps
-     JOIN ecd_centres e ON e.id = ps.ecd_id
-     LEFT JOIN users u ON u.id = ps.assigned_to
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN users u  ON u.id = ps.assigned_to
+     LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
+     LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
+     LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name
-     ORDER BY e.name ASC`,
+     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name, v.full_name, de.status
+     ORDER BY ps.dispatch_date ASC, COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
   );
 
@@ -152,24 +134,32 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
 
 // ── One slip with its lines ───────────────────────────────────
 const getSlipById = async (id) => {
-  const slipResult = await pool.query(
+  // Read together: one wait on the database, not two in a row.
+  const [slipResult, itemsResult] = await Promise.all([
+  pool.query(
     `SELECT
        ps.*,
-       e.name                AS ecd_name,
+       -- The calendar day as text, same reason as getSlips: the DATE
+       -- itself serialises as the previous day in UTC.
+       ps.dispatch_date::text AS dispatch_date_iso,
+       -- The gate's outcome, as getSlips reports it.
+       (SELECT de.status FROM dispatch_events de WHERE de.picking_slip_id = ps.id) AS dispatch_status,
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
        e.child_count,
        e.contact_name,
        e.last_collected_date,
-       u.first_name          AS packer_name
+       u.first_name           AS packer_name,
+       u2.first_name          AS packer_name_2,
+       NULLIF(split_part(trim(v.full_name), ' ', 1), '') AS volunteer_name
      FROM picking_slips ps
-     JOIN ecd_centres e ON e.id = ps.ecd_id
-     LEFT JOIN users u ON u.id = ps.assigned_to
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN users u  ON u.id = ps.assigned_to
+     LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
+     LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
      WHERE ps.id = $1`,
     [id]
-  );
-
-  if (!slipResult.rows[0]) return null;
-
-  const itemsResult = await pool.query(
+  ),
+  pool.query(
     `SELECT
        psi.id,
        psi.product_id,
@@ -178,6 +168,7 @@ const getSlipById = async (id) => {
        psi.packed_quantity,
        psi.status,
        psi.flag_reason,
+       psi.packer_note,
        psi.confirmed_at,
        p.name               AS product_name,
        p.stock_keeping_unit AS sku
@@ -186,154 +177,25 @@ const getSlipById = async (id) => {
      WHERE psi.picking_slip_id = $1
      ORDER BY p.name ASC, psi.unit ASC`,
     [id]
-  );
+  ),
+  ]);
 
-  return { ...slipResult.rows[0], items: itemsResult.rows };
-};
+  if (!slipResult.rows[0]) return null;
 
-// ── Generate a week's slips from ECD master data ──────────────
-// Idempotent: the UNIQUE (ecd_id, dispatch_date) constraint means
-// re-running for the same day updates nothing and creates nothing.
-// Slips already in progress are never touched.
-//
-// An ECD with no effective order lines produces a slip with zero
-// items, which then has zero pending lines and can be closed
-// instantly with nothing packed. That is not blocked — food is never
-// blocked on a data problem — but every such slip is returned in
-// emptySlips so the manager can fix the master data before Monday.
-const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  // FEFO: the soonest use-by date among the deliveries probably still on
+  // the shelf (not ones a manager has dismissed), for the packer to look
+  // for first. An estimate, like the lots it comes from: it says which
+  // date to look for, not how much of it remains. NULL for a product
+  // nobody has recorded a date for (dry goods).
+  const productIds = [...new Set(itemsResult.rows.map((i) => i.product_id))];
+  const shelf = productIds.length > 0 ? await loadShelfLots({ productIds }) : new Map();
+  const today = todayInSAST();
+  const items = itemsResult.rows.map((item) => ({
+    ...item,
+    use_first_date: earliestLive(shelf.get(item.product_id)?.lots ?? [], today)?.expiryDate ?? null,
+  }));
 
-    const slips = await client.query(
-      `INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by)
-       SELECT e.id, $1::date, $2::cohort_group, $3
-       FROM ecd_centres e
-       WHERE e.cohort = $2::cohort_group
-         AND e.is_active = TRUE
-         AND e.approved_at IS NOT NULL
-       ON CONFLICT (ecd_id, dispatch_date) DO NOTHING
-       RETURNING id, ecd_id`,
-      [dispatchDate, cohort, generatedBy]
-    );
-
-    const emptySlips = [];
-
-    // Snapshot the recipe onto each new slip. Copying (not joining) means a
-    // later change to ecd_order_lines can never rewrite a packed slip.
-    for (const slip of slips.rows) {
-      const items = await client.query(
-        `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-         SELECT $1, ol.product_id, ol.quantity, ol.unit
-         FROM ecd_order_lines ol
-         JOIN products p ON p.id = ol.product_id
-         WHERE ol.ecd_id = $2
-           AND ol.effective_from <= $3::date
-           AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
-           AND p.archived_at IS NULL
-         RETURNING id`,
-        [slip.id, slip.ecd_id, dispatchDate]
-      );
-
-      await logEvent(client, slip.id, 'generated', generatedBy, {
-        dispatch_date: dispatchDate,
-        item_count:    items.rowCount,
-      });
-
-      if (items.rowCount === 0) {
-        emptySlips.push({ slipId: slip.id, ecdId: slip.ecd_id });
-        await logEvent(client, slip.id, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
-      }
-    }
-
-    if (slips.rowCount > 0) {
-      await createNotification(client, {
-        type:  'picking_slips_generated',
-        title: `${slips.rowCount} picking slip${slips.rowCount === 1 ? '' : 's'} generated`,
-        body:  `${cohort}, ${dispatchDate}` +
-          (emptySlips.length ? ` — ${emptySlips.length} with no lines to check.` : '.'),
-        entityType: 'picking_slip_run',
-      });
-    }
-
-    await client.query('COMMIT');
-    return { created: slips.rowCount, emptySlips };
-
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-};
-
-// ── Create a single ad-hoc slip ───────────────────────────────
-// Same idempotent shape as generateSlips, scoped to one ECD — for a
-// late-registered ECD, a correction, or any slip needed outside the
-// normal cohort-wide generation run.
-const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const ecdCheck = await client.query(
-      `SELECT id, name FROM ecd_centres WHERE id = $1 AND is_active = TRUE AND approved_at IS NOT NULL`,
-      [ecdId]
-    );
-    if (!ecdCheck.rows[0]) { await client.query('ROLLBACK'); return { ecdNotFound: true }; }
-
-    const slipResult = await client.query(
-      `INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by)
-       VALUES ($1, $2, $3::cohort_group, $4)
-       ON CONFLICT (ecd_id, dispatch_date) DO NOTHING
-       RETURNING id`,
-      [ecdId, dispatchDate, cohort, generatedBy]
-    );
-
-    if (!slipResult.rows[0]) { await client.query('ROLLBACK'); return { alreadyExists: true }; }
-
-    const slipId = slipResult.rows[0].id;
-
-    const itemsResult = await client.query(
-      `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-       SELECT $1, ol.product_id, ol.quantity, ol.unit
-       FROM ecd_order_lines ol
-       JOIN products p ON p.id = ol.product_id
-       WHERE ol.ecd_id = $2
-         AND ol.effective_from <= $3::date
-         AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
-         AND p.archived_at IS NULL
-       RETURNING id`,
-      [slipId, ecdId, dispatchDate]
-    );
-
-    await logEvent(client, slipId, 'generated', generatedBy, {
-      dispatch_date: dispatchDate,
-      mode:          'manual',
-      item_count:    itemsResult.rowCount,
-    });
-    if (itemsResult.rowCount === 0) {
-      await logEvent(client, slipId, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
-    }
-
-    await createNotification(client, {
-      type:       'picking_slip_created',
-      title:      `Ad-hoc picking slip created for ${ecdCheck.rows[0].name}`,
-      body:       `${dispatchDate}${itemsResult.rowCount === 0 ? ' — no lines to check.' : '.'}`,
-      entityType: 'picking_slip',
-      entityId:   slipId,
-    });
-
-    await client.query('COMMIT');
-    return { slipId, itemCount: itemsResult.rowCount };
-
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
+  return { ...slipResult.rows[0], items };
 };
 
 // ── Which statuses can still be claimed ───────────────────────
@@ -376,7 +238,7 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
     await client.query('BEGIN');
 
     const current = await client.query(
-      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = current.rows[0];
@@ -385,6 +247,16 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
     if (!CLAIMABLE_STATUSES.includes(slip.status)) {
       await client.query('ROLLBACK');
       return { locked: true, status: slip.status };
+    }
+
+    // A guest holds a pallet through assigned_volunteer_id, which the
+    // ownership check below never looked at, so a staff claim went
+    // straight through and left two holders. Taken, unless a manager is
+    // overriding (or the pallet is already this packer's).
+    const heldByVolunteer = slip.assigned_volunteer_id !== null && slip.assigned_volunteer_id !== undefined;
+    if (heldByVolunteer && !canOverride && !sameId(slip.assigned_to, packerId)) {
+      await client.query('ROLLBACK');
+      return { volunteerHeld: true };
     }
 
     // Re-claiming a pallet you already hold is not a reassignment —
@@ -400,6 +272,8 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
     const result = await client.query(
       `UPDATE picking_slips
        SET assigned_to = $1,
+           -- A manager override takes the pallet from a guest too.
+           assigned_volunteer_id = NULL,
            status      = 'in_progress',
            started_at  = COALESCE(started_at, NOW())
        WHERE id = $2
@@ -419,10 +293,163 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
       ...(isReassignment
         ? { reassigned_from: slip.assigned_to, previous_status: slip.status }
         : {}),
+      ...(heldByVolunteer
+        ? { taken_from_volunteer_id: slip.assigned_volunteer_id, previous_status: slip.status }
+        : {}),
     });
 
     await client.query('COMMIT');
     return { slip: result.rows[0], reassignedFrom: isReassignment ? slip.assigned_to : null };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── Add a second packer ────────────────────────────────────────
+// Sponsor change request: a slip can be worked by two people "where
+// required" — a big pallet, someone training a new hire, a short-
+// staffed shift. Deliberately its own function rather than a second
+// call into assignSlip: a second packer is additive (the pallet
+// already has an owner and this names a helper), not a claim/conflict
+// decision the way the primary assignment is, so it doesn't belong in
+// the same conflict/reassignment branching.
+//
+// Requires a primary first (slip.assigned_to already set) — a helper
+// with nobody to help does not mean anything, and it keeps "who is
+// the primary" unambiguous for every other check in this file that
+// still only reads assigned_to (started_at, reassignment history,
+// etc.).
+const addSecondPacker = async ({ slipId, packerId, actorId }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const current = await client.query(
+      `SELECT id, status, assigned_to, assigned_to_2 FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      [slipId]
+    );
+    const slip = current.rows[0];
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    if (!CLAIMABLE_STATUSES.includes(slip.status)) {
+      await client.query('ROLLBACK');
+      return { locked: true, status: slip.status };
+    }
+
+    if (!slip.assigned_to) {
+      await client.query('ROLLBACK');
+      return { noPrimary: true };
+    }
+
+    // Already on it, one way or the other — quiet success, same as
+    // assignSlip tapping the same button twice.
+    if (slip.assigned_to === packerId || slip.assigned_to_2 === packerId) {
+      await client.query('ROLLBACK');
+      return { slip };
+    }
+
+    if (slip.assigned_to_2) {
+      await client.query('ROLLBACK');
+      return { full: true, assignedTo2: slip.assigned_to_2 };
+    }
+
+    const result = await client.query(
+      `UPDATE picking_slips SET assigned_to_2 = $1 WHERE id = $2 RETURNING *`,
+      [packerId, slipId]
+    );
+
+    await logEvent(client, slipId, 'assigned', actorId, {
+      packer_id: packerId,
+      second_packer: true,
+    });
+
+    await client.query('COMMIT');
+    return { slip: result.rows[0] };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── Release a slip back to the floor ──────────────────────────
+// The other half of assignSlip: nothing until now could put
+// assigned_to back to NULL once it was set — assignSlip only ever
+// claims. This clears both packer slots and returns the slip to
+// 'pending' so it's spare/claimable again, replacing what used to be
+// a manager hand-picking a specific worker on the floor's behalf.
+//
+// Item-level progress (confirmed/flagged lines) is left untouched —
+// releasing is about who holds the pallet, not what's already been
+// packed on it, so the next claimant picks up where the last one left
+// off rather than starting the checklist over.
+// `beforeCommit(client, facts)`, when given, runs inside this
+// transaction just before COMMIT — the service's notification goes in
+// with the change or not at all (features/communications/notices.js).
+//
+// `ownOnly` is a packer giving back their own claim rather than a
+// manager freeing someone else's: it must be theirs, and nothing on it
+// may be packed yet. Once a line is confirmed or flagged the pallet has
+// food on it, and handing that on is the manager's call.
+const releaseSlip = async ({ slipId, actorId, beforeCommit, ownOnly = false }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const current = await client.query(
+      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      [slipId]
+    );
+    const slip = current.rows[0];
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    if (slip.status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      return { notClaimed: true, status: slip.status };
+    }
+
+    if (ownOnly) {
+      if (Number(slip.assigned_to) !== Number(actorId)) { await client.query('ROLLBACK'); return { notYours: true }; }
+      const started = await client.query(
+        `SELECT 1 FROM picking_slip_items WHERE picking_slip_id = $1 AND status <> 'pending' LIMIT 1`,
+        [slipId]
+      );
+      if (started.rows.length > 0) { await client.query('ROLLBACK'); return { started: true }; }
+    }
+
+    const result = await client.query(
+      `UPDATE picking_slips
+       SET assigned_to = NULL, assigned_to_2 = NULL, assigned_volunteer_id = NULL,
+           status = 'pending'
+       WHERE id = $1
+       RETURNING *`,
+      [slipId]
+    );
+
+    // Reuses the 'assigned' event_type rather than adding a new one —
+    // same reasoning as the reassignment case above: event_type is a
+    // DB-level CHECK constraint, and a label it has never seen would
+    // roll back the one transaction a manager is relying on to free
+    // up a pallet.
+    await logEvent(client, slipId, 'assigned', actorId, {
+      packer_id: null,
+      released_from: slip.assigned_to,
+    });
+
+    // The centre's name, for the floor's "back on the floor" notice
+    // and the caller's push message.
+    const ecd = await client.query('SELECT name FROM ecd_centres WHERE id = $1', [result.rows[0].ecd_id]);
+    const ecdName = ecd.rows[0]?.name ?? result.rows[0].beneficiary_name ?? 'a centre';
+    if (beforeCommit) await beforeCommit(client, { slipId, ecdName });
+
+    await client.query('COMMIT');
+    return { slip: result.rows[0], ecdName };
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -441,14 +468,14 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
 // so the board and the slip can show it. Silently accepting a
 // mismatched confirm is how a short pallet reaches the gate looking
 // complete.
-const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId, actor, canOverride = false }) => {
+const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, note, actorId, actor, canOverride = false }) => {
   const who = asActor(actor, actorId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_to_2, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -466,9 +493,9 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
     // Doing this here (rather than after setItemStatus returns) means a
     // refused packer cannot mutate the row at all. The FOR UPDATE above
     // also closes the race where a slip is reassigned mid-check.
-    // A guest is measured against assigned_volunteer_id, staff against
-    // assigned_to. The staff rule is unchanged.
-    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
+    // See canWorkSlip: the slip's owner for this kind of actor, or
+    // the second packer when the actor is staff.
+    if (!canOverride && !canWorkSlip(who, slip)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -478,12 +505,13 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
        SET status          = $1::picking_item_status,
            packed_quantity = $2,
            flag_reason     = $3,
-           confirmed_by    = $4,
+           packer_note     = $4,
+           confirmed_by    = $5,
            confirmed_at    = NOW()
-       WHERE id = $5 AND picking_slip_id = $6
+       WHERE id = $6 AND picking_slip_id = $7
        RETURNING *, (packed_quantity - required_quantity) AS quantity_variance`,
       // confirmed_by is NULL for a guest — see actorUserId above.
-      [status, packedQuantity ?? null, flagReason ?? null, actorUserId(who), itemId, slipId]
+      [status, packedQuantity ?? null, flagReason ?? null, note ?? null, actorUserId(who), itemId, slipId]
     );
 
     if (!result.rows[0]) { await client.query('ROLLBACK'); return { notFound: true }; }
@@ -508,7 +536,7 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
       client, slipId,
       status === 'flagged' ? 'item_flagged' : 'item_confirmed',
       actorUserId(who),
-      actorDetail(who, { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason })
+      actorDetail(who, { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason, note })
     );
 
     if (variance) {
@@ -565,7 +593,7 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_to_2, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -577,8 +605,8 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
 
     // Same ownership rule as confirm/flag. Closing a pallet is what
     // makes it eligible for the gate, so it can't be looser than the
-    // writes that lead up to it.
-    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
+    // writes that lead up to it. Either packer may close it out.
+    if (!canOverride && !canWorkSlip(who, slip)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -613,9 +641,14 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
       `WITH packed AS (
          SELECT
            psi.product_id,
-           SUM(psi.packed_quantity)::numeric  AS packed_quantity,
-           ARRAY_AGG(DISTINCT psi.unit)       AS units
+           -- In the unit the stock is kept in, so it can be compared
+           -- with what is available; "units" lists only the slip units
+           -- that do not convert to it.
+           SUM(${toStockUnitSql('psi.packed_quantity', 'psi.unit', 'psl.unit')})::numeric AS packed_quantity,
+           COALESCE(ARRAY_AGG(DISTINCT psi.unit)
+             FILTER (WHERE ${unitRatioSql('psi.unit', 'psl.unit')} IS NULL), '{}') AS units
          FROM picking_slip_items psi
+         LEFT JOIN stock_levels psl ON psl.product_id = psi.product_id
          WHERE psi.picking_slip_id = $1
            AND psi.status IN ('confirmed', 'flagged')
            AND psi.packed_quantity IS NOT NULL
@@ -636,7 +669,7 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
        FROM packed
        JOIN products p ON p.id = packed.product_id
        LEFT JOIN stock_levels sl ON sl.product_id = packed.product_id
-       LEFT JOIN (${committedStockSql({ excludeSlipParam: '$1' })}) c
+       LEFT JOIN (${committedStockSql({ excludeSlipParam: '$1', includeBenevolent: false })}) c
               ON c.product_id = packed.product_id
        ORDER BY packed.product_id ASC`,
       [slipId]
@@ -695,6 +728,12 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
       await logEvent(client, slipId, 'unit_mismatch', actorUserId(who), actorDetail(who, { unitMismatches }));
     }
 
+    // The pallet is now committed stock. If that leaves an approved
+    // benevolent request short, the request gives way (pallets come
+    // first): see communityRequestStock.repository.js. Same transaction,
+    // in a savepoint, so it can never fail the packing.
+    await recheckProducts(client, availability.rows.map((r) => r.product_id), { cause: 'pallet' });
+
     await client.query('COMMIT');
     return {
       slip:           result.rows[0],
@@ -728,12 +767,14 @@ const getAssignableWorkers = async () => {
 
 export default {
   CLAIMABLE_STATUSES,
-  getCohortAnchor,
   getSlips,
   getSlipById,
   generateSlips,
   createSlip,
   assignSlip,
+  addSecondPacker,
+  releaseSlip,
+  editSlip,
   setItemStatus,
   completeSlip,
   getAssignableWorkers,

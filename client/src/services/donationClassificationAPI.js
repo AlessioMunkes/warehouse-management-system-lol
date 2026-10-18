@@ -9,7 +9,7 @@ export const PRODUCT_CLASSIFICATION_CATEGORIES = [
   'non_food',
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : '');
+import { API_BASE } from './api';
 
 const parseResponse = async (response) => {
   let payload;

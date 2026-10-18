@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({ TopNavbar: () => <div>Navigation</div> }));
+vi.mock('../components/layout/TopNavBar', () => ({ TopNavbar: () => <div>Navigation</div> }));
 
 const mockRole = { value: 'manager' };
 vi.mock('../context/AuthContext', () => ({
@@ -55,10 +55,11 @@ describe('VolunteerEventPage workspace', () => {
     expect(await screen.findByRole('heading', { name: 'Mandela Day' })).toBeInTheDocument();
     expect(screen.getByText('9 remaining')).toBeInTheDocument();
     expect(screen.getByText('Ayesha Khan')).toBeInTheDocument();
-    expect(screen.getByText(/Community Hall — Cape Town/)).toBeInTheDocument();
+    // Space and its location, as TimeslotPanel shows them.
+    expect(screen.getAllByText(/Community Hall - Cape Town/).length).toBeGreaterThan(0);
     expect(screen.queryByText('t1')).not.toBeInTheDocument();
     expect(screen.getByText('No-show')).toBeInTheDocument();
-    expect(screen.getByText('SYNCED')).toBeInTheDocument();
+    expect(screen.getByText('Synced')).toBeInTheDocument();
   });
 
   it('shows empty timeslot and booking states', async () => {
@@ -142,7 +143,7 @@ describe('VolunteerEventPage workspace', () => {
     expect(await screen.findByText('VMS unavailable')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry sync' }));
     await waitFor(() => expect(api.retrySync).toHaveBeenCalledWith('e1'));
-    expect(await screen.findByText('SYNCED')).toBeInTheDocument();
+    expect(await screen.findByText('Synced')).toBeInTheDocument();
   });
 
   it('keeps management actions hidden while leaving attendance reusable for warehouse staff', async () => {

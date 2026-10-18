@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { google } from 'googleapis';
 import { getGmailConfig, OAUTH_STATE_TTL_MS, parseEncryptionKey } from '../config/gmail.js';
 import gmailRepo from '../repositories/gmail.repository.js';
+import { currentWarehouse } from '../config/warehouseContext.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -66,6 +67,9 @@ const startConnectFlow = ({ initiatedByUserId } = {}) => {
   stateStore.set(state, {
     expiresAt: Date.now() + OAUTH_STATE_TTL_MS,
     initiatedByUserId: initiatedByUserId ? String(initiatedByUserId) : null,
+    // Multi-warehouse: Google calls back with no session, so remember
+    // which warehouse started the flow (null with one database).
+    warehouse: currentWarehouse(),
   });
 
   const oauth2Client = getOAuth2Client(config);
@@ -283,6 +287,21 @@ const getConnectionStatus = async (userId) => {
   };
 };
 
+// For Settings → Connections: is the organisation account (the one
+// system emails go out as) connected, and does Google still accept it?
+// Getting a client refreshes an expired token, which is the real test —
+// a revoked or expired grant fails here rather than on the next email.
+const checkOrganisationConnection = async () => {
+  const connection = await gmailRepo.findLatestConnection();
+  if (!connection) return { connected: false };
+  try {
+    await getOAuth2ClientForConnection(connection);
+    return { connected: true, working: true, email: connection.gmail_email, updatedAt: connection.updated_at };
+  } catch (err) {
+    return { connected: true, working: false, email: connection.gmail_email, error: err.message };
+  }
+};
+
 const encodeMimePart = (value) => Buffer.from(String(value || ''), 'utf8').toString('base64');
 
 const toBase64Url = (str) => {
@@ -383,7 +402,11 @@ console.log("User ID:", initiatedByUserId);
   const connection = initiatedByUserId
     ? await gmailRepo.findConnectionByUserId(initiatedByUserId)
     : await gmailRepo.findLatestConnection();
-    console.log ("Connection: ", connection);
+    console.log("Connection:", {
+      exists: Boolean(connection),
+      id: connection?.id ?? null,
+      gmail_email: connection?.gmail_email ?? null,
+    });
 
   if (!connection) {
     fail(
@@ -454,12 +477,23 @@ const saveDisplayName = async (userId, displayName) => {
   };
 };
 
+// The warehouse that started this OAuth flow, or null. Read-only: the
+// state is still consumed (and validated) by handleOAuthCallback.
+const warehouseForState = (state) => {
+  if (!state) return null;
+  const tracked = stateStore.get(String(state));
+  if (!tracked || tracked.expiresAt <= Date.now()) return null;
+  return tracked.warehouse ?? null;
+};
+
 export default {
+  warehouseForState,
   startConnectFlow,
   handleOAuthCallback,
   getValidAccessToken,
   getOAuth2ClientWithCredentials,
   getConnectionStatus,
+  checkOrganisationConnection,
   disconnect,
   sendEmail,
   saveDisplayName,

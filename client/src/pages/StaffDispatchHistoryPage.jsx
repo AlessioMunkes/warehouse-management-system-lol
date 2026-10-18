@@ -15,39 +15,55 @@
 // routes/paths.js's STAFF.dispatchHistory comment for why this isn't
 // its own tab bar slot.
 //
-// Deliberately read-only and un-paginated, same reasoning as the
-// other two history pages: getHistory already returns everything in
-// the requested range in one call.
+// Read-only, same reasoning as the other history pages: getHistory
+// returns everything in the requested range in one call, and
+// HistoryScreen sorts and filters it in the browser.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
-import DispatchNotePDF from '../features/dispatch/components/DispatchNotePDF';
-import { Notice } from '../features/staff/components/StepPrimitives';
+import DispatchNotePDF from '../features/receipts/DispatchNotePDF';
 import dispatchAPI from '../services/dispatchAPI';
 import { STAFF } from '../routes/paths';
-import Paged from '../features/staff/components/Paged';
-import usePaged from '../features/staff/hooks/usePaged';
-
-const RANGES = [
-  { key: 'today', label: 'Today' },
-  { key: 'week',  label: 'This week' },
-  { key: 'month', label: 'This month' },
-  { key: 'all',   label: 'All' },
-];
-
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+import HistoryScreen, { HistoryRow } from '../features/staff/HistoryScreen';
+import { byNewest, byOldest, byText } from '../features/staff/historyView';
+import StatusBadge from '@/components/ui/status-badge';
+import { workerStatus } from '../features/staff/workerStatus';
+import { formatShortDate as formatDate } from '@/lib/dates';
 
 // One entry per terminal dispatch_events.status. `note` is whether a
 // dispatch note exists to open: nothing was loaded for the two that
 // never left, so offering "View note" on them would be a dead button.
 const STATUS_META = {
-  collected:      { label: 'Collected',     tone: 'is-done',   note: true  },
-  late_collected: { label: 'Late',          tone: 'is-warn',   note: true  },
-  not_collected:  { label: 'Not collected', tone: 'is-warn',   note: false },
-  cancelled:      { label: 'Cancelled',     tone: 'is-active', note: false },
+  collected:      { label: 'Collected',     note: true  },
+  late_collected: { label: 'Late',          note: true  },
+  not_collected:  { label: 'Not collected', note: false },
+  cancelled:      { label: 'Cancelled',     note: false },
 };
+
+const kindLabel = (kind) => {
+  if (!kind) return '';
+  if (kind === 'ecd') return 'ECD';
+  const words = kind.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+// collected_at for the two that moved; dispatch_date for the two that
+// did not, which is the only date those rows have.
+const dateOf = (row) => row.collected_at ?? row.dispatch_date;
+
+const SORTS = [
+  { key: 'newest', label: 'Newest first', compare: byNewest(dateOf) },
+  { key: 'oldest', label: 'Oldest first', compare: byOldest(dateOf) },
+  { key: 'recipient', label: 'Recipient A to Z', compare: byText((r) => r.ecd_name) },
+];
+const FILTERS = [
+  { key: 'status', label: 'Status', valueOf: (r) => r.status, labelOf: (v) => STATUS_META[v]?.label ?? v },
+  { key: 'recipient', label: 'Went to', valueOf: (r) => r.ecd_name },
+  { key: 'kind', label: 'Type', valueOf: (r) => r.beneficiary_kind, labelOf: kindLabel },
+  { key: 'driver', label: 'Driver', valueOf: (r) => r.driver_name },
+];
+const searchText = (r) => [r.ecd_name, r.pallet_ref, r.driver_name].filter(Boolean).join(' ');
 
 export default function StaffDispatchHistoryPage() {
   const navigate = useNavigate();
@@ -75,11 +91,6 @@ export default function StaffDispatchHistoryPage() {
     return () => { cancelled = true; };
   }, [range]);
 
-  // A month of dispatches is the reason this screen needed paging
-  // first: the range selector goes to 'month' and the list does not
-  // end.
-  const paged = usePaged(history);
-
   const openPdf = async (eventId) => {
     setOpeningId(eventId);
     setError(null);
@@ -98,82 +109,47 @@ export default function StaffDispatchHistoryPage() {
       crumb="Dispatch / History"
       onBack={() => navigate(STAFF.dispatch)}
     >
-      <div className="stf-step">
-        <div className="stf-step-head">
-          <h1 className="stf-step-title" tabIndex={-1}>Dispatch history</h1>
-          <p className="stf-step-sub">
-            Every dispatch that's been closed off — collected, late, not collected
-            or cancelled — most recent first. Pallets still waiting are on the gate queue.
-          </p>
-        </div>
-
-        {error ? <Notice tone="warn">{error}</Notice> : null}
-
-        <div className="stf-segments" role="tablist" aria-label="Date range">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              role="tab"
-              aria-selected={range === r.key}
-              className={`stf-segment${range === r.key ? ' is-active' : ''}`}
-              onClick={() => setRange(r.key)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="stf-skeleton" aria-label="Loading" />
-        ) : history.length === 0 ? (
-          <div className="stf-empty">
-            No dispatches recorded in this range yet.
-          </div>
-        ) : (
-          <div className="stf-list">
-            {paged.slice.map((row) => (
-              <div key={row.dispatch_event_id} className="stf-row is-static">
-                <span className="stf-row-main">
-                  <span className="stf-row-title">
-                    {row.ecd_name}
-                    {row.pallet_ref ? ` · ${row.pallet_ref}` : ''}
-                  </span>
-                  <span className="stf-row-meta">
-                    {/* collected_at for the two that moved; dispatch_date
-                        for the two that did not, which is the only date
-                        those rows have. */}
-                    {formatDate(row.collected_at ?? row.dispatch_date)}
-                    {row.driver_name ? ` · ${row.driver_name}` : ''}
-                    {row.beneficiary_kind && row.beneficiary_kind !== 'ecd'
-                      ? ` · ${row.beneficiary_kind.replace(/_/g, ' ')}`
-                      : ''}
-                  </span>
-                </span>
-                <span className={`stf-badge ${STATUS_META[row.status]?.tone ?? 'is-active'}`}>
-                  {STATUS_META[row.status]?.label ?? row.status}
-                </span>
-                {STATUS_META[row.status]?.note ? (
-                  <button
-                    type="button"
-                    className="stf-btn stf-btn-secondary"
-                    onClick={() => openPdf(row.dispatch_event_id)}
-                    disabled={openingId === row.dispatch_event_id}
-                  >
-                    {openingId === row.dispatch_event_id ? 'Opening…' : 'View note'}
-                  </button>
-                ) : (
-                  /* No note exists for a pallet that never left — the
-                     reason is what there is to show instead. */
-                  <span className="stf-row-meta">{row.override_reason || '—'}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <Paged {...paged} noun="dispatches" />
-      </div>
+      <HistoryScreen
+        title="Dispatch history"
+        sub="Every dispatch that's been closed off. Pallets still waiting are on the gate queue."
+        error={error}
+        range={range}
+        onRangeChange={setRange}
+        loading={loading}
+        rows={history}
+        rowKey={(row) => row.dispatch_event_id}
+        search={searchText}
+        searchPlaceholder="Search by recipient, pallet or driver"
+        searchId="stf-dispatch-search"
+        sorts={SORTS}
+        filters={FILTERS}
+        empty="No dispatches recorded in this range yet."
+        noun="dispatches"
+        renderRow={(row) => {
+          const meta = STATUS_META[row.status];
+          return (
+            <HistoryRow
+              title={`${row.ecd_name}${row.pallet_ref ? ` · ${row.pallet_ref}` : ''}`}
+              meta={[
+                formatDate(dateOf(row)),
+                row.driver_name,
+                row.beneficiary_kind && row.beneficiary_kind !== 'ecd' ? kindLabel(row.beneficiary_kind) : null,
+                // No note exists for a pallet that never left; the
+                // reason is what there is to show instead.
+                !meta?.note && row.override_reason ? row.override_reason : null,
+              ].filter(Boolean).join(' · ')}
+              badges={(
+                <StatusBadge {...workerStatus('dispatch', row.status)}>
+                  {meta?.label ?? row.status}
+                </StatusBadge>
+              )}
+              action={meta?.note
+                ? { label: 'View note', onClick: () => openPdf(row.dispatch_event_id), busy: openingId === row.dispatch_event_id }
+                : null}
+            />
+          );
+        }}
+      />
 
       {pdfNote ? (
         <DispatchNotePDF note={pdfNote} onClose={() => setPdfNote(null)} />

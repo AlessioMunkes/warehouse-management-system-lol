@@ -190,6 +190,26 @@ const updatePendingDonationStatus = async (id, status, extraFields = {}, client 
   return result.rows[0] || null;
 };
 
+// Takes a donation for retry in ONE conditional UPDATE: only a row still in
+// commit_failed / commit_incomplete moves to 'committing', and RETURNING
+// says which of the two it was. Two retries arriving together both run
+// this; Postgres lets one update the row and makes the other re-check the
+// status after it, so the second matches nothing and gets null. Without
+// that, both could go on to create the donation, doubling the stock and
+// sending the donor two thank-you emails.
+const claimPendingDonationForRetry = async (id, client = pool) => {
+  const result = await client.query(
+    `UPDATE pending_donations p
+        SET status = 'committing', updated_at = NOW()
+       FROM (SELECT id, status FROM pending_donations WHERE id = $1) prev
+      WHERE p.id = prev.id
+        AND p.status IN ('commit_failed', 'commit_incomplete')
+      RETURNING p.*, prev.status AS previous_status;`,
+    [id]
+  );
+  return result.rows[0] || null;
+};
+
 const lockPendingDonationForUpdate = async (id, client) => {
   if (!client) {
     throw new Error('lockPendingDonationForUpdate requires an explicit client instance.');
@@ -460,12 +480,40 @@ const listPendingDonationsByStatus = async (statuses = [], client = pool) => {
   return result.rows;
 };
 
+// The donations one worker recorded, newest first, for their own
+// History on the floor: what they filled in and where it has got to.
+// `from` is a calendar date (YYYY-MM-DD) or null for everything. Only
+// the columns that screen shows, plus how many lines are still waiting
+// on a manager; the full record is getPendingDonationById.
+const listPendingDonationsByCreator = async (userId, { from = null } = {}, client = pool) => {
+  const result = await client.query(
+    `SELECT d.id, d.status, d.created_at, d.committed_at, d.cancelled_at,
+            d.donor_name, d.donor_first_name, d.donor_last_name,
+            d.estimated_value_zar, d.donation_category, d.section18a_requested,
+            d.committed_donation_id,
+            COUNT(i.id)::int AS item_count,
+            COUNT(i.id) FILTER (WHERE i.status = 'awaiting_resolution')::int AS awaiting_count,
+            COUNT(i.id) FILTER (WHERE i.status = 'rejected')::int AS rejected_count
+       FROM pending_donations d
+       LEFT JOIN pending_donation_items i ON i.pending_donation_id = d.id
+      WHERE d.created_by = $1
+        AND ($2::date IS NULL OR (d.created_at AT TIME ZONE 'Africa/Johannesburg')::date >= $2::date)
+      GROUP BY d.id
+      ORDER BY d.created_at DESC, d.id DESC
+      LIMIT 500;`,
+    [userId, from]
+  );
+  return result.rows;
+};
+
 export default {
+  listPendingDonationsByCreator,
   findPendingDonationIdByIdempotencyKey,
   createPendingDonation,
   createPendingDonationItems,
   getPendingDonationById,
   updatePendingDonationStatus,
+  claimPendingDonationForRetry,
   lockPendingDonationForUpdate,
   lockWarehouseManagerFlagForUpdate,
   createWarehouseManagerFlag,

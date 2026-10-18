@@ -26,9 +26,11 @@
 // ─────────────────────────────────────────────────────────────
 import pool         from '../config/db.js';
 import { logAudit } from './auditLog.repository.js';
+import { runInWarehouse, currentWarehouse } from '../config/warehouseContext.js';
+import { warehouseCodes } from '../config/warehouses.js';
 
 const USER_COLUMNS = `
-  u.id, u.username, u.first_name, u.last_name, u.role, u.is_active,
+  u.id, u.username, u.first_name, u.last_name, u.email, u.role, u.is_active,
   u.archived_at
 `;
 
@@ -37,6 +39,7 @@ const UPDATABLE = {
   username:  'username',
   firstName: 'first_name',
   lastName:  'last_name',
+  email:     'email',
   role:      'role',
 };
 
@@ -89,6 +92,33 @@ const findUserByUsername = async (username, { excludeId = null } = {}) => {
     sql += ` AND u.id <> $${params.length}`;
   }
   const { rows } = await pool.query(sql, params);
+  if (rows[0]) return rows[0];
+
+  // Multi-warehouse: login matches a username in EVERY warehouse, so a
+  // username must belong to one person across all sites. Check the
+  // other warehouses too. excludeId only applies here: ids are per site.
+  // Fails closed: if another site's database cannot be checked, the
+  // error stops the account being created rather than risking a clash.
+  const here = currentWarehouse();
+  if (!here) return null;
+  for (const code of warehouseCodes().filter((c) => c !== here)) {
+    const { rows: elsewhere } = await runInWarehouse(code, () => pool.query(
+      `SELECT ${USER_COLUMNS} FROM users u WHERE lower(u.username) = lower($1)`,
+      [username],
+    ));
+    if (elsewhere[0]) return { ...elsewhere[0], warehouse: code };
+  }
+  return null;
+};
+
+// Same case-insensitive reasoning as findUserByUsername. Used by
+// userInvite.service.js (stop inviting an address that already belongs
+// to an account) and user.service.js (stop two accounts sharing one).
+const findUserByEmail = async (email) => {
+  const { rows } = await pool.query(
+    `SELECT id, username, email FROM users WHERE lower(email) = lower($1)`,
+    [email]
+  );
   return rows[0] ?? null;
 };
 
@@ -99,10 +129,10 @@ const insertUser = async (payload, actorId) => {
     await client.query('BEGIN');
 
     const { rows } = await client.query(
-      `INSERT INTO users (username, first_name, last_name, role, password_hash, is_active)
-       VALUES ($1,$2,$3,$4,$5,true)
+      `INSERT INTO users (username, first_name, last_name, role, password_hash, email, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,true)
        RETURNING ${USER_COLUMNS.replace(/u\./g, '')}`,
-      [payload.username, payload.firstName, payload.lastName, payload.role, payload.passwordHash]
+      [payload.username, payload.firstName, payload.lastName, payload.role, payload.passwordHash, payload.email ?? null]
     );
     const user = rows[0];
 
@@ -260,6 +290,7 @@ export default {
   listUsers,
   getUserById,
   findUserByUsername,
+  findUserByEmail,
   insertUser,
   updateUser,
   setUserActive,

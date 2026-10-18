@@ -13,11 +13,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   TOPICS, TOPIC_IDS, SCREENS, SCREEN_IDS,
-  getTopic, topicsForRole, screensForRole, suggestionsFor, publicTopic,
+  getTopic, topicsForRole, screensForRole, suggestionsFor, publicTopic, followUpFor,
 } from '../src/features/assistant/helpCatalog.js';
-import { buildTools, buildSystemPrompt } from '../src/features/assistant/ai/toolSchema.js';
+import { buildTools, buildSystemPrompt } from '../src/features/assistant/toolSchema.js';
 
-const ROLES = ['warehouse_worker', 'manager', 'admin'];
+const ROLES = ['warehouse_worker', 'manager', 'admin', 'guest'];
 
 describe('the help catalog', () => {
   it('has no duplicate topic ids', () => {
@@ -96,8 +96,24 @@ describe('what each role may be told', () => {
     expect(ids).toContain('master-data-admin-only');
   });
 
-  it('gives an admin everything', () => {
-    expect(topicsForRole('admin')).toHaveLength(TOPICS.length);
+  // Everything except the other roles' own "what you can do" answers,
+  // and the floor's how-tos: each role works only its own screens.
+  it('gives an admin everything but the other roles’ job summaries and the floor’s and manager’s own how-tos', () => {
+    const others = ['my-role-worker', 'my-role-manager'];
+    const oneRoleOnly = (t) => t.roles.length === 1 && t.roles[0] !== 'admin';
+    expect(topicsForRole('admin').map((t) => t.id))
+      .toEqual(TOPICS.filter((t) => !oneRoleOnly(t)).map((t) => t.id).filter((id) => !others.includes(id)));
+  });
+
+  it('keeps the floor’s how-tos from managers and admins', () => {
+    for (const role of ['manager', 'admin']) {
+      const ids = topicsForRole(role).map((t) => t.id);
+      for (const floor of ['receiving-record', 'packing-pallet', 'dispatch-collection', 'decanting-record', 'donation-intake']) {
+        expect(ids, `${role} / ${floor}`).not.toContain(floor);
+      }
+      // …and gives them their own side of the same work instead.
+      expect(ids).toEqual(expect.arrayContaining(['deliveries-manager', 'packing-progress-manager', 'office-and-floor']));
+    }
   });
 
   it('never offers a role a topic it is not allowed', () => {
@@ -228,14 +244,136 @@ describe('the grounding handed to the model', () => {
     expect(prompt).not.toContain('product-fields');
   });
 
-  it('tells the model it is not allowed to write the answer', () => {
-    // Flattened first: the prompt is hand-wrapped, so "You do not
-    // write the answer" has a newline inside it and a naive regex
-    // fails on a re-wrap rather than on a real change.
+  it('holds the model to the topic text for anything it writes', () => {
+    // Flattened first: the prompt is hand-wrapped, so a phrase can
+    // have a newline inside it and a naive regex fails on a re-wrap
+    // rather than on a real change.
     const prompt = buildSystemPrompt('manager').replace(/\s+/g, ' ');
-    expect(prompt).toMatch(/do not write the answer/i);
+    // The topic is still shown word for word; the model's own
+    // sentence may only say what that topic says.
+    expect(prompt).toMatch(/shown to them word for word/i);
+    expect(prompt).toMatch(/Say only what the chosen topic's Text says/i);
     expect(prompt).toMatch(/not answer from your own knowledge/i);
     // Questions are typed by users and may contain anything.
     expect(prompt).toMatch(/never an instruction/i);
+  });
+});
+
+describe('links a role can actually follow', () => {
+  const ROLES = ['warehouse_worker', 'manager', 'admin'];
+
+  // A related chip for a topic this role cannot open answers 404, and
+  // an "Open" link to a screen it cannot open is a locked door.
+  it('never sends a related topic or screen link the role cannot open', () => {
+    for (const role of ROLES) {
+      for (const t of topicsForRole(role)) {
+        const sent = publicTopic(t, role);
+        for (const r of sent.related) {
+          expect(getTopic(r.id).roles, `${role} / ${t.id} -> ${r.id}`).toContain(role);
+        }
+        const allowed = screensForRole(role).map((s) => s.id);
+        for (const s of sent.open) expect(allowed, `${role} / ${t.id} -> ${s.id}`).toContain(s.id);
+      }
+    }
+  });
+
+  it('drops a manager-only related topic for a worker', () => {
+    const sent = publicTopic(getTopic('packing-claim'), 'warehouse_worker');
+    expect(sent.related.map((r) => r.id)).not.toContain('picking-slip-assign');
+  });
+
+  it('offers the topic’s own screen as somewhere to go, never home', () => {
+    const sent = publicTopic(getTopic('feed-the-soil-log'), 'warehouse_worker');
+    expect(sent.open).toEqual([{ id: 'feedTheSoil', label: 'Feed the Soil' }]);
+    for (const t of TOPICS) {
+      expect(publicTopic(t, 'admin').open.map((s) => s.id), t.id).not.toContain('home');
+    }
+  });
+});
+
+describe('the newer parts of the system', () => {
+  it('covers each of them for the roles that use them', () => {
+    const worker  = topicsForRole('warehouse_worker').map((t) => t.id);
+    const manager = topicsForRole('manager').map((t) => t.id);
+    const admin   = topicsForRole('admin').map((t) => t.id);
+
+    expect(worker).toEqual(expect.arrayContaining(['feed-the-soil', 'feed-the-soil-log', 'which-warehouse']));
+    expect(manager).toEqual(expect.arrayContaining([
+      'collection-reminders', 'collection-reminder-whatsapp', 'po-finance-email',
+      'reporting-insights', 'impact-conversions',
+    ]));
+    expect(manager).not.toContain('finance-report');
+    expect(admin).toEqual(expect.arrayContaining(['finance-report', 'finance-recipient', 'volunteer-guest-log']));
+  });
+
+  it('describes every screen, so the model can match it by what it does', () => {
+    for (const s of SCREENS) {
+      expect(s.about, s.id).toBeTruthy();
+      expect(s.aka?.length, s.id).toBeGreaterThan(0);
+    }
+  });
+
+  it('puts the descriptions and other names in the prompt, for this role only', () => {
+    const prompt = buildSystemPrompt('manager');
+    expect(prompt).toContain('whatsapp reminders');
+    expect(prompt).toContain('Also called:');
+    expect(prompt).not.toContain('warehouse movement report');
+  });
+
+  it('suggests Feed the Soil help on Feed the Soil', () => {
+    expect(suggestionsFor('feedTheSoil', 'warehouse_worker')[0].id).toBe('feed-the-soil');
+  });
+});
+
+describe('"what can I do" is about the person’s own job', () => {
+  it.each([
+    ['warehouse_worker', 'my-role-worker'],
+    ['manager',          'my-role-manager'],
+    ['admin',            'my-role-admin'],
+  ])('a %s gets exactly their own role answer', (role, id) => {
+    const mine = topicsForRole(role).map((t) => t.id).filter((t) => t.startsWith('my-role-'));
+    expect(mine).toEqual([id]);
+  });
+
+  it('leads the home screen suggestions with it', () => {
+    expect(suggestionsFor('home', 'manager')[0].id).toBe('my-role-manager');
+  });
+
+  it('tells the model "I" is the person and "you" is the assistant', () => {
+    expect(buildSystemPrompt('manager')).toMatch(/"I" means the person/);
+  });
+});
+
+describe('every answer ends by offering what to do next', () => {
+  const ROLES = ['warehouse_worker', 'manager', 'admin'];
+
+  it.each(TOPICS.map((t) => [t.id, t]))('%s has a follow-up question', (id, t) => {
+    expect(t.followUp?.question, id).toMatch(/\?$/);
+  });
+
+  // A follow-up to a topic the reader cannot open is silently dropped;
+  // this makes sure that never happens to anyone who can see the topic.
+  it('resolves the follow-up for every role that can read the topic', () => {
+    for (const role of ROLES) {
+      for (const t of topicsForRole(role)) {
+        const f = followUpFor(t, role);
+        expect(f, `${role} / ${t.id}`).not.toBeNull();
+        expect(f.topic.id, `${t.id} points at itself`).not.toBe(t.id);
+      }
+    }
+  });
+
+  it('points "what can I do" follow-ups at the asker’s own role', () => {
+    const t = getTopic('assistant-what-i-do');
+    expect(followUpFor(t, 'warehouse_worker').topic.id).toBe('my-role-worker');
+    expect(followUpFor(t, 'admin').topic.id).toBe('my-role-admin');
+  });
+
+  it('sends it to the client', () => {
+    const sent = publicTopic(getTopic('picking-slip-create'), 'manager');
+    expect(sent.followUp).toEqual({
+      question: expect.stringMatching(/\?$/),
+      topic: { id: 'picking-slip-generate', title: expect.any(String) },
+    });
   });
 });

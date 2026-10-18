@@ -33,20 +33,28 @@ import {
 import {
   GuestShell, GuestScreen, PlaceBar, Button, ButtonRow, Notice,
   StatusPill, Progress, Counter, HelpNote, Loading,
-} from '../features/guest/components/GuestPrimitives';
+  ItemList, ItemRow, ItemSteps,
+} from '../features/guest/GuestPrimitives';
 import { formatDay, displayName } from '../features/guest/guestFormat';
+import { fmtQty } from '../lib/quantity';
+import { takeFirstText } from '../features/packing/takeFirst';
+import { useT } from '../translations';
 
 // Plain words. No "variance", no "SKU", no "cohort" — ACC-09.
+// `value` is what is saved and what staff screens and reports read, so
+// it stays in English whatever language the volunteer reads; `label` is
+// a key in translations/messages.js.
 const PROBLEM_REASONS = [
-  { value: 'Short quantity',  label: 'There isn’t enough of it' },
-  { value: 'Damaged stock',   label: 'It looks damaged or spoiled' },
-  { value: 'Substituted item', label: 'I packed something else instead' },
-  { value: 'Other',           label: 'Something else' },
+  { value: 'Short quantity',  label: 'guest.pack.reason.short' },
+  { value: 'Damaged stock',   label: 'guest.pack.reason.damaged' },
+  { value: 'Substituted item', label: 'guest.pack.reason.substituted' },
+  { value: 'Other',           label: 'guest.pack.reason.other' },
 ];
 
 const GuestPackPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const t = useT();
 
   const [slip, setSlip]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,8 +68,14 @@ const GuestPackPage = () => {
   // Deriving it during render means it is never briefly wrong.
   const [qtyFor, setQtyFor] = useState(null);   // { itemId, value }
   const [reason, setReason] = useState('');
+  // The problem screen's own count. Starts at 0 each time, like the
+  // worker's flag counter: a short or damaged item should not arrive
+  // pre-filled with the full amount the slip asked for.
+  const [flagQty, setFlagQty] = useState(0);
+  const [note, setNote] = useState('');          // optional word for staff
   const [busy, setBusy]   = useState(false);
   const [saidSo, setSaidSo] = useState(null);   // the confirmation after every action
+  const [focusId, setFocusId] = useState(null);  // which pending item is on screen
 
   const load = useCallback(async () => {
     try {
@@ -81,8 +95,13 @@ const GuestPackPage = () => {
   const items    = slip?.items ?? [];
   const total    = items.length;
   const done     = items.filter((i) => i.status !== 'pending').length;
-  // The next thing to deal with — progressive disclosure in one line.
-  const current  = items.find((i) => i.status === 'pending') ?? null;
+  // The item on screen: the one they stepped to, else the first still to
+  // do. Previous / next move among the items still to do, as on the
+  // worker's guided view; with no stepping it is the first, as before.
+  const pending   = items.filter((i) => i.status === 'pending');
+  const foundAt   = pending.findIndex((i) => i.id === focusId);
+  const activeAt  = foundAt >= 0 ? foundAt : 0;
+  const current   = pending[activeAt] ?? null;
   const allDone  = total > 0 && done === total;
 
   // Defaults to what the slip asks for, until this volunteer changes it.
@@ -91,31 +110,34 @@ const GuestPackPage = () => {
     : (Number(current?.required_quantity) || 0);
   const setQty = (value) => setQtyFor({ itemId: current?.id, value });
 
-  if (loading) return <GuestShell><Loading label="Loading your pallet" /></GuestShell>;
+  if (loading) return <GuestShell nav><Loading label={t('guest.pack.loading')} /></GuestShell>;
 
   // No pallet — a dead end, so it gets a way out.
   if (!slip) {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
-          title="You don’t have a pallet yet"
-          lede="Pick one and we’ll get started."
+          title={t('guest.pack.noneTitle')}
+          lede={t('guest.pack.noneLede')}
         >
           {error ? <Notice tone="info">{error}</Notice> : null}
-          <Button onClick={() => navigate('/guest-home')}>See today’s pallets</Button>
+          <Button onClick={() => navigate('/guest-home')}>{t('guest.pack.seePallets')}</Button>
           <HelpNote />
         </GuestScreen>
       </GuestShell>
     );
   }
 
-  const beneficiary = slip.beneficiary_name || slip.ecd_name || 'a community partner';
+  const beneficiary = slip.ecd_name || slip.beneficiary_name || t('guest.kind.other');
 
   const act = async (fn, successMessage) => {
     setBusy(true);
     setError(null);
+    // Move on to the item after this one, as the worker's guided view does.
+    const nextId = (pending[activeAt + 1] ?? pending.find((i) => i.id !== current?.id))?.id ?? null;
     try {
       await fn();
+      setFocusId(nextId);
       setSaidSo(successMessage);       // confirmation after every action
       setMode('item');
       setReason('');
@@ -139,7 +161,15 @@ const GuestPackPage = () => {
       // this volunteer actually just worked through — never placeholders.
       const packed  = items.filter((i) => i.status === 'confirmed');
       const flagged = items.filter((i) => i.status === 'flagged');
-      const units   = packed.reduce((sum, i) => sum + (Number(i.packed_quantity) || 0), 0);
+      // Things put into the box: every can or bag counts, and a line
+      // that is weighed or poured counts once. Adding 2.1 kg of cabbage
+      // to 5 cans gave "27.040000000000003 items".
+      const WEIGHED = ['kg', 'g', 'l', 'ml'];
+      const units   = Math.round(packed.reduce((sum, i) => {
+        const quantity = Number(i.packed_quantity) || 0;
+        if (quantity <= 0) return sum;
+        return sum + (WEIGHED.includes(i.unit) ? 1 : quantity);
+      }, 0));
 
       navigate('/guest/done', {
         replace: true,
@@ -168,21 +198,18 @@ const GuestPackPage = () => {
   // nothing, wondering what they did wrong. Say it in words instead.
   if (total === 0) {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
-          title="This pallet is empty"
-          lede={`There is nothing listed for ${beneficiary} yet, so there is nothing to pack right now.`}
+          title={t('guest.pack.emptyTitle')}
+          lede={t('guest.pack.emptyLede', { beneficiary })}
         >
           <PlaceBar items={[
-            { text: 'Packing for' }, { text: beneficiary, strong: true },
-            { text: `Going out ${formatDay(slip.dispatch_date)}` },
+            { text: t('guest.pack.packingFor') }, { text: beneficiary, strong: true },
+            { text: t('guest.card.goingOut', { day: formatDay(slip.dispatch_date, t) }) },
           ]} />
-          <Notice tone="info">
-            This is not something you have done wrong — the list for this pallet
-            has not been set up yet. A staff member needs to sort it out.
-          </Notice>
-          <Button onClick={() => navigate('/guest-home')}>Pick a different pallet</Button>
-          <HelpNote>Please let a staff member know about this one.</HelpNote>
+          <Notice tone="info">{t('guest.pack.emptyNotice')}</Notice>
+          <Button onClick={() => navigate('/guest-home')}>{t('guest.pack.backHome')}</Button>
+          <HelpNote>{t('guest.pack.emptyHelp')}</HelpNote>
         </GuestScreen>
       </GuestShell>
     );
@@ -191,20 +218,20 @@ const GuestPackPage = () => {
   // ── Everything done — offer to close it ─────────────────────
   if (allDone) {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
-          title="That’s everything"
-          lede={`You have been through all ${total} item${total === 1 ? '' : 's'}. One last step.`}
+          title={t('guest.pack.allDoneTitle')}
+          lede={t.n('guest.pack.allDoneLede', total)}
         >
           <PlaceBar items={[
-            { text: 'Packing for' }, { text: beneficiary, strong: true },
+            { text: t('guest.pack.packingFor') }, { text: beneficiary, strong: true },
           ]} />
           <Progress done={done} total={total} />
           {error ? <Notice tone="warn">{error}</Notice> : null}
-          <Button onClick={finish} disabled={busy}>
-            {busy ? 'Finishing…' : 'Finish this pallet'}
+          <Button onClick={finish} disabled={busy} loading={busy}>
+            {busy ? t('guest.pack.finishing') : t('guest.pack.finish')}
           </Button>
-          <HelpNote>Spotted something you want to change first?</HelpNote>
+          <HelpNote>{t('guest.pack.allDoneHelp')}</HelpNote>
         </GuestScreen>
       </GuestShell>
     );
@@ -213,15 +240,15 @@ const GuestPackPage = () => {
   // ── Reporting a problem ─────────────────────────────────────
   if (mode === 'problem') {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
-          title="What’s wrong with it?"
-          lede="Whatever you pick, it gets passed to a staff member. Nothing here is a mistake on your part."
+          title={t('guest.pack.problemTitle')}
+          lede={t('guest.pack.problemLede')}
         >
           <PlaceBar items={[{ text: current.product_name, strong: true }]} />
 
-          <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-            <legend className="gst-sr">Why is there a problem?</legend>
+          <fieldset className="gst-fieldset">
+            <legend className="gst-sr">{t('guest.pack.problemLegend')}</legend>
             <div className="gst-stack-tight">
               {PROBLEM_REASONS.map((r) => (
                 <button
@@ -231,15 +258,27 @@ const GuestPackPage = () => {
                   aria-pressed={reason === r.value}
                   onClick={() => setReason(r.value)}
                 >
-                  <span className="gst-card-title" style={{ fontSize: '1rem' }}>
-                    {reason === r.value ? '✓ ' : ''}{r.label}
+                  <span className="gst-card-title gst-choice-label">
+                    {reason === r.value ? '✓ ' : ''}{t(r.label)}
                   </span>
                 </button>
               ))}
             </div>
           </fieldset>
 
-          <Counter label="How many did you actually pack?" value={qty} onChange={setQty} />
+          <Counter label={t('guest.pack.actuallyPacked')} value={flagQty} onChange={setFlagQty} />
+
+          <div className="gst-field">
+            <label className="gst-label" htmlFor="gst-flag-note">{t('guest.pack.noteLabel')}</label>
+            <textarea
+              id="gst-flag-note"
+              className="gst-input gst-textarea"
+              rows={2}
+              maxLength={200}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
 
           {error ? <Notice tone="warn">{error}</Notice> : null}
 
@@ -247,14 +286,13 @@ const GuestPackPage = () => {
             <Button
               disabled={!reason || busy}
               onClick={() => act(
-                () => flagItem(slip.id, current.id, reason, qty),
-                `Thanks — a staff member will look at the ${current.product_name}.`,
-              )}
-            >
-              {busy ? 'Saving…' : 'Report it'}
+                () => flagItem(slip.id, current.id, reason, flagQty, note.trim() || undefined),
+                t('guest.pack.reported', { product: current.product_name }),
+              )} loading={busy}>
+              {busy ? t('guest.pack.saving') : t('guest.pack.reportIt')}
             </Button>
             <Button variant="ghost" onClick={() => { setMode('item'); setReason(''); }} disabled={busy}>
-              Back
+              {t('guest.pack.back')}
             </Button>
           </ButtonRow>
 
@@ -265,18 +303,15 @@ const GuestPackPage = () => {
   }
 
   // ── The one item in front of them ───────────────────────────
+  // The worker's guided view, in guest words: the pallet as the heading,
+  // a progress bar with n / n, one item in a rounded list with its
+  // counter and buttons under it, previous / next below.
   return (
-    <GuestShell>
+    <GuestShell nav>
       <GuestScreen
-        title={current.product_name}
-        lede={`Put ${current.required_quantity} ${current.unit || ''} into the box.`.replace(/\s+/g, ' ')}
+        title={beneficiary}
+        lede={t('guest.pack.itemLede', { day: formatDay(slip.dispatch_date, t) })}
       >
-        {/* Constant sense of place: what, for whom, how far through. */}
-        <PlaceBar items={[
-          { text: 'For' }, { text: beneficiary, strong: true },
-          { text: `Going out ${formatDay(slip.dispatch_date)}` },
-        ]} />
-
         <Progress done={done} total={total} />
 
         {/* Confirmation after every action — never leave someone
@@ -284,39 +319,54 @@ const GuestPackPage = () => {
         {saidSo ? <Notice tone="good">{saidSo}</Notice> : null}
         {error ? <Notice tone="warn">{error}</Notice> : null}
 
-        <div className="gst-card gst-animate-rise" key={current.id}>
-          <p className="gst-card-meta">Item {done + 1} of {total}</p>
-          <h2 className="gst-card-title" style={{ fontSize: '1.375rem' }}>{current.product_name}</h2>
-          <p className="gst-card-meta">
-            You need <strong>{current.required_quantity} {current.unit || ''}</strong>.
-            Take from the oldest stock first.
-          </p>
-        </div>
-
-        <Counter label="How many did you pack?" value={qty} onChange={setQty} />
-
-        <ButtonRow>
-          <Button
-            disabled={busy}
-            onClick={() => act(
-              () => confirmItem(slip.id, current.id, qty),
-              `${current.product_name} — packed. Nice one, ${displayName(user?.firstName)}.`,
-            )}
+        <ItemList>
+          <ItemRow
+            key={current.id}
+            // Counted among the items still to do, like the worker's guided
+            // view, so it always matches the Previous / Next count below.
+            position={t('guest.pack.itemOf', { n: activeAt + 1, all: pending.length })}
+            title={current.product_name}
+            meta={[
+              t('guest.pack.putInBox', { qty: fmtQty(current.required_quantity, current.unit === 'each' ? '' : (current.unit || '')) }).replace(/\s+/g, ' '),
+              // FEFO, in the same words the staff screen and the printed slip use.
+              takeFirstText(current) ? `${takeFirstText(current)}.` : '',
+            ].filter(Boolean).join(' ')}
           >
-            {busy ? 'Saving…' : 'Packed it'}
-          </Button>
-          <Button variant="secondary" onClick={() => setMode('problem')} disabled={busy}>
-            There’s a problem
-          </Button>
-        </ButtonRow>
+            <Counter label={t('guest.pack.howMany')} value={qty} onChange={setQty} />
+
+            <ButtonRow>
+              <Button
+                disabled={busy}
+                onClick={() => act(
+                  () => confirmItem(slip.id, current.id, qty),
+                  t('guest.pack.packedNice', { product: current.product_name, name: displayName(user?.firstName, t) }),
+                )} loading={busy}>
+                {busy ? t('guest.pack.saving') : t('guest.pack.packedIt')}
+              </Button>
+              <Button variant="secondary" onClick={() => { setFlagQty(0); setNote(''); setMode('problem'); }} disabled={busy}>
+                {t('guest.pack.problem')}
+              </Button>
+            </ButtonRow>
+          </ItemRow>
+        </ItemList>
+
+        {pending.length > 1 ? (
+          <ItemSteps
+            index={activeAt}
+            count={pending.length}
+            disabled={busy}
+            onPrevious={() => { setSaidSo(null); setFocusId(pending[activeAt - 1].id); }}
+            onNext={() => { setSaidSo(null); setFocusId(pending[activeAt + 1].id); }}
+          />
+        ) : null}
 
         {/* What has been dealt with so far, so the screen is a record
             and not just a conveyor belt. Marks and words, never colour
             alone (ACC-03). */}
         {done > 0 ? (
           <details className="gst-card gst-card-quiet">
-            <summary style={{ minHeight: 'var(--gst-tap)', display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 700 }}>
-              What you’ve done so far ({done})
+            <summary className="gst-summary">
+              {t('guest.pack.doneSoFar', { n: done })}
             </summary>
             <ul className="gst-done-list gst-stack-tight">
               {items.filter((i) => i.status !== 'pending').map((i) => (

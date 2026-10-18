@@ -1,20 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/components/layout/StaffShell.jsx
+// @sentinel script-49-staff-shell-in-app
 //
-// The frame every warehouse-staff page sits in: dark app bar,
-// breadcrumb line, the single content column, the tab bar, and the
-// doodle banner footer.
+// The frame every warehouse-staff page sits in. It uses the same app
+// layout as the rest of the system (ManagerLayout: sidebar on a desk,
+// menu drawer on a phone, top bar with the bell, "reduce movement" and
+// log out), then adds the staff page header and the bottom tab bar.
 //
-// Why this exists rather than reusing features/*/components/PageHeader:
-// that header is a desktop bar with a back arrow, an avatar, a status
-// pill and a logout modal — four things competing for the top of a
-// 390px screen. The staff pages need two: who is logged in, and the
-// way back out of a slip. Everything else moved to the tab bar.
-//
-// PageHeader is untouched, so the manager screens keep it.
+// The tab bar only shows for warehouse workers; managers and admins
+// opening a floor screen already have the sidebar. Workers also get a
+// small pop-up when new pallets are put on the floor, except when they
+// are already on the Packing screen.
 // ─────────────────────────────────────────────────────────────
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -22,119 +21,172 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useAuth } from '../../context/AuthContext';
-import useReducedMotion from '../../features/staff/hooks/useReducedMotion';
+import ManagerLayout from './ManagerLayout';
 import StaffTabBar from './StaffTabBar';
+import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';
-import { AppNavDrawer } from '../../features/taskdashboard/components/AppNav';
+import useGoBack from './useGoBack';
+import useSpareSlipAlert from '../../features/staff/useSpareSlipAlert';
+import usePressFlash from '../../features/staff/usePressFlash';
+import useKeepAwake from '../../features/staff/useKeepAwake';
+import useAccountLanguage from '../../features/staff/useAccountLanguage';
+import useFloorTranslation from '../../features/staff/useFloorTranslation';
+import { useT } from '../../translations';
+import { STAFF } from '../../routes/paths';
 
-// Both live in client/public/, the same convention the landing page
-// uses for /images/BatchesLogo.png and /icons/*.svg — plain URLs, no
-// Vite import needed for what is effectively brand furniture.
-const LOGO_URL   = '/images/BatchesLogo.png';
-const BANNER_URL = '/images/banner-doodles.png';
+// 'Packing / Little Stars ECD' → title 'Packing', sub 'Little Stars ECD'.
+// The first segment is the task, which is what the new-style pages put
+// in their heading; the rest is where in the task you are.
+const splitCrumb = (crumb) => {
+  const parts = String(crumb ?? '').split(' / ');
+  return { title: parts[0], sub: parts.slice(1).join(' / ') };
+};
 
 export default function StaffShell({
   crumb,          // 'Receiving' or 'Packing / Little Stars ECD'
   meta,           // right-hand line: a date, a reference, a count
+  // { step, total } for a numbered flow, shown as progress bars in the
+  // page header. Leave out for pages without steps.
+  progress,
   onBack,         // omit for a task's first screen
   backLabel = 'Back',
   // The task flows are a single phone-width column. The week planner
-  // inside Decanting is a two-column form that needs the room, so it
-  // asks for the wide column rather than getting its own chrome —
-  // one app bar, one tab bar, everywhere.
+  // inside Decanting is a two-column form that needs the room.
   wide = false,
-  actions,        // extra controls for the crumb row (e.g. a mode switch)
+  actions,        // extra controls for the header row (e.g. History)
   children,
 }) {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const { reduced, toggle } = useReducedMotion();
+  const goBack = useGoBack();
+  const { pathname } = useLocation();
+  const { title, sub } = splitCrumb(crumb);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
+  // Only workers get the bottom tab bar; managers and admins use the
+  // sidebar. Log out, "reduce movement" and the bell are in the top bar.
+  const { user } = useAuth() ?? {};
+  const showTabBar = !user || user.role === 'warehouse_worker';
+
+  // Only workers are told about new pallets here; managers already get
+  // picking-slip notifications through their bell.
+  const isManager = user?.role === 'manager' || user?.role === 'admin';
+  const { spareCount, justArrived, dismiss } = useSpareSlipAlert(!isManager);
+  // The pressed button flashes, on every floor screen. The screen is
+  // kept awake inside a task, not on the home screen: a tablet left on
+  // the bench showing Home should still go to sleep.
+  usePressFlash(true);
+  // The language this worker chose follows them to this tablet.
+  useAccountLanguage(user?.role === 'warehouse_worker' ? user.id : null);
+  const t = useT();
+  // Everything on a floor screen that is not asked for by key is put
+  // into that language on the page.
+  useFloorTranslation(user?.role === 'warehouse_worker');
+  useKeepAwake(user?.role === 'warehouse_worker' && pathname !== STAFF.home);
+
+  // No pop-up on the Packing screen itself; its tabs already show it.
+  const onPackingPage = pathname.startsWith(STAFF.packing);
 
   return (
-    <div className="stf-shell">
-      <header className="stf-appbar">
-        <div className="stf-appbar-left">
-          {/* Everything the role can open. The tab bar below switches
-              between the four tasks; this reaches the rest without
-              backing out to /noc. No breakpoint on it — this shell has
-              no sidebar at any width. */}
-          <AppNavDrawer />
+    <ManagerLayout>
+      <div className={`stf-shell is-in-app${showTabBar ? '' : ' no-tabbar'}`}>
+        <OfflineBar />
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => navigate(-1)}
-                  aria-label="Go back"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Go back to previous page</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <main className={wide ? 'stf-main is-wide' : 'stf-main'}>
+          <header className="stf-page-head">
+            <div className="stf-page-head-left">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={goBack}
+                      aria-label={t('common.goBack')}
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('common.goBackHint')}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-          <div className="stf-appbar-brand">
-            <img className="stf-appbar-logo" src={LOGO_URL} alt="" aria-hidden="true" />
-            <span className="stf-appbar-name">Batches</span>
-            <span className="stf-appbar-prog">
-              {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Nourish Our Children'}
-            </span>
-          </div>
-        </div>
+              <div className="stf-page-head-text">
+                {onBack ? (
+                  // The label names where "back" goes and what it leaves.
+                  <button
+                    type="button"
+                    className="stf-page-back"
+                    onClick={onBack}
+                    aria-label={`${backLabel} · ${crumb}`}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden="true" />
+                    <span>{backLabel}</span>
+                  </button>
+                ) : null}
+                <p className="stf-page-title">{title}</p>
+                {sub ? <p className="stf-page-sub">{sub}</p> : null}
+              </div>
+            </div>
 
-        <div className="stf-appbar-actions">
-          {/* ACC-08. Labelled with what it does, not "reduce motion" —
-              the staff reading it are not describing an animation
-              system, they just want the screen to stop moving. */}
-          <button
-            type="button"
-            className="stf-appbar-btn"
-            aria-pressed={reduced}
-            onClick={toggle}
-          >
-            Less movement
-          </button>
-          <button type="button" className="stf-appbar-btn" onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-      </header>
+            {/* Step progress for numbered flows. */}
+            {progress ? (
+              <div
+                className="stf-crumb-progress"
+                role="progressbar"
+                aria-valuemin={1}
+                aria-valuemax={progress.total}
+                aria-valuenow={progress.step}
+                aria-label={`Step ${progress.step} of ${progress.total}`}
+              >
+                <span className="stf-crumb-progress-bars">
+                  {Array.from({ length: progress.total }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`stf-crumb-progress-bar${i < progress.step ? ' is-done' : ''}`}
+                    />
+                  ))}
+                </span>
+                <span className="stf-crumb-progress-label">Step {progress.step} of {progress.total}</span>
+              </div>
+            ) : null}
 
-      <div className="stf-crumb">
-        {onBack ? (
-          <button type="button" className="stf-crumb-back" onClick={onBack}>
-            {backLabel} · {crumb}
-          </button>
-        ) : (
-          <span>{crumb}</span>
-        )}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {actions}
-          {meta ? <span className="stf-crumb-meta">{meta}</span> : null}
-        </span>
+            {actions || meta ? (
+              <div className="stf-page-head-right">
+                {actions}
+                {meta ? <span className="stf-crumb-meta">{meta}</span> : null}
+              </div>
+            ) : null}
+          </header>
+
+          {justArrived.length > 0 && !onPackingPage ? (
+            <div className="stf-activity-toast" role="status">
+              <span className="stf-activity-toast-text">
+                {justArrived.length} new pallet{justArrived.length > 1 ? 's' : ''} assigned to the floor.
+              </span>
+              <button
+                type="button"
+                className="stf-activity-toast-btn"
+                onClick={() => { dismiss(); navigate(STAFF.packing); }}
+              >
+                View
+              </button>
+              <button
+                type="button"
+                className="stf-activity-toast-dismiss"
+                aria-label="Dismiss"
+                onClick={dismiss}
+              >
+                &times;
+              </button>
+            </div>
+          ) : null}
+
+          {children}
+        </main>
+
+        {showTabBar ? <StaffTabBar packingBadge={spareCount} /> : null}
       </div>
-
-      <OfflineBar />
-
-      <main className={wide ? 'stf-main is-wide' : 'stf-main'}>{children}</main>
-
-      <StaffTabBar />
-      <div
-        className="stf-footer"
-        aria-hidden="true"
-        style={{ backgroundImage: `url(${BANNER_URL})` }}
-      />
-    </div>
+    </ManagerLayout>
   );
 }

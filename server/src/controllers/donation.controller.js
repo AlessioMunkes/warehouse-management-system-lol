@@ -34,7 +34,7 @@ const listDonations = async (req, res) => {
 
 // ── Record a donation ────────────────────────────────────────
 // POST /api/donations
-// Body: { category, estimatedValueZar, items[], programmeCode?,
+// Body: { category, estimatedValueZar, items[],
 //         donorName?, donorContact?, donorTaxReference?,
 //         donorConsentGiven?, notes?, idempotencyKey? }
 // Returns: { donation, warnings, duplicate }.

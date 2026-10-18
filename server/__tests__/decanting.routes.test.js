@@ -20,6 +20,8 @@ import { ROLES } from '../src/middleware/auth.middleware.js';
 // ── Service mock ──────────────────────────────────────────────
 // Keys match the methods decanting.controller.js actually calls.
 const decantingServiceMock = {
+  // Runs before a calculation: refuses a bulk weight above what is in stock.
+  assertBulkInStock:          vi.fn(async () => {}),
   calculateDecantingPlan:     vi.fn(),   // NOTE: sync in the controller
   recordDecanting:            vi.fn(),
   getDecantingRecords:        vi.fn(),
@@ -47,7 +49,6 @@ const cookieFor = (role, overrides = {}) => {
 
 // ── Role groups, mirroring decanting.routes.js ────────────────
 const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 const PLAN   = { product: 'Rice', bags: [{ sizeKg: 2, count: 12 }], wastageKg: 0.3 };
 const RECORD = { id: 1, product_id: 1, wastage_kg: 0.3 };
@@ -115,22 +116,32 @@ describe('decanting routes — role enforcement', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each(ALL_ROLES)('%s can run a calculation preview', async (role) => {
-    // /calculate is deliberately open to every warehouse role — it
-    // writes nothing.
+  // Decanting is floor work: each role works only its own screens, so
+  // the calculator and the record are the warehouse worker's alone.
+  it('a warehouse worker can run a calculation preview', async () => {
     const res = await request(app)
       .post(`${BASE}/calculate`)
-      .set('Cookie', cookieFor(role))
+      .set('Cookie', cookieFor(ROLES.WORKER))
       .send({ productId: 1, actualWeightKg: 25 });
     expect(res.status).toBe(200);
   });
 
-  it.each(RECEIVERS_UP)('%s can record a completed decanting run', async (role) => {
+  it('a warehouse worker can record a completed decanting run', async () => {
     const res = await request(app)
       .post(BASE)
-      .set('Cookie', cookieFor(role))
+      .set('Cookie', cookieFor(ROLES.WORKER))
       .send({ productId: 1, actualWeightKg: 25 });
     expect(res.status).toBe(201);
+  });
+
+  it.each([ROLES.MANAGER, ROLES.ADMIN])('%s is refused the calculator and the record', async (role) => {
+    const calc = await request(app).post(`${BASE}/calculate`).set('Cookie', cookieFor(role))
+      .send({ productId: 1, actualWeightKg: 25 });
+    const write = await request(app).post(BASE).set('Cookie', cookieFor(role))
+      .send({ productId: 1, actualWeightKg: 25 });
+    expect(calc.status).toBe(403);
+    expect(write.status).toBe(403);
+    expect(decantingServiceMock.recordDecanting).not.toHaveBeenCalled();
   });
 
   it('an unassignable role is refused the write path with 403, not 401', async () => {
@@ -378,5 +389,35 @@ describe('decanting routes — CSV export', () => {
 
     expect(res.text).toContain('product,bag_size_kg,count');
     expect(res.text).not.toContain('"success"');
+  });
+});
+// ── The bulk weight against stock ─────────────────────────────
+describe('decanting routes: a bulk weight above what is in stock', () => {
+  const over = Object.assign(
+    new Error('Rice: the bulk amount (500 kg) is more than the 40 kg in stock. Weigh it again, or ask your manager to check the stock.'),
+    { status: 400, code: 'BULK_EXCEEDS_STOCK' },
+  );
+
+  it('is refused when the weight is entered, before any plan is worked out', async () => {
+    decantingServiceMock.assertBulkInStock.mockRejectedValueOnce(over);
+    const res = await request(app)
+      .post(`${BASE}/calculate`)
+      .set('Cookie', cookieFor(ROLES.WORKER))
+      .send({ items: [{ productId: 1, requiredKg: 20, actualBulkKg: 500 }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ success: false, message: over.message });
+    expect(decantingServiceMock.calculateDecantingPlan).not.toHaveBeenCalled();
+  });
+
+  it('is refused with the same words when the sheet is saved', async () => {
+    decantingServiceMock.recordDecanting.mockRejectedValueOnce(over);
+    const res = await request(app)
+      .post(BASE)
+      .set('Cookie', cookieFor(ROLES.WORKER))
+      .send({ weekOf: '2026-10-05', items: [{ productId: 1, requiredKg: 20, actualBulkKg: 500 }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe(over.message);
   });
 });

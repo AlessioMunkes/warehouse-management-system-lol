@@ -20,7 +20,11 @@
 //                            pallets belong, not a dashboard count.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
-import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
+import { OPEN_PO_STATUSES, CLOSED_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
+import stockRepo from './stock.repository.js';
+import { poSyncKeySql } from './quickbooks.repository.js';
+import { overdueSql } from './communityRequest.repository.js';
+import { idleKitSql } from './collectionKit.repository.js';
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 
@@ -81,23 +85,41 @@ const getMyWork = async () => {
   };
 };
 
+// STOCK HEALTH, FROM THE INVENTORY SCREEN'S OWN ROWS
+// The tiles used to count `quantity_on_hand <= reorder_threshold`
+// where a threshold was set. That missed every product with no stock
+// row or no threshold — 33 of 60 in the demo data had nothing
+// available and the dashboard called them healthy — and it used on
+// hand where the inventory screen uses AVAILABLE (on hand minus what
+// is promised to slips). So the tile said 1 and the inventory filter
+// it links to said 34. Counting getManifest's rows cannot disagree
+// with that screen, because it is that screen's query.
+//   out of stock — nothing available
+//   low          — some available, at or below the reorder level
+//   healthy      — everything else
+const stockHealth = (rows) => {
+  let out = 0;
+  let low = 0;
+  for (const r of rows) {
+    const available = Number(r.available);
+    if (available <= 0) out += 1;
+    else if (available <= Number(r.reorder_threshold)) low += 1;
+  }
+  return { active: rows.length, out, low, healthy: rows.length - out - low };
+};
+
 const getSummary = async () => {
-  const [lowStock, activeProducts, openPOs, deliveriesToday, dispatchesToday, pendingCommunityRequests] = await Promise.all([
-    pool.query(
-      `SELECT COUNT(*)::int AS count
-         FROM stock_levels sl
-         JOIN products p ON p.id = sl.product_id
-        WHERE p.is_active = true
-          AND sl.reorder_threshold > 0
-          AND sl.quantity_on_hand <= sl.reorder_threshold`
-    ),
-    pool.query(
-      `SELECT COUNT(*)::int AS count FROM products WHERE is_active = true`
-    ),
+  const [manifest, openPOs, deliveriesToday, dispatchesToday, pendingCommunityRequests] = await Promise.all([
+    stockRepo.getManifest(),
+    // Open = not finished. follow_up_required is not in
+    // OPEN_PO_STATUSES (that list is "still expecting goods", which
+    // receiving needs), but an order waiting on a supplier problem is
+    // exactly one a manager has to look at — leaving it out made the
+    // tile 4 short of the orders actually outstanding.
     pool.query(
       `SELECT COUNT(*)::int AS count
          FROM purchase_orders
-        WHERE status = ANY($1)`, openPoParams
+        WHERE NOT (status = ANY($1))`, [CLOSED_PO_STATUSES]
     ),
     pool.query(
       `SELECT COUNT(*)::int AS count
@@ -124,9 +146,14 @@ const getSummary = async () => {
     ),
   ]);
 
+  const health = stockHealth(manifest);
   return {
-    lowStockCount:            num(lowStock.rows[0]?.count),
-    activeProductCount:       num(activeProducts.rows[0]?.count),
+    // Low OR out: what the inventory screen's low-stock filter shows.
+    lowStockCount:            health.low + health.out,
+    belowReorderCount:        health.low,
+    outOfStockCount:          health.out,
+    healthyStockCount:        health.healthy,
+    activeProductCount:       health.active,
     openPurchaseOrders:       num(openPOs.rows[0]?.count),
     deliveriesExpectedToday:  num(deliveriesToday.rows[0]?.count),
     pendingDispatchesToday:   num(dispatchesToday.rows[0]?.count),
@@ -134,4 +161,153 @@ const getSummary = async () => {
   };
 };
 
-export default { getSummary, getMyWork };
+// ── What needs a manager, and where ────────────────────────────
+// One read behind the dashboard's "Needs attention" list and the
+// counts on the manager sidebar, so the two can never disagree.
+//
+// Each count is the size of a tab a manager can open:
+//   inventory      — the Inventory tabs (same rules as inventoryViews.js:
+//                    low stock excludes shortfalls; expiring is a
+//                    product with a delivery estimated still on the shelf,
+//                    not dismissed, due within 30 days, today included)
+//   pickingSlips   — this week (Monday to Sunday, SAST), the Picking
+//                    Slips page's default range
+//   purchaseOrders — awaiting approval; flagged for follow-up; the
+//                    Finance email failed; needs a match in QuickBooks
+//   communityRequests — awaiting approval; approved and waiting to go
+//                    out; approved and still not gone out after
+//                    OVERDUE_AFTER_DAYS (communityRequest.repository.js);
+//                    and approved ones that need new items because a
+//                    pallet used their stock
+//   feedTheSoil    — kits nobody has logged compost for (IDLE_KIT_MONTHS,
+//                    collectionKit.repository.js)
+const EXPIRY_WINDOW_DAYS = 30;
+
+const sastDay = (date) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(date);
+
+const getAttention = async ({ now = new Date() } = {}) => {
+  const [manifest, slips, pos, requests, kits] = await Promise.all([
+    stockRepo.getManifest(),
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE ps.status = 'pending')::int          AS unassigned,
+         COUNT(*) FILTER (WHERE de.status = 'not_collected')::int     AS not_collected
+       FROM picking_slips ps
+       LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+       WHERE ps.dispatch_date >= date_trunc('week', ${SAST_TODAY})::date
+         AND ps.dispatch_date <  date_trunc('week', ${SAST_TODAY})::date + 7`
+    ),
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'pending')::int            AS awaiting_approval,
+         -- Flagged for follow-up: part received with no follow-up order on
+         -- its way, or marked by a manager.
+         COUNT(*) FILTER (WHERE (status = 'follow_up_required' OR (status = 'partially_received' AND NOT EXISTS (
+                   SELECT 1 FROM purchase_orders c
+                    WHERE c.follow_up_of = purchase_orders.id AND c.status NOT IN ('completed', 'returned')))))::int AS follow_up,
+         -- Finance was never told about the order; Resend is on the order.
+         COUNT(*) FILTER (WHERE finance_email_status = 'failed')::int AS finance_email_failed,
+         -- A supplier or product not found in QuickBooks by name, or an order
+         -- QuickBooks refused (an item with no expense account): a person has
+         -- to fix it there, then Send again.
+         COUNT(*) FILTER (WHERE EXISTS (
+                   SELECT 1 FROM quickbooks_sync_queue q
+                    WHERE q.idempotency_key = ${poSyncKeySql('purchase_orders.id')}
+                      AND q.payload->>'state' IN ('needs_match', 'refused')))::int AS needs_quickbooks_match
+       FROM purchase_orders`
+    ),
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE outcome = 'pending')::int AS pending,
+         -- The Approved tab: set aside and waiting to go out.
+         COUNT(*) FILTER (WHERE outcome = 'approved'
+                            AND items_short_at IS NULL)::int AS approved,
+         COUNT(*) FILTER (WHERE ${overdueSql('community_requests')})::int AS overdue,
+         COUNT(*) FILTER (WHERE outcome = 'approved'
+                            AND items_short_at IS NOT NULL)::int AS needs_items
+       FROM community_requests`
+    ),
+    // A warehouse without the kit tables has no kits to chase.
+    pool.query(`SELECT COUNT(*)::int AS idle FROM collection_kits k WHERE ${idleKitSql('k')}`)
+      .catch((err) => { if (err.code === '42P01') return { rows: [{ idle: 0 }] }; throw err; }),
+  ]);
+
+  const today = sastDay(now);
+  const horizon = sastDay(new Date(now.getTime() + EXPIRY_WINDOW_DAYS * 86400000));
+  let shortfall = 0; let lowStock = 0; let expiring = 0;
+  for (const p of manifest) {
+    if (p.is_shortfall) shortfall += 1;
+    else if (p.is_low_stock) lowStock += 1;
+    // 'YYYY-MM-DD' strings compare correctly as text.
+    if (p.earliest_expiry && p.earliest_expiry >= today && p.earliest_expiry <= horizon) expiring += 1;
+  }
+
+  return {
+    inventory:         { shortfall, lowStock, expiring },
+    pickingSlips:      { unassigned: num(slips.rows[0]?.unassigned), notCollected: num(slips.rows[0]?.not_collected) },
+    purchaseOrders:    {
+      awaitingApproval:     num(pos.rows[0]?.awaiting_approval),
+      followUp:             num(pos.rows[0]?.follow_up),
+      financeEmailFailed:   num(pos.rows[0]?.finance_email_failed),
+      needsQuickbooksMatch: num(pos.rows[0]?.needs_quickbooks_match),
+    },
+    communityRequests: {
+      pending:    num(requests.rows[0]?.pending),
+      approved:   num(requests.rows[0]?.approved),
+      overdue:    num(requests.rows[0]?.overdue),
+      needsItems: num(requests.rows[0]?.needs_items),
+    },
+    feedTheSoil: { idleKits: num(kits.rows[0]?.idle) },
+  };
+};
+
+// ── Two figures for the manager's board ─────────────────────────
+// Behind the "Slips packed this week" and "Centres missing collections"
+// widgets. The third, "Weeks of stock left", is the shared stock cover
+// (stockCover.repository.js), put together in dashboard.service.js.
+//
+//   packing           — this week's slips (Monday to Sunday, SAST), and
+//                       how many are packed.
+//   missedCollections — centres with two or more pallets not collected
+//                       in the last eight weeks.
+const MISSED_WEEKS = 8;
+const MISSED_AT_LEAST = 2;
+
+const getInsights = async () => {
+  const [packing, missed] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE status NOT IN ('pending', 'in_progress'))::int AS packed,
+              COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress
+         FROM picking_slips
+        WHERE status <> 'cancelled'
+          AND dispatch_date >= date_trunc('week', ${SAST_TODAY})::date
+          AND dispatch_date <  date_trunc('week', ${SAST_TODAY})::date + 7`
+    ),
+    pool.query(
+      `SELECT e.id, e.name, COUNT(*)::int AS missed, MAX(ps.dispatch_date)::text AS last_missed
+         FROM dispatch_events de
+         JOIN picking_slips ps ON ps.id = de.picking_slip_id
+         JOIN ecd_centres e ON e.id = ps.ecd_id
+        WHERE de.status = 'not_collected'
+          AND ps.dispatch_date >= ${SAST_TODAY} - ${MISSED_WEEKS * 7}
+        GROUP BY e.id, e.name
+       HAVING COUNT(*) >= ${MISSED_AT_LEAST}
+        ORDER BY COUNT(*) DESC, MAX(ps.dispatch_date) DESC, e.name ASC
+        LIMIT 8`
+    ),
+  ]);
+
+  return {
+    packing: {
+      total: num(packing.rows[0]?.total),
+      packed: num(packing.rows[0]?.packed),
+      inProgress: num(packing.rows[0]?.in_progress),
+    },
+    missedWeeks: MISSED_WEEKS,
+    missedCollections: missed.rows.map((r) => ({ id: r.id, name: r.name, missed: num(r.missed), lastMissed: r.last_missed })),
+  };
+};
+
+export default { getSummary, getMyWork, getAttention, getInsights, stockHealth };

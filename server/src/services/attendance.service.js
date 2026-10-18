@@ -20,6 +20,7 @@ import bookingRepo from '../repositories/volunteerBooking.repository.js';
 import timeslotRepo from '../repositories/eventTimeslot.repository.js';
 import { logAudit } from '../repositories/auditLog.repository.js';
 import { withTransaction } from '../utils/transaction.js';
+import vmsIntegrationService from './vmsIntegration.service.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -40,6 +41,33 @@ const normaliseAttendance = (checkedIn, checkInTime) => {
   };
 };
 
+const attendanceStatusFor = (checkedIn) => (checkedIn ? 'attended' : 'not_attended');
+
+const sameAttendanceState = (existing, next) => {
+  if (!existing) return false;
+  const existingTime = existing.check_in_time ? new Date(existing.check_in_time).toISOString() : null;
+  const nextTime = next.checkInTime ? new Date(next.checkInTime).toISOString() : null;
+  return existing.checked_in === next.checkedIn && existingTime === nextTime;
+};
+
+const buildVmsAttendancePayload = (booking, attendance) => ({
+  vmsBookingId: booking.external_booking_id,
+  attendanceStatus: attendanceStatusFor(attendance.checked_in),
+  source: 'wms',
+  recordedAt: attendance.check_in_time ?? new Date().toISOString(),
+});
+
+const sendAttendancePostCommit = async (booking, attendance, shouldSend) => {
+  if (!shouldSend || !booking?.external_booking_id) return attendance;
+  try {
+    await vmsIntegrationService.sendAttendance(buildVmsAttendancePayload(booking, attendance));
+    const syncedAt = new Date().toISOString();
+    return await attendanceRepo.updateAttendance(attendance.attendance_id, { lastSyncedAt: syncedAt });
+  } catch {
+    return attendance;
+  }
+};
+
 // ── confirmAttendance ─────────────────────────────────────────
 // Local check-in. Booking must exist. Enforces check_in_time rules
 // and audits the action.
@@ -53,15 +81,20 @@ const confirmAttendance = async (bookingId, data, actor) => {
     data?.checkedIn,
     data?.checkInTime
   );
+  const existingAttendance = await attendanceRepo.findByBookingId(bookingId);
+  const alreadySyncedSameState =
+    booking.external_booking_id
+    && existingAttendance?.last_synced_at
+    && sameAttendanceState(existingAttendance, { checkedIn, checkInTime });
 
-  return withTransaction(async (client) => {
+  const attendance = await withTransaction(async (client) => {
     const attendance = await attendanceRepo.upsertByBookingId(
       bookingId,
       {
         checkedIn,
         checkInTime,
         source: data?.source ?? 'WMS',
-        lastSyncedAt: data?.lastSyncedAt ?? null,
+        lastSyncedAt: alreadySyncedSameState ? existingAttendance.last_synced_at : (data?.lastSyncedAt ?? null),
       },
       client
     );
@@ -75,6 +108,8 @@ const confirmAttendance = async (bookingId, data, actor) => {
 
     return attendance;
   });
+
+  return sendAttendancePostCommit(booking, attendance, !alreadySyncedSameState);
 };
 
 // ── syncExternalAttendance ────────────────────────────────────

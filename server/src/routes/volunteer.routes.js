@@ -10,11 +10,13 @@
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
 import jwt     from 'jsonwebtoken';
-import pool    from '../config/db.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import { guestWarehouseClaim } from '../config/warehouses.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP, GUEST_ONLY } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import volunteerRepo                from '../repositories/volunteer.repository.js';
+import slipAccessRepo               from '../repositories/slipAccess.repository.js';
 
 const router = express.Router();
 
@@ -23,7 +25,6 @@ const router = express.Router();
 // this list — a volunteer signing in must not be able to read every
 // other volunteer's name and arrival time off the back of their own
 // twelve-hour token.
-const LOG_READERS = [ROLES.MANAGER, ROLES.ADMIN];
 
 // A date string as the browser's <input type="date"> sends it, or
 // nothing. Anything else is dropped rather than passed to Postgres to
@@ -45,17 +46,10 @@ router.post('/sign-in', async (req, res) => {
     }
 
     // signed_in_at comes from the DB default — never from the client
-    const result = await pool.query(
-      `INSERT INTO volunteers (full_name, source)
-       VALUES ($1, 'guest_login')
-       RETURNING id, full_name, signed_in_at`,
-      [name.trim()]
-    );
-
-    const volunteer = result.rows[0];
+    const volunteer = await volunteerRepo.createGuestVisit(name.trim());
 
     const token = jwt.sign(
-      { id: volunteer.id, role: 'guest' },
+      { id: volunteer.id, role: 'guest', ...guestWarehouseClaim() },
       process.env.JWT_SECRET,
       { expiresIn: `${SESSION_HOURS}h` }
     );
@@ -84,17 +78,28 @@ router.post('/sign-in', async (req, res) => {
 // The guest log. Every sign-in POST /sign-in has recorded, newest
 // first. Optional name search and an inclusive SAST date range.
 router.get('/',
-  auth, requireRole(...LOG_READERS),
+  auth, requireRole(...MANAGERS_UP),
   async (req, res) => {
     try {
-      const data = await volunteerRepo.listGuestLog({
+      // `limit` / `offset` page through the log; without a limit it is
+      // the latest 500. One extra row is read to know if there is more.
+      const asCount = (v, fallback) => {
+        const n = Math.trunc(Number(v));
+        return Number.isFinite(n) && n >= 0 ? n : fallback;
+      };
+      const limit = Math.min(Math.max(asCount(req.query.limit, 500), 1), 500);
+      const fetched = await volunteerRepo.listGuestLog({
         search: typeof req.query.search === 'string' && req.query.search.trim()
           ? req.query.search.trim()
           : null,
         from: asDate(req.query.from),
         to:   asDate(req.query.to),
+        limit: limit + 1,
+        offset: asCount(req.query.offset, 0),
       });
-      return res.status(200).json({ success: true, data });
+      const hasMore = fetched.length > limit;
+      const data = fetched.slice(0, limit);
+      return res.status(200).json({ success: true, data, hasMore });
     } catch (error) {
       console.error('[volunteers:log]', error.message);
       return res.status(500).json({ success: false, message: 'Failed to load the guest log.' });
@@ -126,10 +131,18 @@ router.get('/',
 // rejects a guest whose visit is closed, but that check should not be
 // the only thing standing between them and the API.
 router.post('/sign-out',
-  auth, requireRole(ROLES.GUEST),
+  auth, requireRole(...GUEST_ONLY),
   async (req, res) => {
     try {
       const id = req.user.id;
+
+      // Every pallet they still hold goes back to the floor first, so a
+      // volunteer who signs out (or whose app skipped the hand-back)
+      // never leaves a pallet locked to someone who has gone home. Only
+      // the caller's own pallets, named by the token; nothing held is a
+      // no-op. Progress on the items is kept for the next person.
+      await slipAccessRepo.releaseForVolunteer({ volunteerId: id });
+
       const updated = await volunteerRepo.signOutVolunteer(id);
 
       res.clearCookie(AUTH_COOKIE, authCookieOptions());
@@ -159,7 +172,7 @@ router.post('/sign-out',
 // a time somebody's laptop clock decided, on a record that is partly a
 // safety document.
 router.post('/:id/sign-out',
-  auth, requireRole(...LOG_READERS), validateIntId,
+  auth, requireRole(...MANAGERS_UP), validateIntId,
   async (req, res) => {
     try {
       const id = Number(req.params.id);

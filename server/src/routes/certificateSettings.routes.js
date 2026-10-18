@@ -16,7 +16,8 @@
 import express from 'express';
 import certificateSettingsController from '../controllers/certificateSettings.controller.js';
 //import { auth, requireRole, ROLES } from '../middleware/auth.middleware.js';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP, ADMIN_ONLY } from '../constants/permissions.js';
 const router = express.Router();
 
 // All routes require authentication
@@ -36,7 +37,7 @@ router.get(
 // Requires admin or manager role.
 router.post(
   '/',
-  requireRole(ROLES.ADMIN, ROLES.MANAGER),
+  requireRole(...MANAGERS_UP),
   certificateSettingsController.createSettings
 );
 
@@ -46,7 +47,7 @@ router.post(
 // Requires admin or manager role.
 router.put(
   '/',
-  requireRole(ROLES.ADMIN, ROLES.MANAGER),
+  requireRole(...MANAGERS_UP),
   certificateSettingsController.updateSettings
 );
 
@@ -56,7 +57,7 @@ router.put(
 // Primarily for testing/reset purposes.
 router.delete(
   '/',
-  requireRole(ROLES.ADMIN),
+  requireRole(...ADMIN_ONLY),
   certificateSettingsController.deleteSettings
 );
 

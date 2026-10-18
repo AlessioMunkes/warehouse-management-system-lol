@@ -18,7 +18,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
-import { PACKING, STAFF, STAFF_ROLES } from '../routes/paths';
+import { PACKING, STAFF } from '../routes/paths';
+import { routeById } from '../routes/routeTable';
+
+// The guard the real floor routes use (routes/routeTable.js).
+const STAFF_ROLES = routeById('packing').roles;
 import { useAuth } from '../context/AuthContext';
 
 vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }));

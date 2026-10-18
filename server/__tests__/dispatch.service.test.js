@@ -98,11 +98,11 @@ describe('currentHour — the hour on the warehouse clock', () => {
   // The whole bug: getHours() on a UTC container returned 14 here, so
   // the cutoff did not fire until 18:00 SAST — two hours after the
   // gate closed, every single day.
-  it('is at the cutoff at 14:00 UTC, not at 16:00 UTC', () => {
-    atUtc('2026-08-19T14:00:00Z');
+  it('is at the cutoff at 13:00 UTC (15:00 SAST), not at 16:00 UTC', () => {
+    atUtc('2026-08-19T13:00:00Z');
     expect(currentHour() >= NON_COLLECTION_CUTOFF_HOUR).toBe(true);
 
-    atUtc('2026-08-19T13:59:00Z');
+    atUtc('2026-08-19T12:59:00Z');
     expect(currentHour() >= NON_COLLECTION_CUTOFF_HOUR).toBe(false);
   });
 
@@ -156,19 +156,19 @@ describe('getBoard — the sweep trigger', () => {
     atUtc('2026-08-19T06:00:00Z');   // 08:00 SAST
     await dispatchService.getBoard({ dispatchDate: '2026-08-18' }, MANAGER);
     expect(repoMock.sweepNonCollections).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-18', actorId: MANAGER.id }
+      { dispatchDate: '2026-08-18', actorId: MANAGER.id, beforeCommit: expect.any(Function) }
     );
   });
 
   it('does not sweep today before the cutoff', async () => {
-    atUtc('2026-08-19T13:00:00Z');   // 15:00 SAST
+    atUtc('2026-08-19T12:00:00Z');   // 14:00 SAST
     await dispatchService.getBoard({ dispatchDate: '2026-08-19' }, MANAGER);
     expect(repoMock.sweepNonCollections).not.toHaveBeenCalled();
   });
 
   // The two hours the old code got wrong.
-  it('sweeps today from 16:00 SAST, which is 14:00 UTC', async () => {
-    atUtc('2026-08-19T14:00:00Z');
+  it('sweeps today from 15:00 SAST, which is 13:00 UTC', async () => {
+    atUtc('2026-08-19T13:00:00Z');
     await dispatchService.getBoard({ dispatchDate: '2026-08-19' }, MANAGER);
     expect(repoMock.sweepNonCollections).toHaveBeenCalled();
   });
@@ -217,12 +217,12 @@ describe('getBoard — the sweep trigger', () => {
       atUtc('2026-08-19T14:00:00Z');   // 16:00 SAST
       await dispatchService.getBoard({ scope: 'gate' }, MANAGER);
       expect(repoMock.sweepNonCollections).toHaveBeenCalledWith(
-        { dispatchDate: '2026-08-19', actorId: MANAGER.id }
+        { dispatchDate: '2026-08-19', actorId: MANAGER.id, beforeCommit: expect.any(Function) }
       );
     });
 
     it('does not sweep before the cutoff', async () => {
-      atUtc('2026-08-19T13:00:00Z');   // 15:00 SAST
+      atUtc('2026-08-19T12:00:00Z');   // 14:00 SAST
       await dispatchService.getBoard({ scope: 'gate' }, MANAGER);
       expect(repoMock.sweepNonCollections).not.toHaveBeenCalled();
     });
@@ -291,9 +291,9 @@ describe('evaluateEligibility — wrongDay against the warehouse date', () => {
   });
 
   it('flags afterCutoff on the warehouse clock', () => {
-    atUtc('2026-08-19T14:00:00Z');
-    expect(evaluateEligibility(gateView()).afterCutoff).toBe(true);
     atUtc('2026-08-19T13:00:00Z');
+    expect(evaluateEligibility(gateView()).afterCutoff).toBe(true);
+    atUtc('2026-08-19T12:00:00Z');
     expect(evaluateEligibility(gateView()).afterCutoff).toBe(false);
   });
 
@@ -309,7 +309,7 @@ describe('sweep', () => {
     atUtc('2026-08-19T22:30:00Z');
     await dispatchService.sweep({}, MANAGER);
     expect(repoMock.sweepNonCollections).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-20', actorId: MANAGER.id }
+      { dispatchDate: '2026-08-20', actorId: MANAGER.id, beforeCommit: expect.any(Function) }
     );
   });
 
@@ -381,23 +381,23 @@ describe('getNonCollectionHistory', () => {
     );
   });
 });
-// ── The 16:00 write-off is a flag, not a lock (BR-14) ─────────
-// The sweep runs opportunistically from getBoard, so from 16:00
+// ── The 15:00 write-off is a flag, not a lock (BR-14) ─────────
+// The sweep runs opportunistically from getBoard, so from 15:00
 // onwards essentially every uncollected pallet carries
 // dispatch_status = 'not_collected'. When that fed needsOverride, the
-// effect was that the gate closed itself at 16:00 for the warehouse
-// worker actually standing at it — a driver arriving at 16:40 had to
+// effect was that the gate closed itself at 15:00 for the warehouse
+// worker actually standing at it — a driver arriving at 15:40 had to
 // find a manager before food could leave, which is the opposite of
 // the rule this service is built on.
 //
 // These pin the corrected behaviour: written off still SHOWS (the
 // flag survives, and the repository files the event as
 // 'late_collected'), but it does not gate anything.
-describe('a pallet written off at 16:00 can still be collected', () => {
+describe('a pallet written off at 15:00 can still be collected', () => {
   const writtenOff = () => gateView({ dispatch_status: 'not_collected' });
 
   beforeEach(() => {
-    atUtc('2026-08-19T14:40:00Z');          // 16:40 SAST, after the sweep
+    atUtc('2026-08-19T13:40:00Z');          // 15:40 SAST, after the sweep
     repoMock.collect.mockResolvedValue({ event: { id: 9, status: 'late_collected' } });
   });
 
@@ -418,7 +418,7 @@ describe('a pallet written off at 16:00 can still be collected', () => {
     });
 
     expect(repoMock.collect).toHaveBeenCalledWith(
-      expect.objectContaining({ overrideReason: null, actorId: WORKER.id })
+      expect.objectContaining({ actorId: WORKER.id })
     );
   });
 
@@ -437,8 +437,8 @@ describe('a pallet written off at 16:00 can still be collected', () => {
 
   // Being written off must not smuggle a pallet past the checks that
   // ARE gates. A written-off pallet at an inactive centre is still
-  // blocked, and one that packing never closed off still needs a
-  // manager.
+  // blocked, and one that packing never closed off is refused for
+  // everyone: the agreed process is to finish packing first.
   it('still blocks an inactive centre (BR-11)', async () => {
     repoMock.getGateView.mockResolvedValue(
       gateView({ dispatch_status: 'not_collected', ecd_is_active: false })
@@ -447,11 +447,34 @@ describe('a pallet written off at 16:00 can still be collected', () => {
     expect(repoMock.collect).not.toHaveBeenCalled();
   });
 
-  it('still needs a manager when packing has not closed the slip', async () => {
+  it('still refuses a pallet packing has not closed, and says to finish packing', async () => {
     repoMock.getGateView.mockResolvedValue(
       gateView({ dispatch_status: 'not_collected', slip_status: 'in_progress' })
     );
-    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({
+      status: 409, message: expect.stringContaining('Finish packing it first'),
+    });
+    expect(repoMock.collect).not.toHaveBeenCalled();
+  });
+
+  // The manager override that used to sit here could never run: the
+  // collect route is worker-only and the repository refuses an
+  // unpacked pallet anyway. It was removed, so a reason no longer
+  // lets anyone past.
+  it('refuses an unpacked pallet even with a reason, for a manager too', async () => {
+    repoMock.getGateView.mockResolvedValue(gateView({ slip_status: 'in_progress' }));
+    await expect(
+      dispatchService.collect(1, { ...body, overrideReason: 'Driver is here' }, MANAGER)
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('Finish packing it first') });
+    expect(repoMock.collect).not.toHaveBeenCalled();
+  });
+
+  it('never passes an override reason down to be recorded', async () => {
+    repoMock.getGateView.mockResolvedValue(gateView());
+    repoMock.collect.mockResolvedValue({ event: { id: 9 } });
+    repoMock.getDispatchNote?.mockResolvedValue?.({});
+    await dispatchService.collect(1, { ...body, overrideReason: 'ignored' }, WORKER);
+    expect(repoMock.collect.mock.calls[0][0]).not.toHaveProperty('overrideReason');
   });
 });
 
@@ -486,7 +509,7 @@ describe('a pallet booked for another day can still be collected', () => {
 
     await expect(dispatchService.collect(1, body, WORKER)).resolves.toBeTruthy();
     expect(repoMock.collect).toHaveBeenCalledWith(
-      expect.objectContaining({ overrideReason: null, actorId: WORKER.id })
+      expect.objectContaining({ actorId: WORKER.id })
     );
   });
 
@@ -517,11 +540,11 @@ describe('a pallet booked for another day can still be collected', () => {
     await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 409 });
   });
 
-  it('still needs a manager when packing has not closed the slip', async () => {
+  it('still refuses a pallet packing has not closed', async () => {
     repoMock.getGateView.mockResolvedValue(
       gateView({ dispatch_date: new Date(2026, 7, 17), slip_status: 'in_progress' })
     );
-    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 409 });
   });
 });
 
@@ -568,5 +591,42 @@ describe('collect — the note comes back with the collection', () => {
 
     expect(repoMock.getDispatchNote).toHaveBeenCalledWith(9);
     expect(result.note).toEqual({ id: 9, ecd_name: 'Sunnyside ECD', lines: [] });
+  });
+});
+
+describe('the not-collected cut-off from Settings', () => {
+  it('judges the gate against the hour an admin chose', async () => {
+    const { default: settings } = await import('../src/services/settings.service.js');
+    settings.get.mockImplementation(async (key) => (key === 'dispatch.nonCollectionCutoffHour' ? 16 : undefined));
+    vi.setSystemTime(new Date('2026-08-19T13:30:00Z'));   // 15:30 SAST: past the old 15:00, before 16:00
+    repoMock.getGateView.mockResolvedValue(gateView());
+
+    const view = await dispatchService.getGateView(7);
+    expect(view.eligibility.afterCutoff).toBe(false);
+    settings.get.mockReset();
+    vi.useRealTimers();
+  });
+});
+
+// ── A pallet for a soup kitchen or the Dignity Kitchen ─────────
+// It has no centre record: its name is on the slip. "No record" used
+// to read as "not an approved centre", and every such pallet was
+// refused at the gate.
+describe('evaluateEligibility: a kitchen has no centre to be inactive', () => {
+  const base = { slip_status: 'complete', dispatch_date: null, dispatch_status: null, items: [] };
+
+  it.each(['soup_kitchen', 'dignity_kitchen', 'community'])('%s is not held to the centre check', async (kind) => {
+    const { evaluateEligibility } = await import('../src/services/dispatch.service.js');
+    const e = evaluateEligibility({ ...base, beneficiary_kind: kind, ecd_is_active: true, ecd_approved_at: null }, 16);
+    expect(e.ecdInactive).toBe(false);
+  });
+
+  it('an ECD centre still has to be active and approved', async () => {
+    const { evaluateEligibility } = await import('../src/services/dispatch.service.js');
+    expect(evaluateEligibility({ ...base, beneficiary_kind: 'ecd', ecd_is_active: true, ecd_approved_at: null }, 16).ecdInactive).toBe(true);
+    expect(evaluateEligibility({ ...base, beneficiary_kind: 'ecd', ecd_is_active: false, ecd_approved_at: '2026-01-01' }, 16).ecdInactive).toBe(true);
+    expect(evaluateEligibility({ ...base, beneficiary_kind: 'ecd', ecd_is_active: true, ecd_approved_at: '2026-01-01' }, 16).ecdInactive).toBe(false);
+    // A row read before the kind was selected is treated as a centre.
+    expect(evaluateEligibility({ ...base, ecd_is_active: true, ecd_approved_at: null }, 16).ecdInactive).toBe(true);
   });
 });

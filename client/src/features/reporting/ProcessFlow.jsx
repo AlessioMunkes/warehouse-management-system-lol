@@ -1,0 +1,553 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/features/reporting/ProcessFlow.jsx
+//
+// THE FLOW MAP: every route cases really took through a process, drawn
+// as steps joined by connections. A thick line is a busy one; a line
+// in the warning colour is off the expected route; a line going back
+// up is work done again. It is the picture process-mining tools open
+// on, and it works the way they do:
+//
+//   follow        which process: an order through to dispatch, a
+//                 purchase order, packing, a donation, a request
+//   routes        the list on the right is every route, commonest
+//                 first. The slider shows more or fewer of them, and
+//                 each can be switched on or off by itself.
+//   how many /    the same map by number of cases or by the typical
+//   how long      time each connection takes
+//   a step        choose one to see what leads to it and what follows,
+//                 and to keep only the cases that pass through it or
+//                 skip it
+//   a connection  choose one for its times and its slowest cases, and
+//                 to keep only the cases that took it or never did
+//   play          dots run along each connection, more on busier ones
+//   root cause    under the map: which supplier, cohort, product or
+//                 weekday is over-represented among the cases that
+//                 deviated, repeated work or ran long, each one a
+//                 filter to narrow the map to
+//
+// All of it is worked out in the browser (flowGraph.js) from the case
+// paths the server sent with the process map, so every change redraws
+// at once.
+// ─────────────────────────────────────────────────────────────
+import { useMemo, useState } from 'react';
+import { Flag, Play, Pause, RotateCw, X } from 'lucide-react';
+import NativeSelect from '@/components/ui/native-select';
+import { duration } from './processFormat';
+import { activityLook } from './processActivityLook';
+import { exportExcel } from '../../lib/excelExport';
+import {
+  START, END, NODE_W, NODE_H, variantsOf, applyFilters, filterLabel, graphOf, neighbours,
+  layoutOf, edgePath, thickness, routesToCover, caseHours, rootCauses, targetTest, ROOT_CAUSE_TARGETS,
+} from './flowGraph';
+
+const count = (n) => Number(n ?? 0).toLocaleString('en-ZA');
+const INK = 'var(--ink)';
+const OFF_ROUTE = 'var(--warn-ink)';
+const FAINT = 'var(--line-strong)';
+
+const reducedMotion = () => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+};
+
+function Bars({ rows, valueOf, textOf, onPick }) {
+  const max = Math.max(...rows.map(valueOf), 0) || 1;
+  return (
+    <ul className="mt-1.5 space-y-1.5">
+      {rows.map((r, i) => (
+        <li key={`${r.label}-${i}`} className="text-xs">
+          <div className="flex items-baseline justify-between gap-3">
+            {onPick && r.pick !== false ? (
+              <button type="button" onClick={() => onPick(r)} className="min-w-0 truncate text-left text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink">{r.label}</button>
+            ) : <span className="min-w-0 truncate text-ink">{r.label}</span>}
+            <span className="shrink-0 tabular-nums text-muted-foreground">{textOf(r)}</span>
+          </div>
+          <div className="mt-1 h-1.5 rounded-full bg-surface-2">
+            <div className="h-1.5 rounded-full bg-ink" style={{ width: `${Math.max(2, (valueOf(r) / max) * 100)}%` }} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Fact({ label, value }) {
+  return (
+    <div className="rounded-xl border border-line bg-surface px-2.5 py-2">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="text-sm font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+const pill = 'rounded-lg border border-line px-2 py-1 text-xs font-bold text-ink hover:bg-muted/60';
+
+export default function ProcessFlow({ flow, range }) {
+  const [processId, setProcessId] = useState(flow.processes.find((p) => p.cases.length)?.id ?? flow.processes[0].id);
+  const [metric, setMetric] = useState('count');          // 'count' | 'time'
+  const [filters, setFilters] = useState([]);
+  const [chosen, setChosen] = useState(null);             // Set of route keys, or null for the default
+  const [selected, setSelected] = useState(null);         // { type: 'node', id } | { type: 'edge', key } | { type: 'route', key }
+  const [hover, setHover] = useState(null);
+  const [playing, setPlaying] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [target, setTarget] = useState('deviation');
+
+  const process = flow.processes.find((p) => p.id === processId) ?? flow.processes[0];
+  const noun = process.caseNoun;
+
+  const inScope = useMemo(() => applyFilters(process.cases, filters), [process, filters]);
+  const variants = useMemo(() => variantsOf(process, inScope), [process, inScope]);
+  const shownKeys = useMemo(
+    () => chosen ?? new Set(variants.slice(0, routesToCover(variants)).map((v) => v.key)),
+    [chosen, variants],
+  );
+  const shown = useMemo(() => variants.filter((v) => shownKeys.has(v.key)), [variants, shownKeys]);
+  const shownCases = useMemo(() => shown.flatMap((v) => v.cases), [shown]);
+  const graph = useMemo(() => graphOf(process, shownCases), [process, shownCases]);
+  // The expected route is the centre column whatever is shown, so a
+  // step keeps its place as routes are switched on and off.
+  const layout = useMemo(() => layoutOf(graph, process.expected), [graph, process]);
+  // Over every case in scope, not only the variants drawn: hiding a
+  // rare variant must not hide what causes it.
+  const causes = useMemo(() => rootCauses(inScope, targetTest(process, inScope, target)), [process, inScope, target]);
+
+  const reset = (next = {}) => { setChosen(null); setSelected(null); setHover(null); if (next.filters) setFilters(next.filters); };
+  const changeProcess = (id) => { setProcessId(id); setFilters([]); reset(); };
+  const addFilter = (f) => reset({ filters: [...filters, f] });
+  const removeFilter = (i) => reset({ filters: filters.filter((_, j) => j !== i) });
+
+  const setRouteCount = (n) => { setChosen(new Set(variants.slice(0, n).map((v) => v.key))); setSelected(null); };
+  const toggleRoute = (key) => {
+    const next = new Set(shownKeys);
+    if (next.has(key)) { if (next.size > 1) next.delete(key); } else next.add(key);
+    setChosen(next);
+    setSelected(null);
+  };
+  const onlyRoute = (key) => { setChosen(new Set([key])); setSelected({ type: 'route', key }); };
+
+  const maxCount = Math.max(...graph.edges.map((e) => e.count), 1);
+  const maxHours = Math.max(...graph.edges.map((e) => e.medianHours ?? 0), 0);
+
+  const onExpected = variants.filter((v) => v.expected).reduce((s, v) => s + v.cases.length, 0);
+  const withRepeats = variants.filter((v) => v.repeats).reduce((s, v) => s + v.cases.length, 0);
+  const pct = (n) => (inScope.length ? `${Math.round((n / inScope.length) * 100)}%` : '0%');
+
+  const selectedNode = selected?.type === 'node' ? graph.nodes.find((n) => n.id === selected.id) : null;
+  const selectedEdge = selected?.type === 'edge' ? graph.edges.find((e) => e.key === selected.key) : null;
+  const selectedRoute = selected?.type === 'route' ? variants.find((v) => v.key === selected.key) : null;
+  const nameOf = (id) => (id === START ? 'Start' : id === END ? 'End' : process.activities[id].label);
+  const routeText = (v) => v.path.map(nameOf).join(' → ');
+
+  const lit = (e) => {
+    if (selectedEdge) return e.key === selectedEdge.key;
+    const focus = hover ?? selectedNode?.id;
+    if (focus === undefined || focus === null) return true;
+    return e.from === focus || e.to === focus;
+  };
+
+  const exportRoutes = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await exportExcel({
+        filename: `process-routes-${process.id}-${range.from}-to-${range.to}`,
+        sheetName: 'Variants',
+        title: `${process.label}: process variants`,
+        subtitle: `${range.from} to ${range.to}  ·  ${count(inScope.length)} ${noun}`,
+        columns: [
+          { key: 'route', label: 'Variant', kind: 'text' },
+          { key: 'cases', label: 'Cases', kind: 'number' },
+          { key: 'share', label: 'Share (%)', kind: 'number' },
+          { key: 'hours', label: 'Median cycle time (hours)', kind: 'number' },
+          { key: 'kind', label: 'Classification', kind: 'text' },
+        ],
+        rows: variants.map((v) => ({
+          route: routeText(v), cases: v.cases.length, share: v.share,
+          hours: v.medianHours === null ? null : Math.round(v.medianHours * 100) / 100,
+          kind: v.expected ? 'Reference path' : v.repeats ? 'Contains rework' : 'Deviation',
+        })),
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const animate = playing && !reducedMotion();
+
+  return (
+    <div className="mt-4">
+      {/* ── Controls ─────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+          Process
+          <NativeSelect className="w-44" value={process.id} onChange={(e) => changeProcess(e.target.value)}>
+            {flow.processes.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </NativeSelect>
+        </label>
+        <div role="group" aria-label="What the map measures" className="flex rounded-3xl bg-input/50 p-0.5 text-xs font-bold">
+          {[['count', 'Frequency'], ['time', 'Duration']].map(([id, label]) => (
+            <button key={id} type="button" aria-pressed={metric === id} onClick={() => setMetric(id)}
+              className={`rounded-3xl px-3 py-1.5 ${metric === id ? 'bg-ink text-on-ink' : 'text-ink'}`}>{label}</button>
+          ))}
+        </div>
+        <button type="button" onClick={() => setPlaying((v) => !v)} aria-pressed={playing} className={`${pill} inline-flex items-center gap-1.5`}>
+          {playing ? <Pause aria-hidden="true" className="size-3.5" /> : <Play aria-hidden="true" className="size-3.5" />}
+          {playing ? 'Stop animation' : 'Animate flow'}
+        </button>
+        {variants.length > 0 ? (
+          <button type="button" onClick={exportRoutes} disabled={exporting}
+            className="ml-auto text-xs font-semibold text-ink underline underline-offset-2 disabled:opacity-60">
+            {exporting ? 'Preparing' : 'Export variants to Excel'}
+          </button>
+        ) : null}
+      </div>
+
+      {/* A process worked out, not recorded step by step, says so. */}
+      {process.note ? (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {process.estimate ? <span className="mr-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold">Estimate</span> : null}
+          {process.note.replace(/^An estimate\. /, '')}
+        </p>
+      ) : null}
+
+      {filters.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-muted-foreground">Case filters:</span>
+          {filters.map((f, i) => (
+            <button key={`${f.kind}-${i}`} type="button" onClick={() => removeFilter(i)}
+              className="relative inline-flex items-center gap-1 rounded-full bg-ink px-2.5 py-1 font-semibold text-on-ink">
+              {filterLabel(process, f)} <X aria-hidden="true" className="size-3" /><span className="sr-only">Remove</span>
+            </button>
+          ))}
+          <button type="button" onClick={() => reset({ filters: [] })} className="font-semibold text-ink underline underline-offset-2">Clear all</button>
+        </div>
+      )}
+
+      {process.cases.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">No {noun} in this period.</p>
+      ) : inScope.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">No {noun} match these filters. Remove a filter to restore the map.</p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Fact label={`${noun[0].toUpperCase()}${noun.slice(1)}`} value={count(inScope.length)} />
+            <Fact label="Variants" value={count(variants.length)} />
+            <Fact label="Conformance rate" value={pct(onExpected)} />
+            <Fact label="Rework rate" value={pct(withRepeats)} />
+          </div>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            {/* ── The map ──────────────────────────────────────── */}
+            <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
+              <svg viewBox={`0 0 ${layout.width} ${layout.height}`} role="group" aria-label={`${process.label}: flow map`}
+                className="mx-auto block w-full min-w-[34rem] max-w-[46rem]" onMouseLeave={() => setHover(null)}>
+                <defs>
+                  {[['ink', INK], ['off', OFF_ROUTE], ['faint', FAINT]].map(([id, colour]) => (
+                    <marker key={id} id={`flow-arrow-${id}`} viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill={colour} />
+                    </marker>
+                  ))}
+                </defs>
+
+                {[...graph.edges].sort((a, b) => a.count - b.count).map((e, index) => {
+                  const rows = Math.abs((layout.at.get(e.to)?.row ?? 0) - (layout.at.get(e.from)?.row ?? 0));
+                  const path = edgePath(layout, e.from, e.to, rows > 1 ? [0.5, 0.32, 0.68, 0.41, 0.59][index % 5] : 0.5);
+                  if (!path) return null;
+                  const on = lit(e);
+                  const colour = !on ? FAINT : e.expected ? INK : OFF_ROUTE;
+                  const marker = !on ? 'faint' : e.expected ? 'ink' : 'off';
+                  const width = metric === 'count' ? thickness(e.count, maxCount) : thickness(e.medianHours, maxHours);
+                  const text = metric === 'count' ? count(e.count) : (e.medianHours === null ? '' : duration(e.medianHours));
+                  const ends = e.from === START || e.to === END;
+                  const picked = selectedEdge?.key === e.key;
+                  const label = `${nameOf(e.from)} to ${nameOf(e.to)}: ${count(e.count)} ${noun}${e.medianHours === null ? '' : `, median ${duration(e.medianHours)}`}${e.expected ? '' : ', deviation'}`;
+                  return (
+                    <g key={e.key} role="button" tabIndex={0} aria-label={label} aria-pressed={picked} className="cursor-pointer outline-none"
+                      onClick={() => setSelected(picked ? null : { type: 'edge', key: e.key })}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setSelected(picked ? null : { type: 'edge', key: e.key }); } }}>
+                      <title>{label}</title>
+                      {/* A wide, unseen line so a thin connection is still easy to hit. */}
+                      <path d={path.d} fill="none" stroke="transparent" strokeWidth={Math.max(16, width + 8)} />
+                      <path d={path.d} fill="none" stroke={colour} strokeWidth={width} strokeLinecap="round"
+                        strokeDasharray={ends ? '2 7' : e.back ? '7 5' : undefined}
+                        opacity={on ? (picked ? 1 : 0.82) : 0.35} markerEnd={`url(#flow-arrow-${marker})`} />
+                      {animate && on ? Array.from({ length: Math.min(3, 1 + Math.round((e.count / maxCount) * 2)) }).map((_, i, all) => (
+                        <circle key={i} r={3.2} fill={e.expected ? INK : OFF_ROUTE}>
+                          <animateMotion dur="2.4s" begin={`${(i * 2.4) / all.length}s`} repeatCount="indefinite" path={path.d} />
+                        </circle>
+                      )) : null}
+                      {text && on ? (
+                        <g>
+                          <rect x={path.mid.x - (text.length * 3.3 + 6)} y={path.mid.y - 9} width={text.length * 6.6 + 12} height={18} rx={9}
+                            fill="var(--surface)" stroke={picked ? INK : 'var(--line)'} />
+                          <text x={path.mid.x} y={path.mid.y + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill={INK}>{text}</text>
+                        </g>
+                      ) : null}
+                    </g>
+                  );
+                })}
+
+                {[START, END].map((id) => {
+                  const p = layout.at.get(id);
+                  return (
+                    <g key={id}>
+                      <circle cx={p.x} cy={p.y} r={13} fill={INK} />
+                      {/* Start plays, End is the finish flag. */}
+                      {(() => {
+                        const Mark = id === START ? Play : Flag;
+                        return <Mark x={p.x - 7} y={p.y - 7} width={14} height={14} color="var(--on-ink)" strokeWidth={2.2} aria-hidden="true" />;
+                      })()}
+                      <text x={p.x + 22} y={p.y + 4} fontSize="12" fontWeight="700" fill={INK}>
+                        {id === START ? 'Start' : 'End'} · {count(graph.cases)}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {graph.nodes.map((n) => {
+                  const p = layout.at.get(n.id);
+                  const picked = selectedNode?.id === n.id;
+                  const dim = selectedEdge ? !(selectedEdge.from === n.id || selectedEdge.to === n.id) : false;
+                  const label = `${n.label}: ${count(n.cases)} ${noun}${n.repeated ? `, repeated in ${count(n.repeated)}` : ''}${n.expected ? '' : ', deviation'}`;
+                  const choose = () => setSelected(picked ? null : { type: 'node', id: n.id });
+                  return (
+                    <g key={n.id} role="button" tabIndex={0} aria-label={label} aria-pressed={picked} className="cursor-pointer outline-none"
+                      opacity={dim ? 0.45 : 1}
+                      onMouseEnter={() => setHover(n.id)} onFocus={() => setHover(n.id)} onBlur={() => setHover(null)}
+                      onClick={choose}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choose(); } }}>
+                      <title>{label}</title>
+                      <rect x={p.x - NODE_W / 2} y={p.y - NODE_H / 2} width={NODE_W} height={NODE_H} rx={NODE_H / 2}
+                        fill={picked ? INK : 'var(--card)'} stroke={picked ? INK : n.expected ? 'var(--line-strong)' : OFF_ROUTE} strokeWidth={n.expected ? 1.2 : 1.8} />
+                      {/* What the step is: its own icon, coloured by what it
+                          means (processActivityLook.js). The traffic through
+                          it is the count under the label. */}
+                      {(() => {
+                        // A node's id is the activity's position in the
+                        // process; the look is keyed by the activity's own
+                        // id ('raised', 'dispatched'), which sits there.
+                        const lookOf = activityLook(process.activities[n.id]?.id ?? n.id, n.expected);
+                        const Icon = lookOf.icon;
+                        const cx = p.x - NODE_W / 2 + 22;
+                        return (
+                          <>
+                            <circle cx={cx} cy={p.y} r={15} fill={lookOf.fill} stroke={picked ? 'var(--on-ink)' : lookOf.ink} strokeWidth={1.5} />
+                            <Icon x={cx - 8} y={p.y - 8} width={16} height={16} color={lookOf.ink} strokeWidth={2} aria-hidden="true" />
+                          </>
+                        );
+                      })()}
+                      <text x={p.x - NODE_W / 2 + 44} y={p.y - 2} fontSize="12.5" fontWeight="700" fill={picked ? 'var(--on-ink)' : INK}>{n.label}</text>
+                      <text x={p.x - NODE_W / 2 + 44} y={p.y + 13} fontSize="10.5" fill={picked ? 'var(--on-ink)' : 'var(--ink-soft)'}>
+                        {count(n.cases)}{n.repeated ? ` · rework in ${count(n.repeated)}` : ''}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-3 py-2 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 bg-ink" /> Reference path</span>
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 bg-warn" /> Deviation</span>
+                <span className="inline-flex items-center gap-1.5"><RotateCw aria-hidden="true" className="size-3" /> Dashed: rework loop</span>
+                <span>Thicker: {metric === 'count' ? 'higher frequency' : 'longer duration'}</span>
+              </p>
+            </div>
+
+            {/* ── Routes, and what is chosen ───────────────────── */}
+            <div className="min-w-0 space-y-3">
+              {selectedNode ? (
+                <section aria-label={`${selectedNode.label}: details`} className="rounded-2xl border border-line bg-card p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-bold text-ink">{selectedNode.label}</h3>
+                    <button type="button" onClick={() => setSelected(null)} className="text-xs font-semibold text-muted-foreground hover:text-ink">Close</button>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Present in {count(selectedNode.cases)} of {count(graph.cases)} {noun} in view.
+                    {selectedNode.repeated ? ` Repeated in ${count(selectedNode.repeated)} (rework).` : ''}
+                    {selectedNode.expected ? '' : ' Not part of the reference path.'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'through', step: selectedNode.id })}>Filter: cases through this activity</button>
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'avoid', step: selectedNode.id })}>Filter: cases bypassing this activity</button>
+                  </div>
+                  <h4 className="mt-3 text-xs font-bold text-ink">Predecessors</h4>
+                  <Bars rows={neighbours(graph, process, selectedNode.id, 'before')} valueOf={(r) => r.count} textOf={(r) => `${count(r.count)} · ${r.share}%`}
+                    onPick={(r) => setSelected({ type: 'edge', key: `${r.id}>${selectedNode.id}` })} />
+                  <h4 className="mt-3 text-xs font-bold text-ink">Successors</h4>
+                  <Bars rows={neighbours(graph, process, selectedNode.id, 'next')} valueOf={(r) => r.count} textOf={(r) => `${count(r.count)} · ${r.share}%`}
+                    onPick={(r) => setSelected({ type: 'edge', key: `${selectedNode.id}>${r.id}` })} />
+                </section>
+              ) : null}
+
+              {selectedEdge ? (
+                <section aria-label={`${nameOf(selectedEdge.from)} to ${nameOf(selectedEdge.to)}: details`} className="rounded-2xl border border-line bg-card p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-bold text-ink">{nameOf(selectedEdge.from)} → {nameOf(selectedEdge.to)}</h3>
+                    <button type="button" onClick={() => setSelected(null)} className="text-xs font-semibold text-muted-foreground hover:text-ink">Close</button>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {count(selectedEdge.cases)} {noun} followed this transition{selectedEdge.count > selectedEdge.cases ? `, ${count(selectedEdge.count)} occurrences in total` : ''}.
+                    {selectedEdge.expected ? '' : ' Deviates from the reference path.'}
+                    {selectedEdge.back ? ' Rework loop: returns to an earlier activity.' : ''}
+                  </p>
+                  {selectedEdge.measured > 0 ? (
+                    <div className="mt-2 grid grid-cols-3 gap-1.5">
+                      <Fact label="Median" value={duration(selectedEdge.medianHours)} />
+                      <Fact label="Mean" value={duration(selectedEdge.averageHours)} />
+                      <Fact label="90th percentile" value={duration(selectedEdge.p90Hours)} />
+                    </div>
+                  ) : selectedEdge.from !== START && selectedEdge.to !== END ? (
+                    <p className="mt-2 text-xs text-muted-foreground">No duration recorded for this transition.</p>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'with', from: selectedEdge.from, to: selectedEdge.to })}>Filter: cases with this transition</button>
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'without', from: selectedEdge.from, to: selectedEdge.to })}>Filter: cases without this transition</button>
+                  </div>
+                  {selectedEdge.timed.length > 0 ? (
+                    <>
+                      <h4 className="mt-3 text-xs font-bold text-ink">Longest durations</h4>
+                      <Bars rows={[...selectedEdge.timed].sort((a, b) => b.hours - a.hours).slice(0, 8).map((x) => ({ label: x.c.label, hours: x.hours }))}
+                        valueOf={(r) => r.hours} textOf={(r) => duration(r.hours)} />
+                    </>
+                  ) : (
+                    <>
+                      <h4 className="mt-3 text-xs font-bold text-ink">Cases</h4>
+                      <ul className="mt-1.5 space-y-1 text-xs text-ink">
+                        {selectedEdge.caseList.slice(0, 8).map((c) => <li key={c.id} className="truncate">{c.label}</li>)}
+                      </ul>
+                    </>
+                  )}
+                </section>
+              ) : null}
+
+              {selectedRoute ? (
+                <section aria-label="Variant: details" className="rounded-2xl border border-line bg-card p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-bold text-ink">{count(selectedRoute.cases.length)} {noun} in this variant</h3>
+                    <button type="button" onClick={() => setSelected(null)} className="text-xs font-semibold text-muted-foreground hover:text-ink">Close</button>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{routeText(selectedRoute)}</p>
+                  <h4 className="mt-3 text-xs font-bold text-ink">Longest cycle times</h4>
+                  <Bars rows={selectedRoute.cases.map((c) => ({ label: c.label, hours: caseHours(c) ?? 0 })).sort((a, b) => b.hours - a.hours).slice(0, 10)}
+                    valueOf={(r) => r.hours} textOf={(r) => duration(r.hours)} />
+                </section>
+              ) : null}
+
+              <section aria-label="Variants" className="rounded-2xl border border-line bg-card p-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-bold text-ink">Variants</h3>
+                  <span className="text-xs text-muted-foreground">
+                    {count(shown.length)} of {count(variants.length)} shown · {inScope.length ? Math.round((shownCases.length / inScope.length) * 100) : 0}% of {noun}
+                  </span>
+                </div>
+                {variants.length > 1 ? (
+                  <label className="mt-2 block text-xs font-semibold text-ink">
+                    <span className="flex justify-between"><span>Most frequent</span><span>All variants</span></span>
+                    <input type="range" min={1} max={variants.length} value={Math.min(shown.length, variants.length)} aria-label="Number of variants shown"
+                      onChange={(e) => setRouteCount(Number(e.target.value))} className="mt-1 w-full accent-[var(--ink)]" />
+                  </label>
+                ) : null}
+                <ul className="mt-2 max-h-[26rem] space-y-1.5 overflow-y-auto pr-1">
+                  {variants.map((v, i) => {
+                    const on = shownKeys.has(v.key);
+                    return (
+                      <li key={v.key} className={`rounded-xl border p-2 text-xs ${on ? 'border-line-strong bg-surface' : 'border-line opacity-70'}`}>
+                        <div className="flex items-start gap-2">
+                          <input type="checkbox" checked={on} onChange={() => toggleRoute(v.key)} className="mt-0.5 accent-[var(--ink)]"
+                            aria-label={`Show variant ${i + 1}: ${routeText(v)}`} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                              <span className="font-bold text-ink">Variant {i + 1}</span>
+                              <span className="tabular-nums text-muted-foreground">{count(v.cases.length)} · {v.share}%</span>
+                            </div>
+                            <div className="mt-1 h-1.5 rounded-full bg-surface-2">
+                              <div className={`h-1.5 rounded-full ${v.expected ? 'bg-ink' : 'bg-warn'}`} style={{ width: `${Math.max(2, (v.cases.length / variants[0].cases.length) * 100)}%` }} />
+                            </div>
+                            <p className="mt-1 text-ink">{routeText(v)}</p>
+                            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-muted-foreground">
+                              <span>{v.expected ? 'Reference path' : v.repeats ? 'Contains rework' : 'Deviation'}</span>
+                              {v.medianHours !== null ? <span>Median {duration(v.medianHours)}</span> : null}
+                              <button type="button" onClick={() => onlyRoute(v.key)} className="font-semibold text-ink underline underline-offset-2">Isolate</button>
+                            </p>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            </div>
+          </div>
+
+          {/* ── Root cause analysis ──────────────────────────── */}
+          <section aria-label="Root cause analysis" className="mt-3 rounded-2xl border border-line bg-card p-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-ink">Root cause analysis</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {count(causes.affected)} of {count(causes.total)} {noun} affected ({causes.rate}%). Attributes ranked by excess cases over that rate.
+                </p>
+              </div>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+                Analyse
+                <NativeSelect className="w-80 max-w-full" value={target} onChange={(e) => setTarget(e.target.value)}>
+                  {ROOT_CAUSE_TARGETS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </NativeSelect>
+              </label>
+            </div>
+            {causes.rows.length === 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {causes.affected === 0
+                  ? 'No affected cases in scope.'
+                  : 'No attribute is over-represented: affected cases are spread in line with the overall rate.'}
+              </p>
+            ) : (
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[34rem] border-collapse text-xs">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th scope="col" className="py-1.5 pr-3 font-semibold">Attribute</th>
+                      <th scope="col" className="py-1.5 pr-3 font-semibold">Value</th>
+                      <th scope="col" className="py-1.5 pr-3 text-right font-semibold">Affected</th>
+                      <th scope="col" className="py-1.5 pr-3 font-semibold">Rate against {causes.rate}% overall</th>
+                      <th scope="col" className="py-1.5 pr-3 text-right font-semibold">Excess cases</th>
+                      <th scope="col" className="py-1.5"><span className="sr-only">Filter</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {causes.rows.map((r) => (
+                      <tr key={`${r.key}:${r.value}`} className="border-t border-line">
+                        <td className="py-1.5 pr-3 text-muted-foreground">{r.key}</td>
+                        <th scope="row" className="py-1.5 pr-3 text-left font-semibold text-ink">{r.value}</th>
+                        <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{count(r.affected)} of {count(r.cases)}</td>
+                        <td className="py-1.5 pr-3">
+                          <div className="flex items-center gap-2">
+                            <div className="relative h-1.5 w-28 shrink-0 rounded-full bg-surface-2">
+                              <div className="h-1.5 rounded-full bg-warn" style={{ width: `${Math.min(100, r.rate)}%` }} />
+                              <span aria-hidden="true" className="absolute -top-0.5 h-2.5 w-px bg-ink" style={{ left: `${Math.min(100, causes.rate)}%` }} />
+                            </div>
+                            <span className="tabular-nums text-ink">{r.rate}%</span>
+                          </div>
+                        </td>
+                        <td className="py-1.5 pr-3 text-right font-bold tabular-nums text-ink">+{r.excess}</td>
+                        <td className="py-1.5 text-right">
+                          <button type="button" className={pill} onClick={() => addFilter({ kind: 'attr', key: r.key, value: r.value })}
+                            aria-label={`Filter to ${r.key}: ${r.value}`}>Filter</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          {process.truncated ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Limited to the most recent {count(process.cases.length)} of {count(process.total)} {noun}. Select a shorter period to include all.
+            </p>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}

@@ -18,6 +18,8 @@ export const toBeneficiary = (row) => ({
   name:              row.name,
   cohort:            row.cohort,
   contactName:       row.contact_name ?? "",
+  contactEmail:      row.contact_email ?? "",
+  mobileNumber:      row.mobile_number ?? "",
   childCount:        row.child_count === null || row.child_count === undefined ? null : Number(row.child_count),
   isActive:          Boolean(row.is_active),
   approvedAt:        row.approved_at ?? null,
@@ -58,7 +60,12 @@ export const approveBeneficiary = async (id) => {
   return toBeneficiary(body.data ?? {});
 };
 
+export const rollbackCohort = async (id) => {
+  const body = await apiPatch(`/api/beneficiaries/${id}/rollback-cohort`, {});
+  return toBeneficiary(body.data ?? {});
+};
+
 export default {
   getBeneficiaries, getBeneficiary, createBeneficiary,
-  updateBeneficiary, setBeneficiaryStatus, approveBeneficiary,
+  updateBeneficiary, setBeneficiaryStatus, approveBeneficiary, rollbackCohort,
 };

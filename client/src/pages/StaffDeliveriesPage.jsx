@@ -10,29 +10,22 @@
 // from its own tab bar slot — see routes/paths.js's STAFF.deliveries
 // comment for why.
 //
-// Deliberately read-only and un-paginated: GET /api/deliveries
-// already returns everything in the requested range in one call
-// (ProcurementDashboard's own equivalent screen never paginates
-// either), and a manager-side version of this page — filters, totals,
-// the ability to act on a flagged delivery — is a later, separate
-// piece of work, not something to half-build here.
+// Read-only. GET /api/deliveries returns everything in the requested
+// range in one call; search, sort and the filters (status, supplier,
+// who received it) narrow that in the browser. The layout is
+// HistoryScreen's, shared by every worker history.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
-import DeliveryNotePDF from '../features/procurement/components/DeliveryNotePDF';
-import { Notice } from '../features/staff/components/StepPrimitives';
+import DeliveryNotePDF from '../features/receiving/DeliveryNotePDF';
 import receivingAPI from '../services/receivingAPI';
 import { STAFF } from '../routes/paths';
-import Paged from '../features/staff/components/Paged';
-import usePaged from '../features/staff/hooks/usePaged';
-
-const RANGES = [
-  { key: 'today', label: 'Today' },
-  { key: 'week',  label: 'This week' },
-  { key: 'month', label: 'This month' },
-  { key: 'all',   label: 'All' },
-];
+import HistoryScreen, { HistoryRow } from '../features/staff/HistoryScreen';
+import { byNewest, byOldest, byText } from '../features/staff/historyView';
+import StatusBadge from '@/components/ui/status-badge';
+import { workerStatus } from '../features/staff/workerStatus';
+import { formatShortDate as formatDate } from '@/lib/dates';
 
 // The badge people actually want to read here is "did the order this
 // delivery belongs to get fully delivered" — not "recorded", which is
@@ -45,12 +38,29 @@ const isPoComplete = (poStatus) => poStatus === 'completed';
 
 const badgeFor = (delivery) => (
   isPoComplete(delivery.po_status)
-    ? { className: 'stf-badge is-done', label: 'Completed' }
-    : { className: 'stf-badge is-active', label: 'Partially delivered' }
+    ? { status: 'completed', label: 'Completed' }
+    : { status: 'partial', label: 'Partially delivered' }
 );
 
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const dateOf = (d) => d.delivery_date ?? d.created_at;
+
+// Module level so their identity is stable across renders.
+const SORTS = [
+  { key: 'newest', label: 'Newest first', compare: byNewest(dateOf) },
+  { key: 'oldest', label: 'Oldest first', compare: byOldest(dateOf) },
+  { key: 'supplier', label: 'Supplier A to Z', compare: byText((d) => d.supplier_name) },
+];
+const FILTERS = [
+  {
+    key: 'status', label: 'Status',
+    // A discrepancy is its own choice: it is what someone goes looking for.
+    valueOf: (d) => (d.status === 'flagged' ? 'discrepancy' : badgeFor(d).status),
+    labelOf: (v) => ({ completed: 'Completed', partial: 'Partially delivered', discrepancy: 'Discrepancy' }[v] ?? v),
+  },
+  { key: 'supplier', label: 'Supplier', valueOf: (d) => d.supplier_name },
+  { key: 'receivedBy', label: 'Received by', valueOf: (d) => d.received_by_name },
+];
+const searchText = (d) => [d.supplier_name, d.po_number, d.received_by_name].filter(Boolean).join(' ');
 
 export default function StaffDeliveriesPage() {
   const navigate = useNavigate();
@@ -78,8 +88,6 @@ export default function StaffDeliveriesPage() {
     return () => { cancelled = true; };
   }, [range]);
 
-  const paged = usePaged(deliveries);
-
   const openPdf = async (id) => {
     setOpeningId(id);
     setError(null);
@@ -98,72 +106,48 @@ export default function StaffDeliveriesPage() {
       crumb="Receiving / Past deliveries"
       onBack={() => navigate(STAFF.receiving)}
     >
-      <div className="stf-step">
-        <div className="stf-step-head">
-          <h1 className="stf-step-title" tabIndex={-1}>Past deliveries</h1>
-          <p className="stf-step-sub">Every delivery note that's been recorded, most recent first.</p>
-        </div>
-
-        {error ? <Notice tone="warn">{error}</Notice> : null}
-
-        <div className="stf-segments" role="tablist" aria-label="Date range">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              role="tab"
-              aria-selected={range === r.key}
-              className={`stf-segment${range === r.key ? ' is-active' : ''}`}
-              onClick={() => setRange(r.key)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="stf-skeleton" aria-label="Loading" />
-        ) : deliveries.length === 0 ? (
-          <div className="stf-empty">
-            No deliveries recorded in this range yet.
-          </div>
-        ) : (
-          <div className="stf-list">
-            {paged.slice.map((delivery) => {
-              const badge = badgeFor(delivery);
-              return (
-                <div key={delivery.id} className="stf-row is-static">
-                  <span className="stf-row-main">
-                    <span className="stf-row-title">{delivery.supplier_name}</span>
-                    <span className="stf-row-meta">
-                      {formatDate(delivery.delivery_date)}
-                      {delivery.received_by_name ? ` · Received by ${delivery.received_by_name}` : ''}
-                    </span>
-                  </span>
-                  <span className={badge.className}>{badge.label}</span>
+      <HistoryScreen
+        title="Past deliveries"
+        sub="Every delivery note that's been recorded."
+        error={error}
+        range={range}
+        onRangeChange={setRange}
+        loading={loading}
+        rows={deliveries}
+        search={searchText}
+        searchPlaceholder="Search by supplier, order number or name"
+        searchId="stf-deliveries-search"
+        sorts={SORTS}
+        filters={FILTERS}
+        empty="No deliveries recorded in this range yet."
+        noun="deliveries"
+        renderRow={(delivery) => {
+          const badge = badgeFor(delivery);
+          return (
+            <HistoryRow
+              title={delivery.supplier_name}
+              meta={[
+                formatDate(delivery.delivery_date),
+                delivery.po_number,
+                delivery.received_by_name ? `Received by ${delivery.received_by_name}` : null,
+              ].filter(Boolean).join(' · ')}
+              badges={(
+                <>
+                  <StatusBadge {...workerStatus('delivery', badge.status)}>{badge.label}</StatusBadge>
                   {/* A count discrepancy is a separate, orthogonal fact
                       from whether the order is complete — an over-count
                       can still fully satisfy the order, so this shows
                       alongside the completion badge, not instead of it. */}
                   {delivery.status === 'flagged' ? (
-                    <span className="stf-badge is-warn">Discrepancy</span>
+                    <StatusBadge {...workerStatus('delivery', 'discrepancy')}>Discrepancy</StatusBadge>
                   ) : null}
-                  <button
-                    type="button"
-                    className="stf-btn stf-btn-secondary"
-                    onClick={() => openPdf(delivery.id)}
-                    disabled={openingId === delivery.id}
-                  >
-                    {openingId === delivery.id ? 'Opening…' : 'View note'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <Paged {...paged} noun="deliveries" />
-      </div>
+                </>
+              )}
+              action={{ label: 'View note', onClick: () => openPdf(delivery.id), busy: openingId === delivery.id }}
+            />
+          );
+        }}
+      />
 
       {pdfDelivery ? (
         <DeliveryNotePDF delivery={pdfDelivery} onClose={() => setPdfDelivery(null)} />

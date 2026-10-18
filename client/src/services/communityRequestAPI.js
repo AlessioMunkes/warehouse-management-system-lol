@@ -2,58 +2,78 @@
 // src/services/communityRequestAPI.js
 //
 // Client wrapper around /api/community-requests (ADM-5.0 / BR-28 —
-// the benevolent package call-in log). Mirrors
-// communityRequest.controller.js, one function per route.
+// benevolent requests). Mirrors communityRequest.controller.js, one
+// function per route.
 //
 // Two jobs, same as supplierAPI.js / stockAPI.js:
 //   1. Unwrap the { success, data } envelope.
 //   2. Map the live snake_case columns to one camelCase shape.
 //
-// The table has a two-step workflow: log → claim (sets handledBy) →
-// resolve (sets outcome + outcomeNote + resolvedAt). Claiming and
-// resolving are separate calls; the UI must not conflate them.
+// THE FLOW
+//   log → approve (a manager chooses products and quantities; stock is
+//   set aside) → claim or assign a packer → confirm what went out
+//   (stock leaves) — or decline at either stage.
 //
-// LOG ONLY — no endpoint here moves stock, and none is coming.
+//   A request whose stock was used by a pallet stays approved but is
+//   flagged (itemsShortAt): it "needs new items" until a manager
+//   chooses other items.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost, apiPatch } from './api';
+import { apiGet, apiPost, apiPatch, apiPut } from './api';
+import { postOrQueue } from './offlinePost';
 
-// request_outcome enum. 'referred' exists in the DB and can appear on
-// a row, so it has a label — but it is never offered as a resolve
-// target (see RESOLVE_OUTCOMES).
+// request_outcome enum. 'pending' is shown as "Awaiting approval".
+// 'referred' exists in the DB but is not used.
 export const OUTCOME_LABELS = {
-  pending:             'Pending',
+  pending:             'Awaiting approval',
+  approved:            'Approved',
   fulfilled:           'Fulfilled',
   partially_fulfilled: 'Partially fulfilled',
   declined:            'Declined',
   referred:            'Referred',
 };
 
-export const OUTCOMES = ['pending', 'fulfilled', 'partially_fulfilled', 'declined', 'referred'];
+export const OUTCOMES = ['pending', 'approved', 'fulfilled', 'partially_fulfilled', 'declined', 'referred'];
 
-// What staff may resolve a request to (BR-28 scope — excludes
-// 'pending', the starting state, and 'referred', out of scope).
-export const RESOLVE_OUTCOMES = ['fulfilled', 'partially_fulfilled', 'declined'];
+const fullName = (first, last) => `${first ?? ''} ${last ?? ''}`.trim() || null;
+
+const toItem = (line = {}) => ({
+  id:               line.id,
+  productId:        line.productId,
+  productName:      line.productName ?? '',
+  unit:             line.unit ?? '',
+  quantityApproved: Number(line.quantityApproved ?? 0),
+  quantityReleased: Number(line.quantityReleased ?? 0),
+  shortAt:          line.shortAt ?? null,
+});
 
 // ── Row mapper ───────────────────────────────────────────────
-export const toRequest = (row = {}) => {
-  const first = row.handled_by_first_name ?? '';
-  const last  = row.handled_by_last_name ?? '';
-  const handledByName = `${first} ${last}`.trim();
-  return {
-    id:             row.id,
-    requestedAt:    row.requested_at ?? null,
-    callerName:     row.caller_name ?? '',
-    callerContact:  row.caller_contact ?? '',
-    itemsRequested: row.items_requested ?? '',
-    quantityNote:   row.quantity_note ?? '',
-    outcome:        row.outcome ?? 'pending',
-    outcomeNote:    row.outcome_note ?? '',
-    handledBy:      row.handled_by ?? null,
-    handledByName:  handledByName || null,
-    resolvedAt:     row.resolved_at ?? null,
-    createdAt:      row.created_at ?? null,
-  };
-};
+export const toRequest = (row = {}) => ({
+  id:             row.id,
+  requestedAt:    row.requested_at ?? null,
+  callerName:     row.caller_name ?? '',
+  callerContact:  row.caller_contact ?? '',
+  itemsRequested: row.items_requested ?? '',
+  quantityNote:   row.quantity_note ?? '',
+  outcome:        row.outcome ?? 'pending',
+  outcomeNote:    row.outcome_note ?? '',
+  handledBy:      row.handled_by ?? null,
+  handledByName:  fullName(row.handled_by_first_name, row.handled_by_last_name),
+  // Who took the request and signed it off.
+  loggedByName:   fullName(row.logged_by_first_name, row.logged_by_last_name),
+  resolvedAt:     row.resolved_at ?? null,
+  createdAt:      row.created_at ?? null,
+  approvedAt:     row.approved_at ?? null,
+  approvedBy:     row.approved_by ?? null,
+  approvedByName: fullName(row.approved_by_first_name, row.approved_by_last_name),
+  assignedTo:     row.assigned_to ?? null,
+  assignedToName: fullName(row.assigned_to_first_name, row.assigned_to_last_name),
+  // Set while any approved line ran short of stock.
+  itemsShortAt:   row.items_short_at ?? null,
+  // Approved a week ago or more and still not gone out (the server's
+  // rule, communityRequest.repository.js).
+  isOverdue:      Boolean(row.is_overdue),
+  items:          (row.items ?? []).map(toItem),
+});
 
 // ── GET /api/community-requests ──────────────────────────────
 export const getRequests = async ({ outcome = '', search = '' } = {}) => {
@@ -72,25 +92,73 @@ export const getRequest = async (id) => {
 };
 
 // ── POST /api/community-requests ─────────────────────────────
-export const logRequest = async (payload) => {
-  const body = await apiPost('/api/community-requests', payload);
+// `keepOffline` is the floor's: with no signal the request is kept on
+// the phone and this returns { queued: true, label } (offlinePost.js).
+// The manager's screen leaves it off, because only the floor's shell
+// shows what is waiting and sends it.
+export const logRequest = async (payload, { keepOffline = false } = {}) => {
+  const body = keepOffline
+    ? await postOrQueue('/api/community-requests', payload, { kind: 'request', label: 'A benevolent request' })
+    : await apiPost('/api/community-requests', payload);
+  return body.queued ? body : toRequest(body.data ?? {});
+};
+
+// ── POST /:id/approve ────────────────────────────────────────
+// items: [{ productId, quantity }]. Manager or admin. Refused with a
+// message if more is asked for than is available.
+export const approveRequest = async (id, items) => {
+  const body = await apiPost(`/api/community-requests/${id}/approve`, { items });
   return toRequest(body.data ?? {});
 };
 
-// ── PATCH /api/community-requests/:id/claim ──────────────────
-// The current user takes ownership. No body.
+// ── POST /:id/decline ────────────────────────────────────────
+// Awaiting approval or approved. Releases any stock set aside.
+export const declineRequest = async (id, reason) => {
+  const body = await apiPost(`/api/community-requests/${id}/decline`, { reason });
+  return toRequest(body.data ?? {});
+};
+
+// ── POST /:id/reverse ────────────────────────────────────────
+// Managers only. Puts what went out back into stock and ends the
+// request as declined, with the reason.
+export const reverseRequest = async (id, reason) => {
+  const body = await apiPost(`/api/community-requests/${id}/reverse`, { reason });
+  return toRequest(body.data ?? {});
+};
+
+// ── PATCH /:id/assign ────────────────────────────────────────
+// userId null clears the packer.
+export const assignRequest = async (id, userId) => {
+  const body = await apiPatch(`/api/community-requests/${id}/assign`, { userId });
+  return toRequest(body.data ?? {});
+};
+
+// ── PUT /:id/items ───────────────────────────────────────────
+// Choose other items for an approved request. Clears the flag.
+export const rechooseItems = async (id, items) => {
+  const body = await apiPut(`/api/community-requests/${id}/items`, { items });
+  return toRequest(body.data ?? {});
+};
+
+// ── PATCH /:id/claim ─────────────────────────────────────────
+// The current user takes an approved request. No body.
 export const claimRequest = async (id) => {
   const body = await apiPatch(`/api/community-requests/${id}/claim`, {});
   return toRequest(body.data ?? {});
 };
 
-// ── PATCH /api/community-requests/:id/resolve ────────────────
-export const resolveRequest = async (id, { outcome, outcomeNote }) => {
-  const body = await apiPatch(`/api/community-requests/${id}/resolve`, { outcome, outcomeNote });
-  return toRequest(body.data ?? {});
+// ── POST /:id/confirm ────────────────────────────────────────
+// items: [{ productId, quantityReleased }]; leave it out to release
+// everything that was approved.
+export const confirmRequest = async (id, items) => {
+  const body = await postOrQueue(`/api/community-requests/${id}/confirm`, items ? { items } : {}, {
+    kind: 'request', label: `Request ${id}`,
+  });
+  return body.queued ? body : toRequest(body.data ?? {});
 };
 
 export default {
-  getRequests, getRequest, logRequest, claimRequest, resolveRequest,
-  OUTCOMES, OUTCOME_LABELS, RESOLVE_OUTCOMES,
+  getRequests, getRequest, logRequest,
+  approveRequest, declineRequest, assignRequest, rechooseItems, claimRequest, confirmRequest, reverseRequest,
+  OUTCOMES, OUTCOME_LABELS,
 };

@@ -19,6 +19,12 @@ vi.mock('../src/config/db.js', () => ({
 
 const signOutVolunteer = vi.fn();
 const getVolunteerById = vi.fn();
+const releaseForVolunteer = vi.fn();
+
+// Signing out hands back any pallet the guest still holds.
+vi.mock('../src/repositories/slipAccess.repository.js', () => ({
+  default: { releaseForVolunteer: (...args) => releaseForVolunteer(...args) },
+}));
 
 vi.mock('../src/repositories/volunteer.repository.js', () => ({
   default: {
@@ -45,9 +51,33 @@ beforeEach(() => {
   vi.clearAllMocks();
   signOutVolunteer.mockResolvedValue(openVisit);
   getVolunteerById.mockResolvedValue(openVisit);
+  releaseForVolunteer.mockResolvedValue({ nothingHeld: true });
 });
 
 describe('POST /api/volunteers/sign-out', () => {
+  // Nothing may stay locked to someone who has gone home, whether or not
+  // the app asked for the hand-back first.
+  it('hands back every pallet the guest holds, named by the token, before closing the visit', async () => {
+    const order = [];
+    releaseForVolunteer.mockImplementation(async () => { order.push('release'); return { slip: { id: 1 }, slips: [{ id: 1 }, { id: 2 }] }; });
+    signOutVolunteer.mockImplementation(async () => { order.push('sign-out'); return openVisit; });
+
+    const res = await request(app)
+      .post('/api/volunteers/sign-out')
+      .set('Cookie', authCookie(GUEST))
+      .send({ volunteerId: 999 });
+
+    expect(res.status).toBe(200);
+    expect(releaseForVolunteer).toHaveBeenCalledWith({ volunteerId: 7 });
+    expect(order).toEqual(['release', 'sign-out']);
+  });
+
+  it('signs out cleanly when no pallet is held', async () => {
+    const res = await request(app).post('/api/volunteers/sign-out').set('Cookie', authCookie(GUEST));
+    expect(res.status).toBe(200);
+    expect(signOutVolunteer).toHaveBeenCalledWith(7);
+  });
+
   it('closes the visit named in the token', async () => {
     const res = await request(app)
       .post('/api/volunteers/sign-out')

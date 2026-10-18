@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DonationManagementPage from '../pages/DonationManagementPage';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
+vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>Top Navbar</div>,
 }));
 
-vi.mock('../features/donationManagement/components/FlaggedItemsTab', () => ({
+vi.mock('../features/donationManagement/FlaggedItemsTab', () => ({
   default: () => <div>Pending Product Review Tab</div>,
 }));
 
-vi.mock('../features/donationManagement/components/ReconciliationTab', () => ({
+vi.mock('../features/donationManagement/ReconciliationTab', () => ({
   default: ({ actionLabel }) => <div>{actionLabel} Tab</div>,
 }));
 
@@ -33,10 +33,10 @@ describe('DonationManagementPage', () => {
   it('renders the title, tab strip and the Pending Product Review tab by default', async () => {
     render(<DonationManagementPage />);
 
-    expect(screen.getByText('Classification Queue')).toBeInTheDocument();
-    expect(screen.getByText('Pending Product Review', { selector: 'button' })).toBeInTheDocument();
-    expect(screen.getByText('Reconciliation', { selector: 'button' })).toBeInTheDocument();
-    expect(screen.getByText('Processing Failed', { selector: 'button' })).toBeInTheDocument();
+    expect(screen.getByText('Classification queue')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Pending Product Review/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Reconciliation/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Processing Failed/ })).toBeInTheDocument();
     expect(screen.getByText('Pending Product Review Tab')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('tab', { name: /Pending Product Review 2/ })).toBeInTheDocument());
   });

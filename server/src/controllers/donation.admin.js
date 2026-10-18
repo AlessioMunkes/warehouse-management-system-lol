@@ -3,7 +3,8 @@
 // Hardened to 10/10 Production Security Standard with Conversational Comments
 // ─────────────────────────────────────────────────────────────
 import donationAdminService from '../services/donationAdmin.service.js';
-import { ROLES } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP } from '../constants/permissions.js';
+import { DONATION_CATEGORIES } from '../constants/donationCategories.js';
 
 /**
  * Authorization Helper for Administrative Endpoints
@@ -27,8 +28,7 @@ const authorizeAdminOrManager = (req, res) => {
     };
   }
 
-  const authorizedRoles = [ROLES.ADMIN, ROLES.MANAGER];
-  if (!authorizedRoles.includes(req.user.role)) {
+  if (!MANAGERS_UP.includes(req.user.role)) {
     return {
       authorized: false,
       status: 403,
@@ -284,7 +284,7 @@ export const evaluateRouting = async (req, res, next) => {
     }
 
     // Strict Whitelist Validation for category strings
-    const allowedCategories = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non_food'];
+    const allowedCategories = DONATION_CATEGORIES;
     const sanitizedCategory = category ? String(category).trim() : null;
     if (sanitizedCategory && !allowedCategories.includes(sanitizedCategory)) {
       return res.status(400).json({

@@ -9,29 +9,39 @@
 // one URL every worker reaches decanting through (see routes/paths.js
 // for why the tab bar has no spare slot for a sixth item).
 //
-// Deliberately read-only and un-paginated, for the same reason
-// StaffDeliveriesPage.jsx is: getDecantingRecords already returns
-// everything in the requested range in one call.
+// Read-only, for the same reason StaffDeliveriesPage.jsx is:
+// getDecantingRecords returns everything in the requested range in one
+// call, and HistoryScreen sorts and filters it in the browser.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
-import DecantingSheetPDF from '../features/decanting/components/DecantingSheetPDF';
-import { Notice } from '../features/staff/components/StepPrimitives';
+import DecantingSheetPDF from '../features/decanting/DecantingSheetPDF';
 import { getDecantingRecords, getDecantingById } from '../services/decantingAPI';
 import { STAFF } from '../routes/paths';
-import Paged from '../features/staff/components/Paged';
-import usePaged from '../features/staff/hooks/usePaged';
+import HistoryScreen, { HistoryRow } from '../features/staff/HistoryScreen';
+import { byNewest, byOldest, byNumber } from '../features/staff/historyView';
+import StatusBadge from '@/components/ui/status-badge';
+import { workerStatus } from '../features/staff/workerStatus';
+import { formatShortDate as formatDate } from '@/lib/dates';
 
-const RANGES = [
-  { key: 'today', label: 'Today' },
-  { key: 'week',  label: 'This week' },
-  { key: 'month', label: 'This month' },
-  { key: 'all',   label: 'All' },
+const dateOf = (r) => r.created_at ?? r.week_of;
+
+const SORTS = [
+  { key: 'newest', label: 'Newest first', compare: byNewest(dateOf) },
+  { key: 'oldest', label: 'Oldest first', compare: byOldest(dateOf) },
+  { key: 'bags', label: 'Most bags', compare: byNumber((r) => r.total_bags) },
+  { key: 'wastage', label: 'Most wastage', compare: byNumber((r) => r.total_wastage_kg) },
 ];
-
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const FILTERS = [
+  {
+    key: 'wastage', label: 'Wastage',
+    valueOf: (r) => (Number(r.total_wastage_kg) > 0 ? 'some' : 'none'),
+    labelOf: (v) => (v === 'some' ? 'Some wastage' : 'No wastage'),
+  },
+  { key: 'recordedBy', label: 'Recorded by', valueOf: (r) => r.recorded_by_name },
+];
+const searchText = (r) => [r.recorded_by_name, `week of ${formatDate(r.week_of)}`].filter(Boolean).join(' ');
 
 export default function StaffDecantingRecordsPage() {
   const navigate = useNavigate();
@@ -59,8 +69,6 @@ export default function StaffDecantingRecordsPage() {
     return () => { cancelled = true; };
   }, [range]);
 
-  const paged = usePaged(records);
-
   const openPdf = async (id) => {
     setOpeningId(id);
     setError(null);
@@ -79,67 +87,38 @@ export default function StaffDecantingRecordsPage() {
       crumb="Decanting / Past sheets"
       onBack={() => navigate(STAFF.decanting)}
     >
-      <div className="stf-step">
-        <div className="stf-step-head">
-          <h1 className="stf-step-title" tabIndex={-1}>Past sheets</h1>
-          <p className="stf-step-sub">Every decanting sheet that's been recorded, most recent first.</p>
-        </div>
-
-        {error ? <Notice tone="warn">{error}</Notice> : null}
-
-        <div className="stf-segments" role="tablist" aria-label="Date range">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              role="tab"
-              aria-selected={range === r.key}
-              className={`stf-segment${range === r.key ? ' is-active' : ''}`}
-              onClick={() => setRange(r.key)}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="stf-skeleton" aria-label="Loading" />
-        ) : records.length === 0 ? (
-          <div className="stf-empty">
-            No decanting sheets recorded in this range yet.
-          </div>
-        ) : (
-          <div className="stf-list">
-            {paged.slice.map((record) => (
-              <div key={record.id} className="stf-row is-static">
-                <span className="stf-row-main">
-                  <span className="stf-row-title">Week of {formatDate(record.week_of)}</span>
-                  <span className="stf-row-meta">
-                    {formatDate(record.created_at)}
-                    {record.recorded_by_name ? ` · Recorded by ${record.recorded_by_name}` : ''}
-                    {` · ${record.line_count} line${Number(record.line_count) === 1 ? '' : 's'}`}
-                  </span>
-                </span>
-                {Number(record.total_wastage_kg) > 0 ? (
-                  <span className="stf-badge is-warn">
-                    {record.total_wastage_kg} kg wastage
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  className="stf-btn stf-btn-secondary"
-                  onClick={() => openPdf(record.id)}
-                  disabled={openingId === record.id}
-                >
-                  {openingId === record.id ? 'Opening…' : 'View sheet'}
-                </button>
-              </div>
-            ))}
-          </div>
+      <HistoryScreen
+        title="Past sheets"
+        sub="Every decanting sheet that's been recorded."
+        error={error}
+        range={range}
+        onRangeChange={setRange}
+        loading={loading}
+        rows={records}
+        search={searchText}
+        searchPlaceholder="Search by name or week"
+        searchId="stf-sheets-search"
+        sorts={SORTS}
+        filters={FILTERS}
+        empty="No decanting sheets recorded in this range yet."
+        noun="sheets"
+        renderRow={(record) => (
+          <HistoryRow
+            title={`Week of ${formatDate(record.week_of)}`}
+            meta={[
+              formatDate(record.created_at),
+              record.recorded_by_name ? `Recorded by ${record.recorded_by_name}` : null,
+              `${record.line_count} line${Number(record.line_count) === 1 ? '' : 's'}`,
+            ].filter(Boolean).join(' · ')}
+            badges={Number(record.total_wastage_kg) > 0 ? (
+              <StatusBadge {...workerStatus('note', 'wastage')}>
+                {record.total_wastage_kg} kg wastage
+              </StatusBadge>
+            ) : null}
+            action={{ label: 'View sheet', onClick: () => openPdf(record.id), busy: openingId === record.id }}
+          />
         )}
-
-        <Paged {...paged} noun="sheets" />
-      </div>
+      />
 
       {pdfRecord ? (
         <DecantingSheetPDF record={pdfRecord} onClose={() => setPdfRecord(null)} />

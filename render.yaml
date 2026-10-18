@@ -43,3 +43,56 @@ services:
         generateValue: true    # Render generates a strong random value
       - key: DB_SSL
         value: "true"
+      # The AI features. WITHOUT THIS KEY BOTH ARE SILENTLY OFF:
+      # provider.isEnabled() is Boolean(GEMINI_API_KEY), so the help
+      # panel answers "the help assistant is not switched on" and the
+      # reporting screen hides its ask-a-question box entirely. Nothing
+      # logs an error, because neither is a fault — they are features
+      # that were never configured.
+      #
+      # Declared here with sync:false rather than left undeclared, so
+      # the blueprint says the key EXISTS and has to be pasted in the
+      # dashboard. That is the whole difference between a handover that
+      # works and one where the next person finds two dead features.
+      - key: GEMINI_API_KEY
+        sync: false            # paste the Google AI Studio key in the dashboard
+      # Pinned rather than left to the code default, because a model
+      # name that is retired for new keys is how this last broke: the
+      # fix is one dashboard edit, but only if you know the knob is
+      # here. See provider.js.
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      # Backup models, tried in order when the one above is out of
+      # quota, overloaded or times out. Free-tier limits are per model,
+      # so this is what keeps both the help panel and reporting
+      # answering on a busy day. Declared so it is visible in the
+      # dashboard; it matches provider.js's default.
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.1-flash-lite,gemini-flash-lite-latest
+      # Phone notifications for the floor (Web Push). Generate the pair
+      # once with `npx web-push generate-vapid-keys` and never rotate it
+      # casually: every phone that turned alerts on is tied to it.
+      # Unset = no phone notifications; the in-app bell still works.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false            # e.g. mailto:ops@ladlesoflove.org.za
+      # QuickBooks Online: sends each approved purchase order across so
+      # Finance does not capture it by hand. From an Intuit developer
+      # app (developer.intuit.com). The redirect URI must be registered
+      # on that app exactly as written here:
+      #   https://<this service>/api/quickbooks/callback
+      # Unset = the feature is off and Finance is emailed each order.
+      # Then an admin connects the company in Settings, Connections.
+      - key: QUICKBOOKS_CLIENT_ID
+        sync: false
+      - key: QUICKBOOKS_CLIENT_SECRET
+        sync: false
+      - key: QUICKBOOKS_REDIRECT_URI
+        sync: false
+      - key: QUICKBOOKS_ENVIRONMENT
+        sync: false            # sandbox (default) or production
+      - key: QUICKBOOKS_TOKEN_ENCRYPTION_KEY
+        sync: false            # base64 of 32 random bytes; falls back to GMAIL_TOKEN_ENCRYPTION_KEY

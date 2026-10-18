@@ -10,7 +10,7 @@
 // hand-written.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { buildTools, buildSystemPrompt } from '../src/features/reporting/ai/toolSchema.js';
+import { buildTools, buildSystemPrompt } from '../src/features/reporting/toolSchema.js';
 import { validateSpec } from '../src/features/reporting/specValidator.js';
 import {
   METRIC_IDS, METRICS, COHORTS, BENEFICIARY_KINDS, MOVEMENT_TYPES, isSnapshot,
@@ -27,9 +27,21 @@ describe('tool schema is generated from the catalog', () => {
     expect(clarify).toBeDefined();
   });
 
-  it('offers exactly the catalog metrics, no more and no fewer', () => {
+  // The ask box is operations-only — see toolSchema.js's own header
+  // note. Impact metrics (children_reached, meals_enabled,
+  // adults_reached, paper_saved, compost_processed) must NOT be
+  // reachable here, so this asserts the catalog's operational subset,
+  // not the full catalog.
+  it('offers exactly the catalog\'s operational metrics, no impact metrics', () => {
+    const operationalIds = Object.values(METRICS).filter((m) => !m.impactOnly).map((m) => m.id);
     expect(runReport.parameters.properties.metric.enum.sort())
-      .toEqual([...METRIC_IDS].sort());
+      .toEqual(operationalIds.sort());
+
+    const impactIds = Object.values(METRICS).filter((m) => m.impactOnly).map((m) => m.id);
+    expect(impactIds.length).toBeGreaterThan(0); // the exclusion is only meaningful if some exist
+    for (const id of impactIds) {
+      expect(runReport.parameters.properties.metric.enum).not.toContain(id);
+    }
   });
 
   // Dates cannot be required any more: snapshot metrics are the
@@ -81,8 +93,17 @@ describe('system prompt', () => {
     expect(prompt).toContain('2026-08-22');
   });
 
-  it('describes every available report', () => {
+  // Every metric id appears somewhere in the prompt — the operational
+  // ones as answerable reports, the impact ones (still checked via
+  // METRIC_IDS, the full set) in the redirect section below, so the
+  // model at least recognises the name even though it cannot run it.
+  it('mentions every metric id, operational or impact', () => {
     for (const id of METRIC_IDS) expect(prompt).toContain(id);
+  });
+
+  it('tells the model impact metrics are out of scope and to redirect instead of guessing', () => {
+    expect(prompt).toMatch(/IMPACT REPORTS ARE OUT OF SCOPE/);
+    expect(prompt).toMatch(/Impact Calculator/);
   });
 
   it('separates period reports from live ones', () => {
@@ -91,7 +112,7 @@ describe('system prompt', () => {
   });
 
   it('carries the domain rules the schema cannot express', () => {
-    expect(prompt).toMatch(/fortnightly/i);
+    expect(prompt).toMatch(/every week on a fixed pickup day/i);
     expect(prompt).toMatch(/week1/);
     expect(prompt).toMatch(/late/i);
   });

@@ -4,6 +4,7 @@
 // decanting.controller.js — all wrap responses as { success, data },
 // so every function below unwraps .data before returning.
 import { apiGet, apiPost, cachedGet } from './api';
+import { postOrQueue } from './offlinePost';
 
 // NOTE: decanting.controller.js has getDecantableProducts fully
 // commented out (route, controller, and service). Reusing
@@ -14,10 +15,12 @@ import { apiGet, apiPost, cachedGet } from './api';
 // fresh route mount every visit to Decanting, and the product list
 // barely changes minute to minute, so without this every visit re-
 // paid the round trip before either view mode had anything to show.
+// Only what is marked decantable on the Products screen. A row with no
+// flag at all (a server not yet on migration 044) is kept.
 export const getProducts = async () =>
   cachedGet('decanting:products', 60_000, async () => {
     const res = await apiGet('/api/deliveries/products');
-    return res.data;
+    return (res.data ?? []).filter((p) => p.is_decantable !== false);
   });
 
 export const calculateDecantingPlan = async (data) => {
@@ -25,9 +28,14 @@ export const calculateDecantingPlan = async (data) => {
   return res.data;
 };
 
+// With no signal this returns { queued: true, label } instead of the
+// sheet: it is kept on the phone and sent when the server can be
+// reached (offlinePost.js). A sheet cannot be un-recorded, which is why
+// it used to fail outright here; the server now recognises a repeat of
+// the same submission, so sending it later is safe.
 export const recordDecanting = async (data) => {
-  const res = await apiPost('/api/decanting', data);
-  return res.data;
+  const res = await postOrQueue('/api/decanting', data, { kind: 'decanting', label: 'A decanting sheet' });
+  return res.queued ? res : res.data;
 };
 
 export const getDecantingRecords = async (range = 'all') => {

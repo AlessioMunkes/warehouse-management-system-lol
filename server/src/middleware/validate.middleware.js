@@ -14,7 +14,7 @@
 // as a clean 400 instead of a Postgres cast error surfacing as 500.
 //
 // Usage in a route file:
-//   import { validateIntParam } from '../middleware/validate.middleware.js'
+//   import { validateIntParam } from './validate.middleware.js'
 //   router.post('/:id/items/:itemId/confirm',
 //     auth, requireRole(...), validateIntParam('id'), validateIntParam('itemId'),
 //     controller)

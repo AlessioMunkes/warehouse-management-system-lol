@@ -7,9 +7,12 @@
 // them an actual page and a way back.
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from "react-router-dom";
+import useGoBack from "../components/layout/useGoBack";
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
+  const goBack = useGoBack();
+
 
   return (
     <div className="stf-shell">
@@ -18,16 +21,16 @@ export default function NotFoundPage() {
           <div className="stf-step-head">
             <h1 className="stf-step-title">Page not found</h1>
             <p className="stf-step-sub">
-              The page you're looking for doesn't exist, or the link may be broken.
+              Check the address, or go back and try the link again.
             </p>
           </div>
 
           <div className="stf-actions">
             <button className="stf-btn stf-btn-primary" onClick={() => navigate("/")}>
-              Go to Home
+              Go to home
             </button>
-            <button className="stf-btn stf-btn-secondary" onClick={() => navigate(-1)}>
-              Go Back
+            <button className="stf-btn stf-btn-secondary" onClick={goBack}>
+              Go back
             </button>
           </div>
         </div>

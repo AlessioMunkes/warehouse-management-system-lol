@@ -24,7 +24,21 @@ const fail = (status, message) => {
 
 export const TIMESLOT_STATUSES = ['OPEN', 'CLOSED', 'CANCELLED'];
 
-const datePart = (value) => String(value ?? '').slice(0, 10);
+const JOHANNESBURG_TIME_ZONE = 'Africa/Johannesburg';
+const johannesburgDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: JOHANNESBURG_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const datePart = (value) => {
+  if (value instanceof Date) {
+    const parts = Object.fromEntries(johannesburgDateFormatter.formatToParts(value).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+  return String(value ?? '').slice(0, 10);
+};
 
 const parseTimestamp = (value, label) => {
   if (!value) fail(400, label + ' is required.');
@@ -34,7 +48,7 @@ const parseTimestamp = (value, label) => {
 };
 
 const ensureSameEventDate = (eventDate, start, end) => {
-  if (start.toISOString().slice(0, 10) !== end.toISOString().slice(0, 10)) {
+  if (datePart(start) !== datePart(end)) {
     fail(400, 'Timeslot startTime and endTime must belong to the same date.');
   }
 };
@@ -168,6 +182,12 @@ const triggerPostCommitSync = (entityType, entityId) => {
   return svc.syncEntity(entityType, entityId).catch(() => null);
 };
 
+const triggerPostCommitCapacitySync = (entityType, entityId, timeslotId, capacity) => {
+  const svc = getSyncService();
+  if (!svc || typeof svc.syncTimeslotCapacity !== 'function') return Promise.resolve(null);
+  return svc.syncTimeslotCapacity(entityType, entityId, timeslotId, capacity).catch(() => null);
+};
+
 const bookEventSpaceAndTimeslots = async (eventId, bookingData, actor) => {
   if (!eventId) fail(400, 'Event ID is required.');
   const { spaceId, timeslots } = bookingData || {};
@@ -224,6 +244,8 @@ const updateEventBooking = async (eventId, changes, actor) => {
     validateCapacity(changes.capacity, 'Timeslot');
   }
   const nextCapacity = changes.capacity !== undefined ? Number(changes.capacity) : existing.capacity;
+  const capacityChanged = changes.capacity !== undefined && nextCapacity !== existing.capacity;
+  const timeslotDetailsChanged = changes.startTime !== undefined || changes.endTime !== undefined || changes.status !== undefined;
   return withTransaction(async (client) => {
     const conflicts = await findAvailabilityConflicts({ spaceId: existing.space_id, start: nextStart, end: nextEnd, excludeTimeslotId: timeslotId, client });
     if (conflicts.length > 0) fail(409, 'Updated timeslot overlaps an existing booking.');
@@ -237,10 +259,14 @@ const updateEventBooking = async (eventId, changes, actor) => {
     }
     const updated = await timeslotRepo.updateTimeslot(timeslotId, mutable, client);
     await logAudit(client, { entityType: 'event_timeslot', entityId: timeslotId, action: 'UPDATE', actorId: actor ? Number(actor.id) : null, before: existing, after: updated });
-    await getSyncService().queueSync('event_booking', existing.event_id, client);
     return updated;
   }).then(async (updated) => {
-    await triggerPostCommitSync('event_booking', updated.event_id ?? existing.event_id);
+    if (capacityChanged) {
+      await triggerPostCommitCapacitySync('event_booking', updated.event_id ?? existing.event_id, timeslotId, nextCapacity);
+    }
+    if (timeslotDetailsChanged) {
+      await triggerPostCommitSync('event_booking', updated.event_id ?? existing.event_id);
+    }
     return updated;
   });
 };

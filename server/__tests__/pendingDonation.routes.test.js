@@ -51,18 +51,24 @@ beforeEach(() => {
 });
 
 describe('pending donation routes', () => {
-  it('creates pending donations for the same roles that can record donations', async () => {
-    for (const role of [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]) {
-      const res = await request(app)
+  it('creates pending donations for the same role that can record donations', async () => {
+    const res = await request(app)
+      .post(BASE)
+      .set('Cookie', cookieFor(ROLES.WORKER, { id: 55 }))
+      .send({ createdBy: 999, donorName: 'Body Donor', items: [] });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({
+      success: true,
+      data: { id: 10, status: 'awaiting_resolution', items: [] },
+    });
+
+    for (const role of [ROLES.MANAGER, ROLES.ADMIN]) {
+      const refused = await request(app)
         .post(BASE)
         .set('Cookie', cookieFor(role, { id: 55 }))
         .send({ createdBy: 999, donorName: 'Body Donor', items: [] });
-
-      expect(res.status).toBe(201);
-      expect(res.body).toEqual({
-        success: true,
-        data: { id: 10, status: 'awaiting_resolution', items: [] },
-      });
+      expect(refused.status, role).toBe(403);
     }
 
     expect(serviceMock.createPendingDonationFromIntake.mock.calls.every((call) => call[0].createdBy === 55)).toBe(true);
@@ -100,7 +106,18 @@ describe('pending donation routes', () => {
     expect(serviceMock.resolveFlagAndMaybeCommit.mock.calls[1][1].resolvedBy).toBe(88);
   });
 
-  it('restricts retry and reconciliation to admin only', async () => {
+  it('lets managers and admins retry and see the reconciliation queue, and nobody else', async () => {
+    const workerRetry = await request(app)
+      .post(`${BASE}/10/retry-commit`)
+      .set('Cookie', cookieFor(ROLES.WORKER))
+      .send({});
+    const workerQueue = await request(app)
+      .get(`${BASE}/reconciliation`)
+      .set('Cookie', cookieFor(ROLES.WORKER));
+    expect(workerRetry.status).toBe(403);
+    expect(workerQueue.status).toBe(403);
+    expect(serviceMock.retryCommit).not.toHaveBeenCalled();
+
     const managerRetry = await request(app)
       .post(`${BASE}/10/retry-commit`)
       .set('Cookie', cookieFor(ROLES.MANAGER))
@@ -109,8 +126,8 @@ describe('pending donation routes', () => {
       .get(`${BASE}/reconciliation`)
       .set('Cookie', cookieFor(ROLES.MANAGER));
 
-    expect(managerRetry.status).toBe(403);
-    expect(managerQueue.status).toBe(403);
+    expect(managerRetry.status).toBe(200);
+    expect(managerQueue.status).toBe(200);
 
     const adminRetry = await request(app)
       .post(`${BASE}/10/retry-commit`)
@@ -227,8 +244,8 @@ describe('GET /api/donations/pending — donation management list endpoint', () 
     expect(repoMock.listPendingDonationsWithItems).not.toHaveBeenCalled();
   });
 
-  it('is admin-only, matching its reconciliation sibling', async () => {
-    for (const role of [ROLES.WORKER, ROLES.MANAGER, 'finance']) {
+  it('is for managers and admins, like its reconciliation sibling', async () => {
+    for (const role of [ROLES.WORKER, 'finance']) {
       const res = await request(app)
         .get(BASE)
         .set('Cookie', cookieFor(role));

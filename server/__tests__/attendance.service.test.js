@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-const attendanceRepoMock = { upsertByBookingId: vi.fn(), findByBookingId: vi.fn(), countCheckedInByTimeslot: vi.fn() };
+const attendanceRepoMock = { upsertByBookingId: vi.fn(), findByBookingId: vi.fn(), updateAttendance: vi.fn(), countCheckedInByTimeslot: vi.fn() };
 const bookingRepoMock = { findById: vi.fn(), findByTimeslotId: vi.fn(), countConfirmedByTimeslot: vi.fn() };
 const timeslotRepoMock = { findById: vi.fn(), findByEventId: vi.fn() };
+const vmsIntegrationMock = { sendAttendance: vi.fn() };
 const auditMock = vi.fn();
 vi.mock('../src/repositories/attendance.repository.js', () => ({ default: attendanceRepoMock }));
 vi.mock('../src/repositories/volunteerBooking.repository.js', () => ({ default: bookingRepoMock }));
 vi.mock('../src/repositories/eventTimeslot.repository.js', () => ({ default: timeslotRepoMock }));
+vi.mock('../src/services/vmsIntegration.service.js', () => ({ default: vmsIntegrationMock }));
 vi.mock('../src/repositories/auditLog.repository.js', () => ({ logAudit: auditMock }));
 const makeClient = () => ({ sql: [], query: vi.fn(async () => ({ rows: [] })), release: vi.fn() });
 const poolMock = { connect: vi.fn() };
@@ -14,8 +16,9 @@ const mod = await import('../src/services/attendance.service.js');
 const svc = mod.default;
 const ACTOR = { id: 5 };
 const BOOKING = { booking_id: 'b1', timeslot_id: 't1', booking_status: 'CONFIRMED' };
+const VMS_BOOKING = { ...BOOKING, external_booking_id: 'VMS-B-100' };
 const ATTENDANCE = { attendance_id: 'a1', booking_id: 'b1', checked_in: true, check_in_time: '2026-10-01T09:05:00.000Z', source: 'WMS' };
-beforeEach(() => { vi.clearAllMocks(); poolMock.connect.mockResolvedValue(makeClient()); });
+beforeEach(() => { vi.clearAllMocks(); poolMock.connect.mockResolvedValue(makeClient()); attendanceRepoMock.findByBookingId.mockResolvedValue(null); });
 
 describe('confirmAttendance', () => {
   it('checks in with explicit timestamp and audits CHECK_IN', async () => {
@@ -25,6 +28,78 @@ describe('confirmAttendance', () => {
     expect(result).toEqual(ATTENDANCE);
     expect(attendanceRepoMock.upsertByBookingId).toHaveBeenCalledWith('b1', expect.objectContaining({ checkedIn: true, checkInTime: '2026-10-01T09:05:00.000Z', source: 'WMS' }), expect.anything());
     expect(auditMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ entityType: 'attendance', entityId: 'b1', action: 'CHECK_IN', actorId: 5 }));
+    expect(vmsIntegrationMock.sendAttendance).not.toHaveBeenCalled();
+  });
+  it('sends VMS attendance for an external booking with minimal payload', async () => {
+    bookingRepoMock.findById.mockResolvedValueOnce(VMS_BOOKING);
+    attendanceRepoMock.upsertByBookingId.mockResolvedValueOnce(ATTENDANCE);
+    attendanceRepoMock.updateAttendance.mockResolvedValueOnce({ ...ATTENDANCE, last_synced_at: '2026-10-01T09:06:00.000Z' });
+    vmsIntegrationMock.sendAttendance.mockResolvedValueOnce({ ok: true });
+
+    const result = await svc.confirmAttendance('b1', {
+      checkedIn: true,
+      checkInTime: '2026-10-01T09:05:00.000Z',
+      worked_minutes: 999,
+      contributionHours: 99,
+    }, ACTOR);
+
+    expect(result.last_synced_at).toBe('2026-10-01T09:06:00.000Z');
+    expect(vmsIntegrationMock.sendAttendance).toHaveBeenCalledWith({
+      vmsBookingId: 'VMS-B-100',
+      attendanceStatus: 'attended',
+      source: 'wms',
+      recordedAt: '2026-10-01T09:05:00.000Z',
+    });
+    const payload = vmsIntegrationMock.sendAttendance.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('worked_minutes');
+    expect(payload).not.toHaveProperty('workedMinutes');
+    expect(payload).not.toHaveProperty('contributionHours');
+    expect(payload).not.toHaveProperty('contribution_hours');
+  });
+  it('maps checked-out attendance to not_attended', async () => {
+    bookingRepoMock.findById.mockResolvedValueOnce(VMS_BOOKING);
+    attendanceRepoMock.upsertByBookingId.mockResolvedValueOnce({ ...ATTENDANCE, checked_in: false, check_in_time: null });
+    attendanceRepoMock.updateAttendance.mockResolvedValueOnce({ ...ATTENDANCE, checked_in: false, check_in_time: null, last_synced_at: 'synced' });
+
+    await svc.confirmAttendance('b1', { checkedIn: false }, ACTOR);
+
+    expect(vmsIntegrationMock.sendAttendance).toHaveBeenCalledWith(expect.objectContaining({
+      vmsBookingId: 'VMS-B-100',
+      attendanceStatus: 'not_attended',
+      source: 'wms',
+    }));
+    expect(vmsIntegrationMock.sendAttendance.mock.calls[0][0].recordedAt).toBeTruthy();
+  });
+  it('does not send VMS attendance for walk-in/local bookings', async () => {
+    bookingRepoMock.findById.mockResolvedValueOnce({ ...BOOKING, external_booking_id: null, booking_source: 'WMS_GUEST' });
+    attendanceRepoMock.upsertByBookingId.mockResolvedValueOnce(ATTENDANCE);
+
+    const result = await svc.confirmAttendance('b1', { checkedIn: true, checkInTime: ATTENDANCE.check_in_time }, ACTOR);
+
+    expect(result).toEqual(ATTENDANCE);
+    expect(vmsIntegrationMock.sendAttendance).not.toHaveBeenCalled();
+  });
+  it('keeps local attendance when VMS attendance send fails', async () => {
+    bookingRepoMock.findById.mockResolvedValueOnce(VMS_BOOKING);
+    attendanceRepoMock.upsertByBookingId.mockResolvedValueOnce(ATTENDANCE);
+    vmsIntegrationMock.sendAttendance.mockRejectedValueOnce(new Error('VMS unavailable'));
+
+    const result = await svc.confirmAttendance('b1', { checkedIn: true, checkInTime: ATTENDANCE.check_in_time }, ACTOR);
+
+    expect(result).toEqual(ATTENDANCE);
+    expect(attendanceRepoMock.updateAttendance).not.toHaveBeenCalled();
+  });
+  it('does not duplicate-send an already synced identical attendance update', async () => {
+    bookingRepoMock.findById.mockResolvedValueOnce(VMS_BOOKING);
+    attendanceRepoMock.findByBookingId.mockResolvedValueOnce({ ...ATTENDANCE, last_synced_at: '2026-10-01T09:06:00.000Z' });
+    attendanceRepoMock.upsertByBookingId.mockResolvedValueOnce({ ...ATTENDANCE, last_synced_at: '2026-10-01T09:06:00.000Z' });
+
+    await svc.confirmAttendance('b1', { checkedIn: true, checkInTime: ATTENDANCE.check_in_time }, ACTOR);
+
+    expect(vmsIntegrationMock.sendAttendance).not.toHaveBeenCalled();
+    expect(attendanceRepoMock.upsertByBookingId).toHaveBeenCalledWith('b1', expect.objectContaining({
+      lastSyncedAt: '2026-10-01T09:06:00.000Z',
+    }), expect.anything());
   });
   it('defaults checkInTime to now when checkedIn true without timestamp', async () => {
     bookingRepoMock.findById.mockResolvedValueOnce(BOOKING);

@@ -3,13 +3,16 @@ import decantingService from '../services/decanting.service.js';
 // POST /api/decanting/calculate
 const calculatePlan = async (req, res) => {
   try {
+    // Refused here, at the moment the weight is entered, so nobody fills
+    // bags from a figure the stock cannot bear.
+    await decantingService.assertBulkInStock(req.body?.items);
     const result = decantingService.calculateDecantingPlan(req.body);
     res.json({ success: true, data: result });
   } catch (err) {
     console.error('[calculatePlan]', err.message);
     const isValidationError = (msg) =>
     msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
-    const status = isValidationError(err.message) ? 400 : 500;
+    const status = err.status || (isValidationError(err.message) ? 400 : 500);
     res.status(status).json({ success: false, message: err.message });
   }
 };
@@ -23,7 +26,7 @@ const recordDecanting = async (req, res) => {
     console.error('[recordDecanting]', err.message);
     const isValidationError = (msg) =>
     msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
-    const status = isValidationError(err.message) ? 400 : 500;
+    const status = err.status || (isValidationError(err.message) ? 400 : 500);
     res.status(status).json({ success: false, message: err.message });
   }
 };

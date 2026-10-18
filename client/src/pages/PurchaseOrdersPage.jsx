@@ -1,107 +1,150 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/PurchaseOrdersPage.jsx
 //
-// Manager view. App.jsx gates the route and POST /api/purchase-orders
-// is requireRole(MANAGER, ADMIN); the useAuth check below is
-// belt-and-braces for the same reason SupplierDirectoryPage and
-// InventoryManagementPage do it — the route decides who reaches the
-// page, the role check decides what the page offers them.
+// Manager view, on the shared list pattern (Inventory's): title, view
+// tabs with counts, toolbar, table, and the order in a panel down the
+// right. Raising or editing an order replaces the list with the form —
+// it is too long for a panel.
 //
-// The page shell, the tab strip, the ErrorBanner and the Skeleton
-// block are all the SupplierDirectoryPage treatment. That is
-// deliberate: it is the closest sibling screen, and a second layout
-// for the same kind of work would be a second thing to maintain.
+// App.jsx gates the route and POST /api/purchase-orders is
+// requireRole(MANAGER, ADMIN); the role check below decides what the
+// page offers, the route decides who reaches it.
 //
-// The tab strip is still hand-rolled because there is no tabs.jsx in
-// components/ui — SupplierDirectoryPage says the same, and flags that
-// the first page to need one should share it. That is now two pages.
-// The next one should extract it.
+// TABS COUNT WHAT WAS FETCHED
+// The list asks for up to 500 orders (the server's default is 50) and
+// the tabs filter and count that, so a tab's number is the rows it
+// shows. A warehouse that ever has more than 500 orders on the books
+// will want server-side paging here.
+//
+// URL
+//   ?status=<tab>     the tab (the dashboard's Needs attention links)
+//   ?id=<id>          open that order (notifications)
+//   ?products=1,2,3   start a new order with these lines (Inventory's
+//                     bulk "Raise purchase order")
 //
 // PRODUCTS COME FROM stockAPI.getManifest().
 // There is no products endpoint, and the manifest already carries
 // name, sku, unit, reorderAt and isLowStock — everything the picker
-// and the low-stock seed need. Caveat worth knowing: the manifest is
-// built from stock_levels, so a product with no stock_levels row will
-// not appear and cannot be ordered. If that bites, the fix belongs in
-// the stock repository, not here.
+// and the low-stock seed need. A product with no stock_levels row will
+// not appear and cannot be ordered; the fix for that belongs in the
+// stock repository, not here.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth }   from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
-import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
-import PurchaseOrderList   from '../features/purchaseOrders/components/PurchaseOrderList';
-import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';
-import purchaseOrderAPI, { PO_STATUS_LABELS } from '../services/purchaseOrderAPI';
+import PurchaseOrderForm   from '../features/purchaseOrders/PurchaseOrderForm';
+import PurchaseOrderList   from '../features/purchaseOrders/PurchaseOrderList';
+import PurchaseOrderDetail from '../features/purchaseOrders/PurchaseOrderDetail';
+import purchaseOrderAPI, { PO_STATUS_LABELS, needsFollowUp } from '../services/purchaseOrderAPI';
+import { getStatus as getQuickbooksStatus } from '../services/quickbooksAPI';
 import supplierAPI from '../services/supplierAPI';
 import stockAPI    from '../services/stockAPI';
-
 import { Button }   from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus }     from 'lucide-react';
+import ViewTabs from '@/components/ui/view-tabs';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ListCard from '@/components/ui/list-card';
+import ErrorBanner from '@/components/ui/error-banner';
+import ListToolbar from '@/components/ui/list-toolbar';
+import { useToast } from '@/components/ui/toastContext';
+import { Plus, Link2 } from 'lucide-react';
+import QuickbooksImportDialog from '../features/purchaseOrders/QuickbooksImportDialog';
+import useTableView from '../features/masterdata/useTableView';
+import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
+import { PO_COLUMNS } from '../features/purchaseOrders/poColumns';
+import { exportExcel } from '../lib/excelExport';
+import { useRecordCache } from '@/lib/recordCache';
+import useListFilters from '../features/masterdata/useListFilters';
 
-import useTableView from '../features/masterdata/hooks/useTableView';
-import ColumnToggle  from '../features/masterdata/components/ColumnToggle';
-import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
-
-const CAN_MANAGE = ['manager', 'admin'];
-
-const TABS = [
-  { id: 'open', label: 'Open' },
-  { id: 'all',  label: 'All' },
+// "+ Filter" on the order list (module level, so the hook's memo holds).
+const PO_FILTERS = [
+  { key: 'supplier', label: 'Supplier', valueOf: (po) => po.supplierName },
+  { key: 'raisedBy', label: 'Raised by', valueOf: (po) => po.createdByName },
+  { key: 'quickbooks', label: 'QuickBooks', valueOf: (po) => (po.quickbooksPoId ? 'linked' : 'not_linked'),
+    labelOf: (v) => (v === 'linked' ? 'Has a QuickBooks PO' : 'No QuickBooks PO') },
 ];
 
-// Same markup as the global fetch error banner in
-// InventoryManagementPage and SupplierDirectoryPage. One error style
-// per app.
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
+const CAN_MANAGE = ['manager', 'admin'];
+const LIST_LIMIT = 500;
+
+// `id` is what goes in ?status=. The ids that are statuses are the
+// status itself, so the dashboard links read plainly.
+const PO_VIEWS = [
+  { id: 'open',               label: 'Open',
+    test: (po) => po.status !== 'completed' && po.status !== 'returned' },
+  { id: 'pending',            label: 'Awaiting approval', alert: true, test: (po) => po.status === 'pending' },
+  { id: 'in_transit',         label: 'In transit',         test: (po) => po.status === 'in_transit' },
+  // A flag, not a status: part received with no follow-up order yet.
+  { id: 'follow_up_required', label: 'Follow-up required', alert: true, test: needsFollowUp },
+  { id: 'partially_received', label: 'Partially received', test: (po) => po.status === 'partially_received' },
+  { id: 'closed',             label: 'Closed', test: (po) => po.status === 'completed' || po.status === 'returned' },
+  // Flags a person has to act on, whatever the order's status. Shown
+  // only while there are any (or the tab is open from a link).
+  { id: 'email_failed',       label: 'Finance email failed', alert: true, onlyWhenAny: true,
+    test: (po) => po.financeEmailStatus === 'failed' },
+  { id: 'needs_match',        label: 'Needs QuickBooks attention', alert: true, onlyWhenAny: true,
+    // A name not found there, or an order QuickBooks refused: both wait for a person.
+    test: (po) => po.quickbooksState === 'needs_match' || po.quickbooksState === 'refused' },
+  { id: 'all',                label: 'All',                test: () => true },
+];
+const viewById = (id) => PO_VIEWS.find((v) => v.id === id) ?? PO_VIEWS[0];
+
+const EXPORT_COLUMNS = [
+  { key: 'poNumber', label: 'PO number' },
+  { key: 'supplierName', label: 'Supplier' },
+  { key: 'statusLabel', label: 'Status' },
+  { key: 'expectedDeliveryDate', label: 'Expected', kind: 'date' },
+  { key: 'receivedLineCount', label: 'Lines received' },
+  { key: 'lineCount', label: 'Lines' },
+  { key: 'estimatedValue', label: 'Estimated value', kind: 'money' },
+];
 
 export default function PurchaseOrdersPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const canManage = CAN_MANAGE.includes(user?.role);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = viewById(searchParams.get('status')).id;
 
-  const [tab, setTab]           = useState('open');
-  const [statusFilter, setStatusFilter] = useState('');
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts]   = useState([]);
   const [selected, setSelected]   = useState(null);
-  const [mode, setMode]           = useState('list');
+  const [mode, setMode]           = useState('list');   // list | create | edit
   const [isLoading, setLoading]   = useState(true);
   const [busy, setBusy]           = useState(false);
   const [error, setError]         = useState(null);
   const [formError, setFormError] = useState(null);
   const [invalidProductIds, setInvalidProductIds] = useState([]);
+  const [search, setSearch]       = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
-  // Sorting and column visibility, from the same hook every other table
-  // in the app reads. The status filter below stays a <select> and
-  // stays server-side: there are seven statuses, and seven pills across
-  // a toolbar that already carries two tabs is not a filter any more —
-  // it is a second row of tabs.
-  const view = useTableView('purchaseOrders', PO_COLUMNS);
+  // Is QuickBooks connected and working? Then new orders sync by
+  // themselves and the file import is only for orders captured by hand, so
+  // it is shown as the secondary thing it has become. Unknown (still
+  // loading, or the status could not be read) is treated as not connected:
+  // the import is the way to link orders, and it should never be hidden.
+  const [qbConnected, setQbConnected] = useState(false);
+  useEffect(() => {
+    if (!canManage) return undefined;
+    let cancelled = false;
+    getQuickbooksStatus()
+      .then((s) => { if (!cancelled) setQbConnected(Boolean(s?.connected && s?.working)); })
+      .catch(() => { if (!cancelled) setQbConnected(false); });
+    return () => { cancelled = true; };
+  }, [canManage]);
+
+  // Sorting and column visibility, from the hook every other table in
+  // the app reads.
+  const tableView = useTableView('purchaseOrders', PO_COLUMNS);
 
   const loadPurchaseOrders = useCallback(async () => {
-    const rows = await purchaseOrderAPI.getPurchaseOrders({ status: statusFilter });
-    setPurchaseOrders(rows);
-  }, [statusFilter]);
+    setPurchaseOrders(await purchaseOrderAPI.getPurchaseOrders({ limit: LIST_LIMIT }));
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      // In parallel: three independent reads, and doing them in
-      // sequence would show a skeleton for three round trips to
-      // Supabase instead of one.
       const [, sups, prods] = await Promise.all([
         loadPurchaseOrders(),
         supplierAPI.getSuppliers(),
@@ -118,8 +161,10 @@ export default function PurchaseOrdersPage() {
 
   useEffect(() => {
     let cancelled = false;
+    // In parallel: three independent reads, so one skeleton for one
+    // round trip rather than three.
     Promise.all([
-      purchaseOrderAPI.getPurchaseOrders({ status: statusFilter }),
+      purchaseOrderAPI.getPurchaseOrders({ limit: LIST_LIMIT }),
       supplierAPI.getSuppliers(),
       stockAPI.getManifest(),
     ])
@@ -129,31 +174,58 @@ export default function PurchaseOrdersPage() {
         setSuppliers(sups);
         setProducts(prods);
       })
-      .catch((err) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [statusFilter]);
+  }, []);
 
-  const open = async (id) => {
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a status change, from a link) reads it again.
+  const records = useRecordCache((id) => purchaseOrderAPI.getPurchaseOrder(id));
+  const open = useCallback(async (id, { fresh = true } = {}) => {
     setError(null);
     try {
-      const po = await purchaseOrderAPI.getPurchaseOrder(id);
-      setSelected(po);
-      setMode('detail');
+      setSelected(await records.load(id, { fresh }));
+      setMode('list');
     } catch (err) { setError(err.message); }
+  }, [records]);
+  useOpenFromQuery(open, { param: 'id' });
+
+  // ?products=1,2,3 — the inventory screen's bulk "Raise purchase
+  // order". Opens a new order with a line per product once the
+  // manifest has loaded (the lines need its reorder levels and costs).
+  // The parameter is then dropped, so a refresh or a later Cancel does
+  // not reopen the same draft.
+  const [seedProducts, setSeedProducts] = useState([]);
+  const [seededFrom, setSeededFrom] = useState(null);
+  const productsParam = searchParams.get('products');
+  if (productsParam && productsParam !== seededFrom && canManage && products.length) {
+    const ids = new Set(productsParam.split(',').map(Number).filter(Number.isInteger));
+    setSeededFrom(productsParam);
+    setSeedProducts(products.filter((p) => ids.has(p.id)));
+    setMode('create');
+    setSelected(null);
+    setFormError(null);
+  }
+  useEffect(() => {
+    if (!seededFrom || searchParams.get('products') !== seededFrom) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('products');
+    setSearchParams?.(next, { replace: true });
+  }, [seededFrom, searchParams, setSearchParams]);
+
+  const changeView = (id) => {
+    setSearchParams(id === 'open' ? {} : { status: id }, { replace: true });
   };
 
+  // ── Actions ────────────────────────────────────────────────
   const create = async (payload) => {
     setBusy(true); setFormError(null); setInvalidProductIds([]);
     try {
       const created = await purchaseOrderAPI.createPurchaseOrder(payload);
       await loadPurchaseOrders();
       // Straight into the new PO rather than back to a list where the
-      // manager has to find what she just made.
+      // manager has to find what they just made.
       await open(created.id);
     } catch (err) {
       setFormError(err.message);
@@ -165,131 +237,251 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const approve = async () => {
-    setError(null);
+  const update = async (payload) => {
+    setBusy(true); setFormError(null); setInvalidProductIds([]);
     try {
-      await purchaseOrderAPI.approvePurchaseOrder(selected.id);
+      const updated = await purchaseOrderAPI.updatePurchaseOrder(selected.id, payload);
       await loadPurchaseOrders();
-      await open(selected.id);
-    } catch (err) { setError(err.message); }
+      setSelected(updated);
+      setMode('list');
+    } catch (err) {
+      setFormError(err.message);
+      if (err.missingProductIds) setInvalidProductIds(err.missingProductIds);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const visible = tab === 'open'
-    ? purchaseOrders.filter((po) => po.status !== 'completed' && po.status !== 'returned')
-    : purchaseOrders;
+  // Status changes report through a toast and return whether they
+  // worked, so the panel knows whether to close its own editor.
+  const changeStatus = async (status, reason, done) => {
+    try {
+      await purchaseOrderAPI.setPurchaseOrderStatus(selected.id, status, reason);
+      await loadPurchaseOrders();
+      await open(selected.id);
+      toast({ variant: 'success', title: done });
+      return true;
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not change this order', description: err.message });
+      return false;
+    }
+  };
 
-  const sortedVisible = useMemo(() => view.sortRows(visible), [visible, view]);
+  // A second order for what came short. The first moves to Partially
+  // received; the new one opens, since it is the one to act on next.
+  const createFollowUp = async () => {
+    try {
+      const followUp = await purchaseOrderAPI.createFollowUpOrder(selected.id);
+      await loadPurchaseOrders();
+      await open(followUp.id);
+      toast({ variant: 'success', title: `${followUp.poNumber} created`, description: `Follow-up to ${selected.poNumber}.` });
+      return true;
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not create the follow-up order', description: err.message });
+      return false;
+    }
+  };
+
+  const remove = async () => {
+    try {
+      await purchaseOrderAPI.deletePurchaseOrder(selected.id);
+      await loadPurchaseOrders();
+      setSelected(null);
+      return true;
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not delete this order', description: err.message });
+      return false;
+    }
+  };
+
+  const setQuickbooksRef = async (quickbooksPoId) => {
+    try {
+      await purchaseOrderAPI.setQuickbooksReference(selected.id, quickbooksPoId);
+      await loadPurchaseOrders();
+      await open(selected.id);
+      return true;
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not save the QuickBooks reference', description: err.message });
+      return false;
+    }
+  };
+
+  // Resend the Finance email. Returns success like setQuickbooksRef so
+  // the button can stop spinning either way. The order is reloaded in
+  // both cases: a failed attempt still leaves a status behind.
+  const resendFinanceEmail = async () => {
+    try {
+      await purchaseOrderAPI.resendFinanceEmail(selected.id);
+      await open(selected.id);
+      return true;
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not resend to Finance', description: err.message });
+      await open(selected.id);
+      return false;
+    }
+  };
+
+  // ── The list ───────────────────────────────────────────────
+  const counts = useMemo(
+    () => Object.fromEntries(PO_VIEWS.map((v) => [v.id, purchaseOrders.filter(v.test).length])),
+    [purchaseOrders],
+  );
+  const { sortRows } = tableView;
+  // The tabs narrow by status; these narrow by who the order is with,
+  // who raised it and whether it has a QuickBooks number.
+  const listFilters = useListFilters(PO_FILTERS, purchaseOrders);
+  const { apply: applyFilters } = listFilters;
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const inView = applyFilters(purchaseOrders.filter(viewById(view).test)).filter((po) => !q
+      || po.poNumber?.toLowerCase().includes(q)
+      || po.supplierName?.toLowerCase().includes(q));
+    return sortRows(inView);
+  }, [purchaseOrders, view, search, sortRows, applyFilters]);
+
+  const exportRows = () => exportExcel({
+    filename: `purchase-orders-${view}`,
+    sheetName: 'Purchase orders',
+    title: `Purchase orders: ${String(view).replace(/_/g, ' ')}`,
+    columns: EXPORT_COLUMNS,
+    rows: rows.map((po) => ({ ...po, statusLabel: PO_STATUS_LABELS[po.status] ?? po.status })),
+  });
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-medium">Purchase orders</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              What we have asked suppliers for, and what has arrived.
-            </p>
-          </div>
-          {canManage && mode !== 'create' ? (
+    <PageShell>
+      <PageHeader
+        title="Purchase orders"
+        description="Raise, approve and track orders to suppliers."
+        actions={canManage && mode === 'list' ? (
+          <>
+            {qbConnected ? (
+              <Button
+                type="button" variant="ghost" size="sm" onClick={() => setImportOpen(true)}
+                title="New orders go to QuickBooks automatically when approved. Use this only for orders Finance captured there by hand."
+              >
+                <Link2 /> Link existing QuickBooks POs
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
+                <Link2 /> Import QuickBooks links
+              </Button>
+            )}
             <Button
               type="button"
-              onClick={() => { setMode('create'); setSelected(null); setFormError(null); }}
+              onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); }}
             >
               <Plus /> New purchase order
             </Button>
-          ) : null}
+          </>
+        ) : null}
+      />
+
+      {mode === 'create' || mode === 'edit' ? (
+        <div className="mt-6">
+          <PurchaseOrderForm
+            // Forces a remount (and so a fresh read of initialValue)
+            // whenever the target changes — create vs. edit, or one
+            // PO's edit vs. another's.
+            key={mode === 'edit' ? `edit-${selected?.id}` : 'create'}
+            suppliers={suppliers}
+            products={products}
+            busy={busy}
+            error={formError}
+            invalidProductIds={invalidProductIds}
+            initialValue={mode === 'edit' ? selected : null}
+            initialProducts={mode === 'create' ? seedProducts : []}
+            submitLabel={mode === 'edit' ? 'Save changes' : undefined}
+            onSubmit={mode === 'edit' ? update : create}
+            onCancel={() => {
+              if (mode === 'create') setSelected(null);
+              setMode('list');
+              setSeedProducts([]);
+              setFormError(null);
+              setInvalidProductIds([]);
+            }}
+          />
         </div>
+      ) : (
+        <>
+          <ErrorBanner className="mt-4" message={error} onRetry={reload} />
 
-        {mode === 'create' ? (
-          <div className="mt-6">
-            <PurchaseOrderForm
-              suppliers={suppliers}
-              products={products}
-              busy={busy}
-              error={formError}
-              invalidProductIds={invalidProductIds}
-              onSubmit={create}
-              onCancel={() => { setMode('list'); setFormError(null); setInvalidProductIds([]); }}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="mt-5 flex gap-1 border-b">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => { setTab(t.id); setSelected(null); setMode('list'); }}
-                  className={
-                    tab === t.id
-                      ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
-                      : 'px-4 py-2 text-sm text-muted-foreground'
-                  }
-                >
-                  {t.label}
-                </button>
-              ))}
+          <ViewTabs
+            className="mt-5"
+            label="Purchase order views"
+            value={view}
+            onChange={changeView}
+            tabs={PO_VIEWS.filter((v) => !v.onlyWhenAny || counts[v.id] > 0 || v.id === view)
+              .map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+          />
 
-              {/* Server-side status filter, separate from the tabs.
-                  The tabs are the two views a manager wants by default;
-                  this is for chasing one specific state. */}
-              <select
-                value={statusFilter}
-                onChange={(e) => { setLoading(true); setStatusFilter(e.target.value); setSelected(null); }}
-                className="ml-auto mb-1 rounded-[4px] border-2 px-2 py-1 text-sm"
-                aria-label="Filter by status"
-              >
-                <option value="">All statuses</option>
-                {Object.entries(PO_STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-
-              <ColumnToggle
-                idPrefix="po"
-                columns={view.availableColumns}
-                hidden={view.hidden}
-                onToggle={view.toggleColumn}
-                onReset={view.resetColumns}
+          <ListCard
+            className="mt-6"
+            header={
+              <ListToolbar
+                search={{ value: search, onChange: setSearch, placeholder: 'Search PO number or supplier' }}
+                filters={listFilters.filters}
+                onClearAll={() => { setSearch(''); listFilters.clear(); }}
+                columns={{
+                  idPrefix: 'po',
+                  columns: tableView.availableColumns,
+                  hidden: tableView.hidden,
+                  onToggle: tableView.toggleColumn,
+                  onReset: tableView.resetColumns,
+                }}
+                onExport={rows.length ? exportRows : undefined}
               />
-            </div>
-
-            {error ? (
-              <div className="mt-4">
-                <ErrorBanner message={error} onRetry={reload} />
-              </div>
-            ) : null}
-
+            }
+          >
             {isLoading ? (
-              <div className="mt-6 space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : (
-              <div className="mt-6 space-y-6">
-                {mode === 'detail' && selected ? (
-                  <PurchaseOrderDetail
-                    purchaseOrder={selected}
-                    canManage={canManage}
-                    onApprove={approve}
-                    onClose={() => { setSelected(null); setMode('list'); }}
-                  />
-                ) : null}
-
-                <PurchaseOrderList
-                  purchaseOrders={sortedVisible}
-                  selectedId={selected?.id ?? null}
-                  onSelect={open}
-                  columns={view.visibleColumns}
-                  sort={view.sort}
-                  onToggleSort={view.toggleSort}
-                />
-              </div>
+              <PurchaseOrderList
+                purchaseOrders={rows}
+                selectedId={selected?.id ?? null}
+                onSelect={(id) => open(id, { fresh: false })}
+                onIntent={(id) => records.warm(id)}
+                columns={tableView.visibleColumns}
+                sort={tableView.sort}
+                onToggleSort={tableView.toggleSort}
+              />
             )}
-          </>
-        )}
-      </main>
-    </ManagerLayout>
+          </ListCard>
+        </>
+      )}
+
+      {selected && mode === 'list' ? (
+        <PurchaseOrderDetail
+          key={selected.id}
+          purchaseOrder={selected}
+          canManage={canManage}
+          onApprove={() => changeStatus('approved', null, `${selected.poNumber} approved`)}
+          onRecordFollowUp={(reason) => changeStatus('follow_up_required', reason, `Follow-up recorded on ${selected.poNumber}`)}
+          onReopen={() => changeStatus('approved', null, `${selected.poNumber} reopened for receiving`)}
+          onMarkInTransit={() => changeStatus('in_transit', null, `${selected.poNumber} marked as in transit`)}
+          onNotInTransit={() => changeStatus('approved', null, `${selected.poNumber} is no longer in transit`)}
+          onMarkReturned={(reason) => changeStatus('returned', reason, `${selected.poNumber} marked as returned`)}
+          onCloseOrder={() => changeStatus('completed', null, `${selected.poNumber} closed`)}
+          onCreateFollowUp={createFollowUp}
+          onOpenOrder={open}
+          onSetQuickbooksRef={setQuickbooksRef}
+          onResendFinanceEmail={resendFinanceEmail}
+          onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}
+          onDelete={remove}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+      {canManage ? (
+        <QuickbooksImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onDone={async () => {
+            await loadPurchaseOrders();
+            if (selected) await open(selected.id);
+          }}
+        />
+      ) : null}
+    </PageShell>
   );
 }

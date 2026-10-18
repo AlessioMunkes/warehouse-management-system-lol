@@ -28,16 +28,21 @@
 // setProductActive() is separate from updateProduct().
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { logAudit } from './auditLog.repository.js';
+
+const COHORT_FLIP = { tuesday: 'thursday', thursday: 'tuesday' };
 
 const UPDATABLE = {
   name:        'name',
   cohort:      'cohort',
   contactName: 'contact_name',
+  contactEmail: 'contact_email',
+  mobileNumber: 'mobile_number',
   childCount:  'child_count',
 };
 
 const BENEFICIARY_COLUMNS = `
-  e.id, e.name, e.cohort, e.contact_name, e.child_count,
+  e.id, e.name, e.cohort, e.contact_name, e.contact_email, e.mobile_number, e.child_count,
   e.is_active, e.approved_at, e.last_collected_date
 `;
 
@@ -88,10 +93,17 @@ const findByName = async (name, { excludeId = null } = {}) => {
 // ── Write ─────────────────────────────────────────────────────
 const insertBeneficiary = async (payload) => {
   const { rows } = await pool.query(
-    `INSERT INTO ecd_centres (name, cohort, contact_name, child_count, is_active)
-     VALUES ($1, $2::cohort_group, $3, $4, true)
+    `INSERT INTO ecd_centres (name, cohort, contact_name, contact_email, mobile_number, child_count, is_active)
+     VALUES ($1, $2::cohort_group, $3, $4, $5, $6, true)
      RETURNING ${BENEFICIARY_COLUMNS.replace(/e\./g, '')}`,
-    [payload.name, payload.cohort, payload.contactName ?? null, payload.childCount ?? null]
+    [
+      payload.name,
+      payload.cohort,
+      payload.contactName ?? null,
+      payload.contactEmail ?? null,
+      payload.mobileNumber ?? null,
+      payload.childCount ?? null,
+    ]
   );
   return rows[0];
 };
@@ -145,6 +157,62 @@ const approveBeneficiary = async (id) => {
   return rows[0] ?? null;
 };
 
+// ── Cohort rollback ───────────────────────────────────────────
+// Moves a centre to the other pickup day (Tuesday <-> Thursday), e.g.
+// when Tuesday's run overran and a centre needs to come on Thursday
+// instead. Requested by the sponsor for centres that miss a collection.
+//
+// Audited as its own action (not routed through the generic
+// updateBeneficiary PATCH, which writes no audit row at all) because
+// this one is a business-rule-driven change tied to a specific missed
+// collection, not an incidental edit — the "why" matters here.
+//
+// FOR UPDATE: two managers actioning the same non-collection at once
+// must not flip the cohort twice and land back where it started.
+const rollbackCohort = async (id, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: existing } = await client.query(
+      `SELECT id, cohort FROM ecd_centres WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    const before = existing[0];
+    if (!before) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const nextCohort = COHORT_FLIP[before.cohort];
+    const { rows } = await client.query(
+      `UPDATE ecd_centres SET cohort = $2::cohort_group
+        WHERE id = $1
+        RETURNING ${BENEFICIARY_COLUMNS.replace(/e\./g, '')}`,
+      [id, nextCohort]
+    );
+    const after = rows[0];
+
+    await logAudit(client, {
+      entityType: 'ecd_centre',
+      entityId:   id,
+      action:     'cohort_rollback',
+      actorId,
+      reason:     'Moved to the other cohort after a missed collection.',
+      before:     { cohort: before.cohort },
+      after:      { cohort: after.cohort },
+    });
+
+    await client.query('COMMIT');
+    return after;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   listBeneficiaries,
   getBeneficiaryById,
@@ -153,4 +221,5 @@ export default {
   updateBeneficiary,
   setBeneficiaryActive,
   approveBeneficiary,
+  rollbackCohort,
 };

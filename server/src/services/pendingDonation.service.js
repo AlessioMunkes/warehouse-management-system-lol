@@ -1,11 +1,14 @@
 import pool from '../config/db.js';
-import { determineRouting } from '../lib/donationRouting.js';
+import { determineRouting } from '../utils/donationRouting.js';
 import { logAudit } from '../repositories/auditLog.repository.js';
+import { createNotification } from '../repositories/notification.repository.js';
 import pendingDonationRepository from '../repositories/pendingDonation.repository.js';
+import managerFlagRepository from '../repositories/managerFlag.repository.js';
 import productRepository from '../repositories/product.repository.js';
 import donationAdminService from './donationAdmin.service.js';
 import donationService from './donation.service.js';
-import { validateEmail } from '../lib/validation/donationIntake.part1.js';
+import { validateEmail } from '../utils/donationValidation.js';
+import { FOOD_CATEGORIES } from '../constants/donationCategories.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -40,7 +43,7 @@ const normalisePendingItem = (raw = {}, index = 0) => {
 };
 
 const REVIEW_DECISIONS = new Set(['match_existing_product', 'create_product', 'move_to_non_food']);
-const REVIEW_ROUTE_CATEGORIES = new Set(['recipe_food', 'add_on_food', 'non_recipe_food']);
+const REVIEW_ROUTE_CATEGORIES = new Set(FOOD_CATEGORIES);
 
 const normalizeReviewDecision = (value) => String(value || '').trim().toLowerCase();
 
@@ -142,9 +145,6 @@ const sortDonationItemsByLine = (items = []) =>
 const validateIntakePayload = (data = {}) => {
   const errors = {};
   const itemErrors = {};
-  const valueRaw = data.estimatedValueZar ?? data.estimated_value_zar ?? 0;
-  const value = Number(valueRaw);
-  if (!Number.isFinite(value) || value < 0) errors.estimatedValueZar = 'Estimated value must be 0 or greater.';
 
   const snapshot = typeof data.draftSnapshot === 'string'
     ? (() => { try { return JSON.parse(data.draftSnapshot)?.draft ?? {}; } catch { return {}; } })()
@@ -159,6 +159,13 @@ const validateIntakePayload = (data = {}) => {
   const donorName = String(data.donorName ?? data.donor_name ?? '').trim();
   const donorContact = String(data.donorContact ?? data.donor_contact ?? '').trim();
   const donorConsentGiven = data.donorConsentGiven ?? data.donor_consent_given;
+  if (donorConsentGiven === true) {
+    const valueRaw = data.estimatedValueZar ?? data.estimated_value_zar;
+    const value = Number(valueRaw);
+    if (valueRaw === undefined || valueRaw === null || valueRaw === '' || !Number.isFinite(value) || value < 0) {
+      errors.estimatedValueZar = 'Estimated value must be 0 or greater.';
+    }
+  }
   if (phasePayload && donorName && !donorContact) errors.donorContact = 'Donor email is required unless the donor is anonymous.';
   if (phasePayload && donorConsentGiven === true) {
     const email = validateEmail(donorContact, { required: true });
@@ -169,7 +176,8 @@ const validateIntakePayload = (data = {}) => {
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  if (phasePayload && items.length === 0) errors.items = 'At least one donated item is required.';
+  // Whatever shape the request is in: a donation of nothing is not one.
+  if (items.length === 0) errors.items = 'At least one donated item is required.';
   items.forEach((item, index) => {
     const row = {};
     const quantity = Number(item?.quantity);
@@ -353,11 +361,12 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         donorConsentGiven: data.donorConsentGiven ?? data.donor_consent_given ?? null,
         estimatedValueZar: data.estimatedValueZar ?? data.estimated_value_zar ?? null,
         donationCategory: data.donationCategory ?? data.donation_category ?? null,
-        programmeId: data.programmeId ?? data.programme_id ?? null,
         notes: data.notes ?? null,
         section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,
         section18aQualifying: data.section18aQualifying ?? data.section_18a_qualifying ?? null,
-        draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? null,
+        // The column is NOT NULL. It is an archive of what was typed, so
+        // an empty record is the honest value when none was sent.
+        draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? '{}',
         idempotencyKey,
         createdBy: data.createdBy ?? data.created_by ?? null,
       },
@@ -417,21 +426,11 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         if (!flagProductId) {
           const ts = Date.now();
           const safeName = `[Unclassified] ${item.description || `Pending donation line ${item.lineNo}`} (${ts})`;
-          const placeholderRes = await client.query(
-            `INSERT INTO products (
-               name,
-               stock_keeping_unit,
-               storage_type,
-               is_active,
-               is_decantable,
-               code_type,
-               default_unit,
-               is_perishable
-             ) VALUES ($1, $2, 'dry', false, false, 'fixed', 'kg', false)
-             RETURNING id;`,
-            [safeName, `PENDING-${pendingDonation.id}-L${item.lineNo}-${ts}`]
-          );
-          flagProductId = placeholderRes.rows[0].id;
+          const placeholder = await managerFlagRepository.createPlaceholderProduct(client, {
+            name: safeName,
+            sku: `PENDING-${pendingDonation.id}-L${item.lineNo}-${ts}`,
+          });
+          flagProductId = placeholder.id;
         }
 
         const flag = await pendingDonationRepository.createWarehouseManagerFlag(
@@ -481,6 +480,18 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
       {},
       client
     );
+
+    if (unresolvedCount > 0) {
+      await createNotification(client, {
+        type: 'donation_review',
+        title: `${unresolvedCount} donation item${unresolvedCount === 1 ? '' : 's'} need review`,
+        body: `Donation #${pendingDonation.id} is waiting in donation management.`,
+        entityType: 'pending_donation',
+        entityId: pendingDonation.id,
+        targetRoles: ['manager', 'admin'],
+        avoidDuplicate: true,
+      });
+    }
 
     await client.query('COMMIT');
 
@@ -757,79 +768,72 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
   }
 };
 
+// Retrying a failed save. The donation is CLAIMED first, in one conditional
+// UPDATE (claimPendingDonationForRetry): only one of two simultaneous
+// retries gets it, and the other is told it is already being retried. The
+// claim is what stops a double click, or a manager and an admin acting
+// together, from creating the donation twice: two sets of stock movements
+// and two thank-you emails.
 export const retryCommit = async (pendingDonationId) => {
   if (!pendingDonationId) {
     fail(400, 'Pending donation ID is required.');
   }
 
-  const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
-  if (!pendingDonation) {
-    fail(404, 'Pending donation not found.');
+  const claimed = await pendingDonationRepository.claimPendingDonationForRetry(pendingDonationId, pool);
+  if (!claimed) {
+    const current = await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+    if (!current) {
+      fail(404, 'Pending donation not found.');
+    }
+    if (current.status === 'committing') {
+      fail(409, 'This donation is already being retried. Check again in a moment.');
+    }
+    fail(409, `Retry commit is only valid for status 'commit_failed' or 'commit_incomplete'; current status is '${current.status}'.`);
   }
 
-  if (pendingDonation.status === 'commit_failed') {
-    // attemptCommitForPendingDonation persists the new donationId via
-    // setPendingDonationCommittedId, which only matches rows already in
-    // 'committing' (WHERE status = 'committing'). Every other caller
-    // (createPendingDonationFromIntake, resolveFlagAndMaybeCommit) already
-    // transitions to 'committing' before calling it; retryCommit must do
-    // the same or the guard silently no-ops, the function throws "no
-    // longer in committing state", and the outer catch re-stamps
-    // commit_failed — a real donation gets created but the pending
-    // donation row never reflects it, and the retry appears to fail on
-    // every attempt even though nothing is actually wrong with the data.
-    await pendingDonationRepository.updatePendingDonationStatus(
-      pendingDonationId,
-      'committing',
-      {},
-      pool
-    );
+  // The claim moved it to 'committing' (what attemptCommitForPendingDonation
+  // and setPendingDonationCommittedId expect); previous_status is what it was.
+  if (claimed.previous_status === 'commit_failed') {
     return await attemptCommitForPendingDonation(pendingDonationId);
   }
 
-  if (pendingDonation.status === 'commit_incomplete') {
-    const acceptedItems = (pendingDonation.items || []).filter((item) => item.status === 'resolved');
-    const committedDonationId = pendingDonation.committed_donation_id ?? null;
-    if (!committedDonationId) {
-      await pendingDonationRepository.updatePendingDonationStatus(
-        pendingDonationId,
-        'committing',
-        {},
-        pool
-      );
-      return await attemptCommitForPendingDonation(pendingDonationId);
-    }
-
-    const donationItems = await pendingDonationRepository.listDonationItemsForDonation(committedDonationId, pool);
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await linkPendingItemsToDonationItems(
-        acceptedItems,
-        donationItems,
-        client,
-        `Pending donation ${pendingDonationId} retry finalization`
-      );
-      await pendingDonationRepository.updatePendingDonationStatus(
-        pendingDonationId,
-        'committed',
-        { committed_at: new Date() },
-        client
-      );
-
-      await client.query('COMMIT');
-      return await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('[pendingDonation.service] retryCommit for commit_incomplete failed:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
+  // commit_incomplete: the real donation may already exist.
+  const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+  const acceptedItems = (pendingDonation?.items || []).filter((item) => item.status === 'resolved');
+  const committedDonationId = pendingDonation?.committed_donation_id ?? null;
+  if (!committedDonationId) {
+    return await attemptCommitForPendingDonation(pendingDonationId);
   }
 
-  fail(409, `Retry commit is only valid for status 'commit_failed' or 'commit_incomplete'; current status is '${pendingDonation.status}'.`);
+  const donationItems = await pendingDonationRepository.listDonationItemsForDonation(committedDonationId, pool);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await linkPendingItemsToDonationItems(
+      acceptedItems,
+      donationItems,
+      client,
+      `Pending donation ${pendingDonationId} retry finalization`
+    );
+    await pendingDonationRepository.updatePendingDonationStatus(
+      pendingDonationId,
+      'committed',
+      { committed_at: new Date() },
+      client
+    );
+
+    await client.query('COMMIT');
+    return await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('[pendingDonation.service] retryCommit for commit_incomplete failed:', error);
+    // Give it back as it was, so it can be retried again.
+    await pendingDonationRepository.updatePendingDonationStatus(pendingDonationId, 'commit_incomplete', {}, pool);
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 export default {

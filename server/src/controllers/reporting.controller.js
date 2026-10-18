@@ -19,6 +19,8 @@
 // ─────────────────────────────────────────────────────────────
 import reportingService from '../services/reporting.service.js';
 import aiService        from '../services/reportingAi.service.js';
+import insightService   from '../services/reportingInsight.service.js';
+import savedReportService from '../services/savedReport.service.js';
 
 // Upstream conditions whose text is safe and useful to show.
 const PASS_THROUGH = new Set([502, 503, 504]);
@@ -53,6 +55,75 @@ const runReport = async (req, res) => {
   }
 };
 
+// Saved reports — always the signed-in manager's own.
+// GET /api/reporting/saved · POST /saved · PATCH /saved/:id · DELETE /saved/:id · POST /saved/:id/send
+const wrap = (fn, fallback) => async (req, res) => {
+  try {
+    res.status(200).json({ success: true, data: await fn(req) });
+  } catch (err) {
+    console.error('[savedReports]', err.message);
+    send(res, err, fallback);
+  }
+};
+const listSaved   = wrap((req) => savedReportService.list(req.user.id), 'Failed to load saved reports.');
+const createSaved = wrap((req) => savedReportService.create(req.user.id, req.body ?? {}), 'Failed to save the report.');
+const updateSaved = wrap((req) => savedReportService.update(req.user.id, req.params.id, req.body ?? {}), 'Failed to update the saved report.');
+const removeSaved = wrap((req) => savedReportService.remove(req.user.id, req.params.id), 'Failed to remove the saved report.');
+const sendSaved   = wrap((req) => savedReportService.sendNow(req.user.id, req.params.id), 'Failed to send the report.');
+
+// POST /api/reporting/drill  { spec, label } — the report behind one bar.
+// POST /api/reporting/records  { spec, label? } — the rows behind a
+// report or one bar of it: the last level of a drill.
+const records = async (req, res) => {
+  try {
+    const data = await reportingService.records(req.body ?? {});
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[records]', err.message);
+    send(res, err, 'Failed to list the records behind the report.');
+  }
+};
+
+// GET /api/reporting/filter-options — the choices for filters with no
+// fixed list (suppliers, products, centres, statuses as recorded).
+const filterOptions = async (_req, res) => {
+  try {
+    const data = await reportingService.filterOptions();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[filter-options]', err.message);
+    send(res, err, 'Failed to load the filter choices.');
+  }
+};
+
+// POST /api/reporting/process  { dateRange, filters? } — the main
+// process from purchase order to dispatch note, as a map of steps.
+const processMap = async (req, res) => {
+  try {
+    const data = await reportingService.processMap(req.body ?? {});
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[process]', err.message);
+    send(res, err, 'Failed to work out the process map.');
+  }
+};
+
+// GET /api/reporting/reorder?weeks=8 — when each product runs out and
+// what to order by when.
+const reorderPlan = wrap((req) => reportingService.reorderPlan({ horizonWeeks: req.query.weeks }), 'Failed to work out the reorder plan.');
+// GET /api/reporting/alerts?weeks=12 — weekly measures outside their control limits.
+const exceptionAlerts = wrap((req) => reportingService.exceptionAlerts({ weeks: req.query.weeks }), 'Failed to work out the exception alerts.');
+
+const drill = async (req, res) => {
+  try {
+    const report = await reportingService.drillDown(req.body ?? {});
+    res.status(200).json({ success: true, data: report });
+  } catch (err) {
+    console.error('[drill]', err.message);
+    send(res, err, 'Failed to drill into the report.');
+  }
+};
+
 // POST /api/reporting/ask
 // Returns a report payload, or { type:'clarify', question, options }.
 const ask = async (req, res) => {
@@ -71,4 +142,98 @@ const ask = async (req, res) => {
   }
 };
 
-export default { getCatalog, runReport, ask };
+// POST /api/reporting/insight
+// { spec, narrate } → the report plus key figures, related charts,
+// who-to-act-on lists and, when narrate is true, a written reading.
+// Operational metrics only; the service refuses impact ones.
+const insight = async (req, res) => {
+  try {
+    const result = await insightService.buildInsight({
+      spec: req.body?.spec,
+      narrate: req.body?.narrate === true,
+      userId: req.user?.id,
+    });
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    if (!err.status || err.status >= 500) console.error('[insight]', err);
+    else console.error('[insight]', err.status, err.message);
+    send(res, err, 'Failed to build the report breakdown.');
+  }
+};
+
+// GET /api/reporting/comparisons
+const getComparisons = (req, res) => {
+  res.status(200).json({ success: true, data: insightService.listComparisons() });
+};
+
+// POST /api/reporting/comparison  { id, dateRange, narrate }
+const runComparison = async (req, res) => {
+  try {
+    const result = await insightService.runComparison({
+      id: req.body?.id, dateRange: req.body?.dateRange, narrate: req.body?.narrate === true,
+    });
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    console.error('[runComparison]', err.status ?? '', err.message);
+    send(res, err, 'Failed to run the comparison.');
+  }
+};
+
+// GET /api/reporting/targets — this manager's effective targets.
+const getTargets = async (req, res) => {
+  try {
+    res.status(200).json({ success: true, data: await insightService.getTargets(req.user?.id) });
+  } catch (err) {
+    console.error('[getTargets]', err.message);
+    send(res, err, 'Failed to load targets.');
+  }
+};
+
+// PUT /api/reporting/targets/:metricId  { value } — null resets.
+const setTarget = async (req, res) => {
+  try {
+    const target = await insightService.setTarget({
+      userId: req.user?.id, metricId: req.params.metricId, value: req.body?.value,
+    });
+    res.status(200).json({ success: true, data: target });
+  } catch (err) {
+    console.error('[setTarget]', err.status ?? '', err.message);
+    send(res, err, 'Failed to save the target.');
+  }
+};
+
+// PUT /api/reporting/factors/:factorKey
+// Manager/admin only — see reportingFactor.repository.js for why this
+// inserts a new row rather than updating one in place.
+const setFactor = async (req, res) => {
+  try {
+    const factor = await reportingService.setFactor({
+      factorKey: req.params.factorKey,
+      value: req.body?.value,
+      unit: req.body?.unit,
+      sourceNote: req.body?.sourceNote,
+      actorId: req.user?.id,
+    });
+    res.status(200).json({ success: true, data: factor });
+  } catch (err) {
+    console.error('[setFactor]', err.message);
+    send(res, err, 'Failed to set the factor.');
+  }
+};
+
+// GET /api/reporting/factors/:factorKey/history
+const getFactorHistory = async (req, res) => {
+  try {
+    const history = await reportingService.getFactorHistory(req.params.factorKey);
+    res.status(200).json({ success: true, data: history });
+  } catch (err) {
+    console.error('[getFactorHistory]', err.message);
+    send(res, err, 'Failed to load factor history.');
+  }
+};
+
+export default {
+  drill, records, filterOptions, processMap, reorderPlan, exceptionAlerts, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
+  getCatalog, runReport, ask, insight, getComparisons, runComparison, getTargets, setTarget,
+  setFactor, getFactorHistory,
+};

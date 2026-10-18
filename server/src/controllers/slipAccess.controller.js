@@ -11,6 +11,7 @@
 import jwt from 'jsonwebtoken';
 import slipAccessService from '../services/slipAccess.service.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
+import { guestWarehouseClaim } from '../config/warehouses.js';
 
 // Matches the gate sign-in in volunteer.routes.js. A volunteer's day is
 // longer than a staff shift's 8 hours and they cannot reset a password
@@ -26,6 +27,7 @@ const handle = (res, error, logLabel, fallback) => {
       success: false,
       message: error.message,
       ...(error.ambiguous ? { ambiguous: true } : {}),
+      ...(error.alreadyHolding ? { alreadyHolding: true } : {}),
     });
   }
   console.error(logLabel, error.message);
@@ -63,7 +65,7 @@ const claim = async (req, res) => {
     });
 
     const token = jwt.sign(
-      { id: volunteer.id, role: 'guest' },
+      { id: volunteer.id, role: 'guest', ...guestWarehouseClaim() },
       process.env.JWT_SECRET,
       { expiresIn: `${SESSION_HOURS}h` },
     );
@@ -114,6 +116,15 @@ const getMySlip = async (req, res) => {
   }
 };
 
+const releaseMySlip = async (req, res) => {
+  try {
+    const data = await slipAccessService.releaseMySlip(req.user);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return handle(res, error, '[slip:release]', 'Could not return your pallet.');
+  }
+};
+
 const confirmItem = async (req, res) => {
   try {
     const data = await slipAccessService.confirmItem(
@@ -130,7 +141,7 @@ const flagItem = async (req, res) => {
   try {
     const data = await slipAccessService.flagItem(
       req.user, Number(req.params.id), Number(req.params.itemId),
-      { reason: req.body?.reason, packedQuantity: req.body?.packedQuantity },
+      { reason: req.body?.reason, packedQuantity: req.body?.packedQuantity, note: req.body?.note },
     );
     return res.status(200).json({ success: true, data });
   } catch (error) {
@@ -156,6 +167,7 @@ export default {
   claimById,
   listAvailable,
   getMySlip,
+  releaseMySlip,
   confirmItem,
   flagItem,
   completeSlip,

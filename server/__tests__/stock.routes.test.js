@@ -13,6 +13,7 @@ import { ROLES } from '../src/middleware/auth.middleware.js';
 const serviceMock = {
   getManifest:    vi.fn(),
   getMovements:   vi.fn(),
+  getExpiryBatches: vi.fn(),
   adjustManually: vi.fn(),
 };
 
@@ -44,12 +45,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   serviceMock.getManifest.mockResolvedValue(MANIFEST);
   serviceMock.getMovements.mockResolvedValue([]);
+  serviceMock.getExpiryBatches.mockResolvedValue([]);
   serviceMock.adjustManually.mockResolvedValue(OUTCOME);
 });
 
 const endpoints = [
   ['get',  BASE],
   ['get',  `${BASE}/1/history`],
+  ['get',  `${BASE}/1/batches`],
   ['post', `${BASE}/adjust`],
 ];
 
@@ -93,6 +96,11 @@ describe('stock routes — role enforcement', () => {
 
   it.each(ALL_ROLES)('%s can read a product\'s movement history', async (role) => {
     const res = await request(app).get(`${BASE}/1/history`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(200);
+  });
+
+  it.each(ALL_ROLES)("%s can read a product's expiry dates", async (role) => {
+    const res = await request(app).get(`${BASE}/1/batches`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(200);
   });
 
@@ -148,6 +156,12 @@ describe('stock routes — controller passes the right arguments', () => {
   it('gives the service a numeric product id after validateIntId', async () => {
     await request(app).get(`${BASE}/7/history`).set('Cookie', cookieFor(ROLES.WORKER));
     expect(serviceMock.getMovements).toHaveBeenCalledWith(7);
+  });
+
+  it('gives the batches handler a numeric product id', async () => {
+    await request(app).get(`${BASE}/7/batches`).set('Cookie', cookieFor(ROLES.WORKER));
+    expect(serviceMock.getExpiryBatches).toHaveBeenCalledWith(7);
+    expect(serviceMock.getMovements).not.toHaveBeenCalled();
   });
 
   it('passes only the acting user\'s id, not the whole user object', async () => {
@@ -209,6 +223,14 @@ describe('stock routes — validateIntId on the history route', () => {
 
     expect(res.status).toBe(400);
     expect(serviceMock.getMovements).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0'])('rejects GET /%s/batches with 400', async (id) => {
+    const res = await request(app).get(`${BASE}/${id}/batches`)
+      .set('Cookie', cookieFor(ROLES.WORKER));
+
+    expect(res.status).toBe(400);
+    expect(serviceMock.getExpiryBatches).not.toHaveBeenCalled();
   });
 });
 

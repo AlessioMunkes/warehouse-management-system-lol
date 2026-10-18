@@ -18,16 +18,20 @@ vi.mock('../services/stockAPI', () => ({
   getManifest:    vi.fn(),
   getMovements:   vi.fn(),
   adjustStock:    vi.fn(),
-  getStockTrends: vi.fn(),
+  getBatches:     vi.fn(),
 }));
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, firstName: 'Alessio', lastName: 'M', role: 'manager' }, logout: vi.fn() }),
 }));
 
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  // The page keeps its filters in the URL (useSearchParams).
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+}));
 
-const { getManifest, getMovements, adjustStock, getStockTrends } = await import('../services/stockAPI');
+const { getManifest, getMovements, adjustStock, getBatches } = await import('../services/stockAPI');
 const { ToastProvider } = await import('../components/ui/toast');
 const { useToast } = await import('../components/ui/toastContext');
 const { default: InventoryManagementPage } = await import('../pages/InventoryManagementPage');
@@ -41,16 +45,19 @@ const MAIZE = {
 const renderPage = () =>
   render(<ToastProvider><InventoryManagementPage /></ToastProvider>);
 
+// Adjust lives in the product's detail panel: name -> panel -> Adjust.
 async function openAdjustModal(user) {
-  await user.click(await screen.findByRole('button', { name: /Adjust/ }));
-  return within(await screen.findByRole('dialog'));
+  await user.click(await screen.findByRole('button', { name: 'Maize Meal' }));
+  const panel = within(await screen.findByRole('dialog'));
+  await user.click(panel.getByRole('button', { name: /Adjust stock/ }));
+  return within(await screen.findByRole('dialog', { name: /Adjust stock · Maize Meal/ }));
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   getManifest.mockResolvedValue([MAIZE]);
   getMovements.mockResolvedValue([]);
-  getStockTrends.mockResolvedValue({ 3: [60, 58, 55] });
+  getBatches.mockResolvedValue([]);
   adjustStock.mockResolvedValue({ before: 60, after: 48, isShortfall: false });
 });
 
@@ -105,17 +112,6 @@ describe('toast primitive', () => {
 
 // ── The page ───────────────────────────────────────────
 describe('inventory adjustments — toast and undo', () => {
-  it('loads the 30 day sparkline series alongside the manifest', async () => {
-    renderPage();
-    await waitFor(() => expect(getStockTrends).toHaveBeenCalledWith(30));
-  });
-
-  it('still renders the manifest when the trend fetch fails', async () => {
-    getStockTrends.mockRejectedValue(new Error('trends unavailable'));
-    renderPage();
-    expect(await screen.findAllByText('Maize Meal')).not.toHaveLength(0);
-  });
-
   it('offers Undo after a successful adjustment', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -124,7 +120,7 @@ describe('inventory adjustments — toast and undo', () => {
     await user.selectOptions(modal.getByLabelText('Direction'), 'remove');
     await user.type(modal.getByLabelText(/Quantity/), '12');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Damaged / spoiled');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
@@ -137,7 +133,7 @@ describe('inventory adjustments — toast and undo', () => {
     await user.selectOptions(modal.getByLabelText('Direction'), 'remove');
     await user.type(modal.getByLabelText(/Quantity/), '12');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Damaged / spoiled');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     await user.click(await screen.findByRole('button', { name: 'Undo' }));
 
@@ -160,7 +156,7 @@ describe('inventory adjustments — toast and undo', () => {
     const modal = await openAdjustModal(user);
     await user.type(modal.getByLabelText(/Quantity/), '5');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Spillage');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Could not save that adjustment/i);
     expect(alertSpy).not.toHaveBeenCalled();

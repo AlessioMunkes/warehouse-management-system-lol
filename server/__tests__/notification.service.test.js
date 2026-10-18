@@ -29,19 +29,19 @@ beforeEach(() => {
 describe('listNotifications', () => {
   it('scopes the read to the calling user\'s id', async () => {
     await notificationService.listNotifications(USER, {});
-    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, { unreadOnly: false });
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: false, limit: 50, offset: 0 });
   });
 
   it('treats the string "true" from a query param as true', async () => {
     await notificationService.listNotifications(USER, { unreadOnly: 'true' });
-    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, { unreadOnly: true });
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: true, limit: 50, offset: 0 });
   });
 });
 
 describe('getUnreadCount', () => {
   it('scopes the read to the calling user\'s id', async () => {
     await notificationService.getUnreadCount(USER);
-    expect(repoMock.getUnreadCount).toHaveBeenCalledWith(USER.id);
+    expect(repoMock.getUnreadCount).toHaveBeenCalledWith(USER.id, USER.role);
   });
 });
 
@@ -53,13 +53,56 @@ describe('markRead', () => {
 
   it('marks read for the calling user only', async () => {
     await notificationService.markRead(USER, 12);
-    expect(repoMock.markRead).toHaveBeenCalledWith(12, USER.id);
+    expect(repoMock.markRead).toHaveBeenCalledWith(12, USER.id, USER.role);
   });
 });
 
 describe('markAllRead', () => {
   it('scopes the write to the calling user\'s id', async () => {
     await notificationService.markAllRead(USER);
-    expect(repoMock.markAllRead).toHaveBeenCalledWith(USER.id);
+    expect(repoMock.markAllRead).toHaveBeenCalledWith(USER.id, USER.role);
+  });
+});
+
+// ── Floor (worker-facing) ────────────────────────────────────
+// Same repo functions, narrowed to FLOOR_TYPES so a worker's bell
+// never pulls in a manager-only event (BR-14's sweep, a PO return).
+const FLOOR_TYPES = ['picking_slips_generated', 'picking_slip_created', 'picking_slip_released'];
+
+describe('listFloorNotifications', () => {
+  it('scopes the read to floor types only', async () => {
+    await notificationService.listFloorNotifications(USER, {});
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, null, {
+      unreadOnly: false, types: FLOOR_TYPES, limit: 50, offset: 0,
+    });
+  });
+});
+
+// The notifications page loads older ones in batches.
+describe('paging the feed', () => {
+  it('passes a page through from the query', async () => {
+    await notificationService.listNotifications(USER, { limit: '100', offset: '200' });
+    expect(repoMock.listForUser).toHaveBeenLastCalledWith(USER.id, USER.role, { unreadOnly: false, limit: 100, offset: 200 });
+  });
+
+  it.each([['0', '0'], ['201', '0'], ['abc', '0'], ['50', '-1'], ['50', '1.5']])(
+    'refuses limit %s, offset %s', async (limit, offset) => {
+      await expect(notificationService.listNotifications(USER, { limit, offset }))
+        .rejects.toMatchObject({ status: 400 });
+    },
+  );
+});
+
+describe('getFloorUnreadCount', () => {
+  it('scopes the count to floor types only', async () => {
+    await notificationService.getFloorUnreadCount(USER);
+    expect(repoMock.getUnreadCount).toHaveBeenCalledWith(USER.id, null, { types: FLOOR_TYPES });
+  });
+});
+
+describe('markAllFloorRead', () => {
+  it('scopes the write to floor types only', async () => {
+    await notificationService.markAllFloorRead(USER);
+    expect(repoMock.markAllRead).toHaveBeenCalledWith(USER.id, null, { types: FLOOR_TYPES });
   });
 });

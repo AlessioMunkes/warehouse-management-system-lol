@@ -4,8 +4,8 @@
 // The assistant can navigate. This is the test that says it can only
 // navigate somewhere the app would actually let you in.
 //
-// It reads the role guards out of App.jsx — the real route table —
-// and compares them against the `roles` on each screen in the
+// It reads the role guards out of routes/routeTable.js — the table
+// App.jsx builds its routes from — and compares them against the `roles` on each screen in the
 // server's help catalogue. Two files, in two packages, that have to
 // agree, and nothing but this would notice if they stopped: a screen
 // whose catalogue roles are too wide produces a confident "Opened
@@ -21,85 +21,27 @@
 // of this. Widening a catalogue entry cannot let anyone in anywhere.
 // The failure this prevents is the assistant OFFERING a locked door.
 //
-// Runs in node: it reads source off disk and imports across the
-// package boundary. Same directive, same reason, as
+// Runs in node: it imports across the package boundary. Same directive, same reason, as
 // duplicate-imports.test.js.
 //
 // @vitest-environment node
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { SCREEN_PATHS } from '../features/assistant/screenPaths';
-import { STAFF, ADMIN, PACKING, DONATIONS, VOLUNTEERS } from '../routes/paths';
+import { SCREEN_PATHS, pathForScreen } from '../features/assistant/screenPaths';
+import { ROUTES } from '../routes/routeTable';
 import {
   SCREENS,
 } from '../../../server/src/features/assistant/helpCatalog.js';
 
-const ALL = ['warehouse_worker', 'manager', 'admin'];
-
-const appSource = readFileSync(
-  fileURLToPath(new URL('../App.jsx', import.meta.url)), 'utf8'
-);
-
-const CONSTANTS = { STAFF, ADMIN, PACKING, DONATIONS, VOLUNTEERS };
-
-// The role lists App.jsx refers to by name. Kept here rather than
-// imported wholesale so that a change to one of them shows up as a
-// failing test with a name, not a silently different expectation.
-const ROLE_LISTS = {
-  DONATION_INTAKE_ROLES:      ['warehouse_worker', 'manager', 'admin'],
-  STAFF_ROLES:                ['warehouse_worker', 'manager', 'admin'],
-  COMMUNITY_REQUEST_ROLES:    ['warehouse_worker', 'manager', 'admin'],
-  VOLUNTEER_MANAGEMENT_ROLES: ['manager', 'admin'],
-};
-
-/**
- * path -> the roles App.jsx lets through, by walking the file and
- * tracking which <ProtectedRoute> group each <Route> sits in.
- *
- * Deliberately simple: it keys off the `roles=` on the group opener
- * and resets at the closing tag. The route table is a flat list of
- * groups, and the two guard tests below fail loudly if that ever
- * stops being true.
- */
-const routeRoles = (() => {
-  const out = new Map();
-  let current = null;
-
-  for (const line of appSource.split('\n')) {
-    const group = line.match(/<Route element=\{<ProtectedRoute([^>]*)\/>\}>/);
-    if (group) {
-      const attrs = group[1];
-      const inline = attrs.match(/roles=\{\[([^\]]*)\]\}/);
-      const named  = attrs.match(/roles=\{([A-Z_]+)\}/);
-      if (inline)      current = inline[1].split(',').map((r) => r.trim().replace(/['"]/g, '')).filter(Boolean);
-      else if (named)  current = ROLE_LISTS[named[1]] ?? null;
-      else             current = ALL;   // <ProtectedRoute /> — any signed-in role
-      continue;
-    }
-    if (/^\s*<\/Route>\s*$/.test(line)) { current = null; continue; }
-    if (!current) continue;
-
-    // `path=` on its own line, not necessarily after `<Route` — the
-    // donation routes wrap their element in a provider and are
-    // formatted across several lines. Inside a group, a bare `path=`
-    // is unambiguous.
-    const lit = line.match(/\bpath=["']([^"']+)["']/);
-    if (lit) { out.set(lit[1], current); continue; }
-
-    const con = line.match(/\bpath=\{([A-Z_]+)\.([A-Za-z0-9_]+)\}/);
-    if (con) {
-      const value = CONSTANTS[con[1]]?.[con[2]];
-      if (typeof value === 'string') out.set(value, current);
-    }
-  }
-  return out;
-})();
+// path -> the roles the app lets through, straight from the route
+// table App.jsx is built from (routes/routeTable.js). Public routes
+// have no roles and are left out: the assistant only offers screens
+// behind a login.
+const routeRoles = new Map(ROUTES.filter((r) => r.roles).map((r) => [r.path, [...r.roles]]));
 
 describe('reading the route table', () => {
   // If the parse breaks, every comparison below passes vacuously.
-  it('found the guarded routes in App.jsx', () => {
+  it('found the guarded routes in the route table', () => {
     expect(routeRoles.size).toBeGreaterThan(20);
   });
 
@@ -126,12 +68,13 @@ describe('what the assistant offers matches what the app allows', () => {
   it.each(
     SCREENS.map((s) => [s.id, s])
   )('%s is never offered to someone the route would refuse', (id, screen) => {
-    const path = SCREEN_PATHS[id];
-    if (!path) return;                     // `home`, per role by design
-    const allowed = routeRoles.get(path);
-    if (!allowed) return;                  // reported by the test above
-
+    // Per role: Benevolent Requests and Feed the Soil send a worker to
+    // the floor's page and everyone else to the manager's.
     for (const role of screen.roles) {
+      const path = pathForScreen(id, role);
+      if (!path) continue;                 // `home`, per role by design
+      const allowed = routeRoles.get(path);
+      if (!allowed) continue;              // reported by the test above
       expect(
         allowed,
         `the assistant offers ${id} to a ${role}, but App.jsx would bounce them`
@@ -145,13 +88,11 @@ describe('what the assistant offers matches what the app allows', () => {
   it.each(
     SCREENS.map((s) => [s.id, s])
   )('%s is offered to everyone the route does allow', (id, screen) => {
-    const path = SCREEN_PATHS[id];
-    if (!path) return;
-    const allowed = routeRoles.get(path);
-    if (!allowed) return;
-
-    for (const role of allowed) {
-      if (role === 'guest') continue;      // never offered the assistant at all
+    for (const role of ['warehouse_worker', 'manager', 'admin']) {
+      const path = pathForScreen(id, role);
+      if (!path) continue;
+      const allowed = routeRoles.get(path);
+      if (!allowed || !allowed.includes(role)) continue;
       expect(
         screen.roles,
         `App.jsx lets a ${role} open ${id}, but the assistant will not take them`
@@ -170,7 +111,7 @@ describe('spot checks, in case the parser is ever fooled', () => {
   });
 
   it('keeps a manager off the admin screens', () => {
-    for (const id of ['products', 'suppliers', 'users', 'section18a', 'emailIntegration']) {
+    for (const id of ['products', 'suppliers', 'users', 'activityLog', 'emailIntegration']) {
       expect(rolesFor(id), id).not.toContain('manager');
     }
   });

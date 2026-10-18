@@ -21,7 +21,7 @@ export default function EmptyState({
   className = '',
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center px-4 py-12 text-center ${className}`}>
+    <div className={`fx-fade-in flex flex-col items-center justify-center px-4 py-12 text-center ${className}`}>
       {Icon && (
         <div className="mb-3 rounded-full bg-muted p-3 text-muted-foreground">
           <Icon className="size-5" aria-hidden="true" />

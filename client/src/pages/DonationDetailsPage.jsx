@@ -2,20 +2,19 @@
 // src/pages/DonationDetailsPage.jsx
 // Route: /donations/new
 //
-// Page 1 of 2. Step indicator restored — this page still leads to a
-// separate Review page (step 2). Category selector removed (search-
-// driven item classification instead, handled inside
-// DonationItemsList). Donor fields conditionally rendered based on
-// consent, not just disabled.
+// Donation intake, page 1 of 2: the donor's details (shown depending on
+// consent) and the items, classified by searching the product list. Leads
+// to the review page. Used by warehouse workers and admins, inside
+// StaffShell so the tab bar is there.
 // ─────────────────────────────────────────────────────────────
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
-//import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
+import StaffShell from "../components/layout/StaffShell";
 
-import { useDonationDraft, validateDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { useDonationDraft, validateDonationDraft } from "../features/donation/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
-import { DonationRail } from "../features/donation/components/DonationRail";
-import { DonationItemsList } from "../features/donation/components/DonationItemsList";
+import { DonationRail } from "../features/donation/DonationRail";
+import { DonationItemsList } from "../features/donation/DonationItemsList";
 
 export function DonationDetailsPage() {
   const navigate = useNavigate();
@@ -77,102 +76,115 @@ export function DonationDetailsPage() {
   ].filter(Boolean);
 
   return (
-    <div className="stf-shell donation-intake-shell">
-      <div className="stf-crumb">
-        <span>Donations / Record a Donation</span>
-        <span className="stf-crumb-meta">{today}</span>
-      </div>
+    <StaffShell
+      crumb="Donations / Record a donation"
+      meta={today}
+      // What this worker recorded before, and where it has got to.
+      actions={(
+        <Link to={DONATIONS.history} className="stf-crumb-link">
+          <i className="ti ti-history" aria-hidden="true" />
+          <span>History</span>
+        </Link>
+      )}
+    >
+      <DonationRail currentStep={0} />
 
-      <main className="stf-main donation-intake-main">
-        <DonationRail currentStep={0} />
+      <section className="stf-step donation-intake-card">
+        <div className="stf-step-head">
+          <h1 className="stf-step-title">Record a donation</h1>
+          <p className="stf-step-sub">Record the donor, the value and the items.</p>
+        </div>
 
-        <section className="stf-step donation-intake-card">
-          <div className="stf-step-head">
-            <h1 className="stf-step-title">Record a Donation</h1>
-            <p className="stf-step-sub">Capture donor basics, value and donated items.</p>
-          </div>
-
-          {validationMessages.length > 0 && (
-            <div className="stf-notice is-warn" role="alert">
-              <span className="stf-notice-mark" aria-hidden="true">!</span>
-              <div className="stf-notice-body">
-                <strong>Fix these before continuing:</strong>
-                <ul className="donation-intake-error-list">
-                  {[...new Set(validationMessages)].map((message) => (
-                    <li key={message}>{message}</li>
-                  ))}
-                </ul>
-              </div>
+        {validationMessages.length > 0 && (
+          <div className="stf-notice is-warn" role="alert">
+            <span className="stf-notice-mark" aria-hidden="true">!</span>
+            <div className="stf-notice-body">
+              <strong>Fix these before continuing:</strong>
+              <ul className="donation-intake-error-list">
+                {[...new Set(validationMessages)].map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
             </div>
-          )}
-
-          <div className="donation-intake-grid">
-            <div className="stf-field">
-              <label htmlFor="donor-name" className="stf-field-label">Donor Name</label>
-              <input id="donor-name" className="stf-input is-text" value={draft.donorName} onChange={(e) => updateDraft({ donorName: e.target.value })} />
-              <span className="stf-field-hint">Leave blank for an anonymous donation.</span>
-            </div>
-            <div className="stf-field">
-              <label htmlFor="donor-email" className="stf-field-label">Donor Email</label>
-              <input id="donor-email" type="email" className={`stf-input is-text ${errors.donorContact ? "is-flagged" : ""}`} value={draft.donorContact} onChange={(e) => updateDraft({ donorContact: e.target.value, contactDetails: e.target.value, contactMethod: e.target.value ? "email" : "" })} aria-invalid={Boolean(errors.donorContact)} />
-              <span className="stf-field-hint">Required if Section 18A is requested. Leave blank for anonymous donations.</span>
-              {errors.donorContact && <span className="stf-field-hint donation-intake-error">{errors.donorContact}</span>}
-            </div>
-            <fieldset className="stf-field donation-intake-choice" aria-label="Section 18A">
-              <legend className="stf-field-label">Section 18A?</legend>
-              <div className="donation-intake-options">
-                <label className={`donation-intake-option ${draft.donorConsentGiven === true ? "is-chosen" : ""}`}>
-                  <input name="section-18a" type="radio" checked={draft.donorConsentGiven === true} onChange={() => updateDraft({ donorConsentGiven: true })} />
-                  Yes
-                </label>
-                <label className={`donation-intake-option ${draft.donorConsentGiven === false ? "is-chosen" : ""}`}>
-                  <input name="section-18a" type="radio" checked={draft.donorConsentGiven === false} onChange={() => updateDraft({ donorConsentGiven: false })} />
-                  No
-                </label>
-              </div>
-              {errors.donorConsentGiven && <span className="stf-field-hint donation-intake-error">{errors.donorConsentGiven}</span>}
-            </fieldset>
-            <div className="stf-field">
-              <label htmlFor="estimated-value-zar" className="stf-field-label">Estimated Donation Value</label>
-              <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" value={draft.estimatedValueZar} onChange={(e) => updateDraft({ estimatedValueZar: e.target.value })} aria-invalid={Boolean(errors.value)} />
-              {errors.value && <span className="stf-field-hint donation-intake-error">{errors.value}</span>}
-            </div>
-            <fieldset className="stf-field donation-intake-choice" aria-label="Food donation">
-              <legend className="stf-field-label">Food?</legend>
-              <div className="donation-intake-options">
-                <label className={`donation-intake-option ${draft.isFood === true ? "is-chosen" : ""}`}>
-                  <input name="is-food" type="radio" checked={draft.isFood === true} onChange={() => updateDraft({ isFood: true })} /> 
-                  Yes
-                </label>
-                <label className={`donation-intake-option ${draft.isFood === false ? "is-chosen" : ""}`}>
-                  <input name="is-food" type="radio" checked={draft.isFood === false} onChange={() => updateDraft({ isFood: false })} /> 
-                  No
-                </label>
-              </div>
-              {errors.isFood && <span className="stf-field-hint donation-intake-error">{errors.isFood}</span>}
-            </fieldset>
           </div>
+        )}
 
-          <div className="donation-intake-items">
-            <DonationItemsList
-              ref={itemsRef}
-              items={draft.items}
-              isFood={draft.isFood}
-              onChange={(items) => updateDraft({ items })}
-              itemErrors={itemErrors}
-            />
+        <div className="donation-intake-grid">
+          <div className="stf-field">
+            <label htmlFor="donor-name" className="stf-field-label">Donor name</label>
+            <input id="donor-name" className="stf-input is-text" value={draft.donorName} onChange={(e) => updateDraft({ donorName: e.target.value })} />
+            <span className="stf-field-hint">Leave blank for an anonymous donation.</span>
           </div>
+          <div className="stf-field">
+            <label htmlFor="donor-email" className="stf-field-label">Donor email</label>
+            <input id="donor-email" type="email" className={`stf-input is-text ${errors.donorContact ? "is-flagged" : ""}`} value={draft.donorContact} onChange={(e) => updateDraft({ donorContact: e.target.value, contactDetails: e.target.value, contactMethod: e.target.value ? "email" : "" })} aria-invalid={Boolean(errors.donorContact)} />
+            <span className="stf-field-hint">Required if Section 18A is requested. Leave blank for anonymous donations.</span>
+            {errors.donorContact && <span className="stf-field-hint donation-intake-error">{errors.donorContact}</span>}
+          </div>
+          <fieldset className="stf-field donation-intake-choice" aria-label="Section 18A">
+            <legend className="stf-field-label">Section 18A?</legend>
+            <div className="donation-intake-options">
+              <label className={`donation-intake-option ${draft.donorConsentGiven === true ? "is-chosen" : ""}`}>
+                <input name="section-18a" type="radio" checked={draft.donorConsentGiven === true} onChange={() => updateDraft({ donorConsentGiven: true })} />
+                Yes
+              </label>
+              <label className={`donation-intake-option ${draft.donorConsentGiven === false ? "is-chosen" : ""}`}>
+                <input name="section-18a" type="radio" checked={draft.donorConsentGiven === false} onChange={() => updateDraft({ donorConsentGiven: false })} />
+                No
+              </label>
+            </div>
+            {errors.donorConsentGiven && <span className="stf-field-hint donation-intake-error">{errors.donorConsentGiven}</span>}
+          </fieldset>
+          {/* Always offered. Needed for a Section 18A certificate and
+              optional otherwise (DonationDraftContext validates both). */}
+          <div className="stf-field">
+            <label htmlFor="estimated-value-zar" className="stf-field-label">Estimated value (ZAR)</label>
+            <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" value={draft.estimatedValueZar} onChange={(e) => updateDraft({ estimatedValueZar: e.target.value })} aria-invalid={Boolean(errors.value)} />
+            {errors.value
+              ? <span className="stf-field-hint donation-intake-error">{errors.value}</span>
+              : (
+                <span className="stf-field-hint">
+                  {draft.donorConsentGiven === true
+                    ? "Needed for the Section 18A certificate. Enter 0 if it has no value."
+                    : "Optional. Leave blank if you do not know it."}
+                </span>
+              )}
+          </div>
+          <fieldset className="stf-field donation-intake-choice" aria-label="Food donation">
+            <legend className="stf-field-label">Food?</legend>
+            <div className="donation-intake-options">
+              <label className={`donation-intake-option ${draft.isFood === true ? "is-chosen" : ""}`}>
+                <input name="is-food" type="radio" checked={draft.isFood === true} onChange={() => updateDraft({ isFood: true })} /> 
+                Yes
+              </label>
+              <label className={`donation-intake-option ${draft.isFood === false ? "is-chosen" : ""}`}>
+                <input name="is-food" type="radio" checked={draft.isFood === false} onChange={() => updateDraft({ isFood: false })} /> 
+                No
+              </label>
+            </div>
+            {errors.isFood && <span className="stf-field-hint donation-intake-error">{errors.isFood}</span>}
+          </fieldset>
+        </div>
 
-          <div className="stf-actions is-row donation-intake-actions">
-            <button type="button" className="stf-btn stf-btn-secondary" onClick={handleCancel}>
-              Cancel
-            </button>
-            <button type="button" className="stf-btn stf-btn-primary" onClick={handleNext}>
-              Next
-            </button>
-          </div>
-        </section>
-      </main>
-    </div>
+        <div className="donation-intake-items">
+          <DonationItemsList
+            ref={itemsRef}
+            items={draft.items}
+            isFood={draft.isFood}
+            onChange={(items) => updateDraft({ items })}
+            itemErrors={itemErrors}
+          />
+        </div>
+
+        <div className="stf-actions is-row donation-intake-actions">
+          <button type="button" className="stf-btn stf-btn-secondary" onClick={handleCancel}>
+            Cancel
+          </button>
+          <button type="button" className="stf-btn stf-btn-primary" onClick={handleNext}>
+            Next
+          </button>
+        </div>
+      </section>
+    </StaffShell>
   );
 }

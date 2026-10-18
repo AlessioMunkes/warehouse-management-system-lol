@@ -8,12 +8,19 @@ const bookMock = { countConfirmedByTimeslot: vi.fn() };
 const auditMock = vi.fn();
 const queueSyncMock = vi.fn();
 const syncEntityMock = vi.fn();
+const syncTimeslotCapacityMock = vi.fn();
 vi.mock('../src/repositories/loveActivismEvent.repository.js', () => ({ default: eventRepoMock }));
 vi.mock('../src/repositories/eventSpace.repository.js', () => ({ default: spaceRepoMock }));
 vi.mock('../src/repositories/eventTimeslot.repository.js', () => ({ default: slotMock }));
 vi.mock('../src/repositories/volunteerBooking.repository.js', () => ({ default: bookMock }));
 vi.mock('../src/repositories/auditLog.repository.js', () => ({ logAudit: auditMock }));
-vi.mock('../src/services/vmsSync.service.js', () => ({ default: { queueSync: queueSyncMock, syncEntity: syncEntityMock } }));
+vi.mock('../src/services/vmsSync.service.js', () => ({
+  default: {
+    queueSync: queueSyncMock,
+    syncEntity: syncEntityMock,
+    syncTimeslotCapacity: syncTimeslotCapacityMock,
+  },
+}));
 const makeClient = () => ({ query: vi.fn(async (s) => { if (s === 'BEGIN' || s === 'COMMIT' || s === 'ROLLBACK') order.push(s); return { rows: [] }; }), release: vi.fn(() => { released = true; }) });
 let order = []; let released = false;
 const poolMock = { connect: vi.fn() };
@@ -24,7 +31,7 @@ const ACTOR = { id: 5 };
 const EVENT = { event_id: 'e1', event_date: '2026-10-01' };
 const SPACE = { space_id: 's1', is_active: true };
 const SLOT = { timeslot_id: 't1', event_id: 'e1', space_id: 's1', start_time: '2026-10-01T09:00:00Z', end_time: '2026-10-01T10:00:00Z', capacity: 10, status: 'OPEN' };
-beforeEach(() => { vi.clearAllMocks(); order = []; released = false; poolMock.connect.mockImplementation(async () => makeClient()); queueSyncMock.mockResolvedValue({ sync_status: 'PENDING' }); syncEntityMock.mockResolvedValue({ sync_status: 'SYNCED' }); });
+beforeEach(() => { vi.clearAllMocks(); order = []; released = false; poolMock.connect.mockImplementation(async () => makeClient()); queueSyncMock.mockResolvedValue({ sync_status: 'PENDING' }); syncEntityMock.mockResolvedValue({ sync_status: 'SYNCED' }); syncTimeslotCapacityMock.mockResolvedValue({ sync_status: 'SYNCED' }); });
 const combinedPayload = {
   eventName: 'Drive',
   description: 'Pack food boxes',
@@ -153,7 +160,86 @@ describe('post-commit VMS failure preserves local records', () => {
     slotMock.updateTimeslot.mockResolvedValueOnce({ ...SLOT, capacity: 20 });
     await svc.updateEventBooking('e1', { timeslotId: 't1', capacity: 20 }, ACTOR);
     expect(slotMock.createTimeslot).not.toHaveBeenCalled();
-    expect(queueSyncMock).toHaveBeenCalledWith('event_booking', 'e1', expect.anything());
-    expect(syncEntityMock).toHaveBeenCalledWith('event_booking', 'e1');
+    expect(queueSyncMock).not.toHaveBeenCalled();
+    expect(syncEntityMock).not.toHaveBeenCalled();
+    expect(syncTimeslotCapacityMock).toHaveBeenCalledWith('event_booking', 'e1', 't1', 20);
   });
 });
+describe('timeslot capacity VMS sync', () => {
+  it('syncs capacity post-commit only when capacity changes', async () => {
+    eventRepoMock.findById.mockResolvedValueOnce(EVENT);
+    slotMock.findById.mockResolvedValueOnce(SLOT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.updateTimeslot.mockResolvedValueOnce({ ...SLOT, capacity: 25 });
+    let syncAtCall = null;
+    syncTimeslotCapacityMock.mockImplementationOnce(async () => { syncAtCall = { order: [...order], released }; return { sync_status: 'SYNCED' }; });
+
+    const result = await svc.updateEventBooking('e1', { timeslotId: 't1', capacity: 25 }, ACTOR);
+
+    expect(result.capacity).toBe(25);
+    expect(queueSyncMock).not.toHaveBeenCalled();
+    expect(syncEntityMock).not.toHaveBeenCalled();
+    expect(syncTimeslotCapacityMock).toHaveBeenCalledTimes(1);
+    expect(syncTimeslotCapacityMock).toHaveBeenCalledWith('event_booking', 'e1', 't1', 25);
+    expect(syncAtCall.order).toContain('COMMIT');
+    expect(syncAtCall.released).toBe(true);
+  });
+
+  it('does not call VMS when submitted capacity matches the existing capacity', async () => {
+    eventRepoMock.findById.mockResolvedValueOnce(EVENT);
+    slotMock.findById.mockResolvedValueOnce(SLOT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.updateTimeslot.mockResolvedValueOnce({ ...SLOT });
+
+    await svc.updateEventBooking('e1', { timeslotId: 't1', capacity: 10 }, ACTOR);
+
+    expect(syncTimeslotCapacityMock).not.toHaveBeenCalled();
+    expect(queueSyncMock).not.toHaveBeenCalled();
+    expect(syncEntityMock).not.toHaveBeenCalled();
+  });
+
+  it('publishes the event for non-capacity timeslot edits without calling capacity sync', async () => {
+    eventRepoMock.findById.mockResolvedValueOnce(EVENT);
+    slotMock.findById.mockResolvedValueOnce(SLOT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.updateTimeslot.mockResolvedValueOnce({ ...SLOT, end_time: '2026-10-01T10:30:00Z' });
+
+    await svc.updateEventBooking('e1', { timeslotId: 't1', endTime: '2026-10-01T10:30:00Z' }, ACTOR);
+
+    expect(syncTimeslotCapacityMock).not.toHaveBeenCalled();
+    expect(queueSyncMock).not.toHaveBeenCalled();
+    expect(syncEntityMock).toHaveBeenCalledWith('event_booking', 'e1');
+  });
+
+  it('returns the local update even when post-commit capacity sync fails', async () => {
+    eventRepoMock.findById.mockResolvedValueOnce(EVENT);
+    slotMock.findById.mockResolvedValueOnce(SLOT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.updateTimeslot.mockResolvedValueOnce({ ...SLOT, capacity: 25 });
+    syncTimeslotCapacityMock.mockRejectedValueOnce(new Error('VMS down'));
+
+    const result = await svc.updateEventBooking('e1', { timeslotId: 't1', capacity: 25 }, ACTOR);
+
+    expect(result.capacity).toBe(25);
+    expect(order).toContain('COMMIT');
+    expect(syncTimeslotCapacityMock).toHaveBeenCalledWith('event_booking', 'e1', 't1', 25);
+  });
+
+  it('returns the committed local update when capacity sync records FAILED', async () => {
+    eventRepoMock.findById.mockResolvedValueOnce(EVENT);
+    slotMock.findById.mockResolvedValueOnce(SLOT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.updateTimeslot.mockResolvedValueOnce({ ...SLOT, capacity: 25 });
+    syncTimeslotCapacityMock.mockResolvedValueOnce({
+      sync_status: 'FAILED',
+      error_message: 'VMS capacity verification failed: requested 25, returned 5',
+    });
+
+    const result = await svc.updateEventBooking('e1', { timeslotId: 't1', capacity: 25 }, ACTOR);
+
+    expect(result.capacity).toBe(25);
+    expect(order).toContain('COMMIT');
+    expect(syncTimeslotCapacityMock).toHaveBeenCalledWith('event_booking', 'e1', 't1', 25);
+  });
+});
+

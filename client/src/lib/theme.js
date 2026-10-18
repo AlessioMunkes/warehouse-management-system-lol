@@ -7,10 +7,10 @@
 // reading a hook.
 //
 // WHY lib/ RATHER THAN shellContext.js
-// The motion setting lives in a taskdashboard component because only
-// that shell sets it. This one is read by main.jsx before React
-// exists, so it cannot live inside a feature folder without the entry
-// point reaching into one.
+// The motion setting lives with the shell (components/layout/
+// shellContext.js) because only that shell sets it. This one is read
+// by main.jsx before React exists, so it lives here rather than with
+// the components.
 //
 // WHY main.jsx AND NOT AN EFFECT
 // An effect runs after the first paint. For someone who keeps the app

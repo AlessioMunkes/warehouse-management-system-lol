@@ -1,4 +1,4 @@
-import pendingDonationRepository from '../repositories/pendingDonation.repository.js';
+import pendingDonationReadService, { MINE_RANGE_DAYS } from '../services/pendingDonationRead.service.js';
 import pendingDonationService from '../services/pendingDonation.service.js';
 
 const handleError = (res, label, fallbackMessage) => (err) => {
@@ -80,7 +80,7 @@ const parseRequestedStatuses = (rawQuery) => {
 const listPendingDonations = async (req, res) => {
   try {
     const statuses = parseRequestedStatuses(req.query.statuses);
-    const data = await pendingDonationRepository.listPendingDonationsWithItems(statuses);
+    const data = await pendingDonationReadService.listWithItems(statuses);
     return res.status(200).json({ success: true, data });
   } catch (err) {
     return handleError(res, 'listPendingDonations', 'Failed to retrieve pending donations.')(err);
@@ -89,10 +89,7 @@ const listPendingDonations = async (req, res) => {
 
 const listReconciliationQueue = async (req, res) => {
   try {
-    const queue = await pendingDonationRepository.listPendingDonationsByStatus([
-      'commit_failed',
-      'commit_incomplete',
-    ]);
+    const queue = await pendingDonationReadService.listReconciliationQueue();
 
     return res.status(200).json({ success: true, data: queue });
   } catch (err) {
@@ -102,7 +99,7 @@ const listReconciliationQueue = async (req, res) => {
 
 const getPendingDonationById = async (req, res) => {
   try {
-    const pendingDonation = await pendingDonationRepository.getPendingDonationById(req.params.id);
+    const pendingDonation = await pendingDonationReadService.getById(req.params.id);
     if (!pendingDonation) {
       return res.status(404).json({ success: false, message: 'Pending donation not found.' });
     }
@@ -113,7 +110,24 @@ const getPendingDonationById = async (req, res) => {
   }
 };
 
+// GET /api/donations/pending/mine?range=today|week|month|all
+// The signed-in worker's own donations, for their History. Scoped by
+// req.user.id from the session, never by anything in the request.
+const listMyPendingDonations = async (req, res) => {
+  try {
+    const range = req.query.range ?? 'all';
+    if (range !== 'all' && !(range in MINE_RANGE_DAYS)) {
+      return res.status(400).json({ success: false, message: 'Range must be today, week, month or all.' });
+    }
+    const rows = await pendingDonationReadService.listMine(req.user.id, range);
+    return res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    return handleError(res, 'listMyPendingDonations', 'Failed to retrieve your donations.')(err);
+  }
+};
+
 export default {
+  listMyPendingDonations,
   createPendingDonation,
   resolvePendingDonationFlag,
   retryPendingDonationCommit,

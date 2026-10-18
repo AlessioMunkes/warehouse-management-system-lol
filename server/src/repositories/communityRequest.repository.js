@@ -1,37 +1,89 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/communityRequest.repository.js
 //
-// All SQL for public.community_requests — the ADM-5.0 / BR-28 call-in
-// log. The table was created on the live database ahead of this code
-// (2026-08-19); these columns are the real, deployed shape, not
-// anything this repo migrates into being.
+// All SQL for public.community_requests (the ADM-5.0 / BR-28 call-in
+// log) and its approved items, public.community_request_items
+// (migration 036).
 //
-// LOG ONLY. Nothing here touches stock_levels or stock_movements.
+// THE FLOW
+//   pending ("Awaiting approval")  logged by anyone
+//     → approved                   a manager chose products and
+//                                  quantities; stock is set aside
+//        → fulfilled / partially_fulfilled
+//                                  a worker confirmed what went out;
+//                                  stock leaves the building
+//     → declined                   at either stage; any reservation is
+//                                  released
+//   "referred" stays in the enum, unused.
 //
-// NO AUDIT WRITES HERE — deliberately, and for the same reason the
-// suppliers slice has none. audit_log.entity_id is `uuid NOT NULL`
-// with no FK; community_requests.id is a plain integer sequence, so
-// logAudit(client, { entityId: <int> }) fails with 22P02 (invalid
-// uuid) exactly as it does today on users / products / purchase_orders.
-// That mismatch is a known repo-wide gap; fixing it is out of scope
-// for this feature. handled_by / resolved_at + outcome_note are the
-// who/when/why trail this table actually keeps.
+// Stock is NOT written here. Reservations are derived from the lines
+// (committedStock.sql.js) and stock leaves through adjustStock, called
+// by the service in the same transaction as the confirmation.
+//
+// Every write below takes the caller's transaction client, and every
+// UPDATE names the status it expects in its WHERE, so a lost race
+// updates nothing and the caller reports it instead of overwriting.
+//
+// NO AUDIT WRITES HERE. handled_by / approved_by / resolved_at +
+// outcome_note are the who/when/why trail this table keeps.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { logAudit } from './auditLog.repository.js';
 
-// One projection, reused by every read. LEFT JOIN so an unclaimed
-// request (handled_by IS NULL) still comes back.
-const SELECT_BASE = `
+// ── Approved, and still not gone out ─────────────────────────
+// An approved request holds its stock aside until it is confirmed or
+// declined. One that has not gone out a week after approval most
+// likely never will: the caller has not come, and the stock it holds
+// is kept from everyone else. The manager's list flags it and the
+// dashboard counts it, from this one rule, so the two always agree.
+// A request flagged for new items is left out: it has its own line.
+export const OVERDUE_AFTER_DAYS = 7;
+export const overdueSql = (alias = 'cr') =>
+  `(${alias}.outcome = 'approved' AND ${alias}.items_short_at IS NULL
+     AND ${alias}.approved_at < now() - make_interval(days => ${OVERDUE_AFTER_DAYS}))`;
+
+// items: the approved lines, newest information first for the page.
+// A line with short_at set has stopped reserving stock.
+export const SELECT_BASE = `
   SELECT cr.id, cr.requested_at, cr.caller_name, cr.caller_contact,
          cr.items_requested, cr.quantity_note, cr.outcome, cr.outcome_note,
          cr.handled_by, cr.resolved_at, cr.created_at,
-         u.first_name AS handled_by_first_name,
-         u.last_name  AS handled_by_last_name
+         cr.approved_by, cr.approved_at, cr.assigned_to, cr.items_short_at,
+         ${overdueSql('cr')} AS is_overdue,
+         -- Who logged and signed off the request (migration 046). Read
+         -- through to_jsonb so a database that has not had 046 yet
+         -- still lists its requests, with nobody named, rather than
+         -- failing every read on a missing column.
+         NULLIF(to_jsonb(cr)->>'logged_by', '')::int AS logged_by,
+         ul.first_name AS logged_by_first_name,
+         ul.last_name  AS logged_by_last_name,
+         u.first_name  AS handled_by_first_name,
+         u.last_name   AS handled_by_last_name,
+         ua.first_name AS assigned_to_first_name,
+         ua.last_name  AS assigned_to_last_name,
+         ub.first_name AS approved_by_first_name,
+         ub.last_name  AS approved_by_last_name,
+         COALESCE((
+           SELECT json_agg(json_build_object(
+                    'id',               cri.id,
+                    'productId',        cri.product_id,
+                    'productName',      p.name,
+                    'unit',             cri.unit,
+                    'quantityApproved', cri.quantity_approved,
+                    'quantityReleased', cri.quantity_released,
+                    'shortAt',          cri.short_at
+                  ) ORDER BY p.name, cri.id)
+             FROM community_request_items cri
+             JOIN products p ON p.id = cri.product_id
+            WHERE cri.request_id = cr.id
+         ), '[]'::json) AS items
     FROM public.community_requests cr
-    LEFT JOIN public.users u ON u.id = cr.handled_by
+    LEFT JOIN public.users u  ON u.id  = cr.handled_by
+    LEFT JOIN public.users ua ON ua.id = cr.assigned_to
+    LEFT JOIN public.users ub ON ub.id = cr.approved_by
+    LEFT JOIN public.users ul ON ul.id = NULLIF(to_jsonb(cr)->>'logged_by', '')::int
 `;
 
-// ── One request by id ────────────────────────────────────────
 const getRequestById = async (id, client = pool) => {
   const { rows } = await client.query(
     `${SELECT_BASE} WHERE cr.id = $1`,
@@ -40,9 +92,6 @@ const getRequestById = async (id, client = pool) => {
   return rows[0] ?? null;
 };
 
-// ── List, newest first, with optional persistence-level filters ──
-// outcome narrows to one enum value; search matches the item text or
-// the caller name.
 const listRequests = async ({ outcome = null, search = null } = {}, client = pool) => {
   const params = [];
   const where = [];
@@ -65,12 +114,6 @@ const listRequests = async ({ outcome = null, search = null } = {}, client = poo
   return rows;
 };
 
-// ── Create ───────────────────────────────────────────────────
-// payload is already validated / normalised by the service:
-// { callerName, callerContact, itemsRequested, quantityNote, requestedAt }.
-// id (sequence), outcome ('pending'), requested_at (now()) and
-// created_at (now()) all fall back to their column defaults —
-// requestedAt is passed through COALESCE so a supplied value wins.
 const createRequest = async (payload, client = pool) => {
   const {
     callerName = null,
@@ -78,6 +121,7 @@ const createRequest = async (payload, client = pool) => {
     itemsRequested,
     quantityNote = null,
     requestedAt = null,
+    loggedBy = null,
   } = payload;
 
   const { rows } = await client.query(
@@ -87,43 +131,225 @@ const createRequest = async (payload, client = pool) => {
      RETURNING id`,
     [callerName, callerContact, itemsRequested, quantityNote, requestedAt]
   );
-  return getRequestById(rows[0].id, client);
-};
+  const id = rows[0].id;
 
-// ── Claim / assign — sets handled_by only ────────────────────
-// The live seed data shows handled_by populated while outcome is
-// still 'pending' and resolved_at is NULL: it is "who owns this
-// request", set independently of resolution. Returns null when the
-// row does not exist.
-const claimRequest = async (id, handledBy, client = pool) => {
-  const { rowCount } = await client.query(
-    `UPDATE public.community_requests
-        SET handled_by = $1
-      WHERE id = $2`,
-    [handledBy, id]
-  );
-  if (rowCount === 0) return null;
+  // The sign-off. Two records of it: the audit log, which is the act
+  // (who, when, what they signed), and logged_by on the request, which
+  // is what the screens read. Both in the caller's transaction, so a
+  // request is never logged without its signature.
+  if (loggedBy) {
+    await logAudit(client, {
+      entityType: 'community_request',
+      entityId:   id,
+      action:     'logged',
+      actorId:    loggedBy,
+      after:      { caller_name: callerName, items_requested: itemsRequested, quantity_note: quantityNote },
+    });
+    // In a savepoint: before migration 046 the column is not there, and
+    // that must not cost the floor the request it just took down.
+    await client.query('SAVEPOINT request_logged_by');
+    try {
+      await client.query(`UPDATE public.community_requests SET logged_by = $2 WHERE id = $1`, [id, loggedBy]);
+      await client.query('RELEASE SAVEPOINT request_logged_by');
+    } catch (err) {
+      await client.query('ROLLBACK TO SAVEPOINT request_logged_by');
+      if (err.code !== '42703') throw err;
+    }
+  }
   return getRequestById(id, client);
 };
 
-// ── Resolve — sets outcome, outcome_note and resolved_at ──────
-// Does NOT touch handled_by: a request may have been claimed earlier
-// (handled_by already set) or resolved without ever being claimed
-// (handled_by stays NULL). Returns null when the row does not exist.
-const resolveRequest = async (id, { outcome, outcomeNote = null }, client = pool) => {
-  const { rowCount } = await client.query(
-    `UPDATE public.community_requests
-        SET outcome = $1::request_outcome,
-            outcome_note = $2,
-            resolved_at = NOW()
-      WHERE id = $3`,
-    [outcome, outcomeNote, id]
-  );
-  if (rowCount === 0) return null;
-  return getRequestById(id, client);
+// ── Transitions ───────────────────────────────────────────────
+
+// The row, locked for the rest of the transaction. Every transition
+// starts here, which is what makes two people acting at once take
+// turns: the second one reads the state the first one left.
+export const LOCK_REQUEST_SQL = `
+  SELECT id, outcome, handled_by, assigned_to, items_short_at
+    FROM public.community_requests
+   WHERE id = $1
+     FOR UPDATE`;
+
+const lockRequest = async (id, client) => {
+  const { rows } = await client.query(LOCK_REQUEST_SQL, [id]);
+  return rows[0] ?? null;
 };
 
-// ── Dashboard count ──────────────────────────────────────────
+export const GET_ITEMS_SQL = `
+  SELECT id, product_id, unit, quantity_approved, quantity_released, short_at
+    FROM community_request_items
+   WHERE request_id = $1
+   ORDER BY product_id`;
+
+const getItems = async (requestId, client) => {
+  const { rows } = await client.query(GET_ITEMS_SQL, [requestId]);
+  return rows;
+};
+
+export const APPROVE_SQL = `
+  UPDATE public.community_requests
+     SET outcome = 'approved'::request_outcome,
+         approved_by = $2,
+         approved_at = NOW(),
+         items_short_at = NULL
+   WHERE id = $1 AND outcome = 'pending'::request_outcome
+   RETURNING id`;
+
+const markApproved = async (id, userId, client) => {
+  const { rowCount } = await client.query(APPROVE_SQL, [id, userId]);
+  return rowCount > 0;
+};
+
+// Replaces the lines wholesale. Only ever called while nothing has
+// been released (pending → approved, or an approved request being
+// re-chosen), so there is no released quantity to lose.
+export const DELETE_ITEMS_SQL = `
+  DELETE FROM community_request_items WHERE request_id = $1`;
+export const INSERT_ITEMS_SQL = `
+  INSERT INTO community_request_items (request_id, product_id, unit, quantity_approved)
+  SELECT $1, t.product_id, t.unit, t.quantity
+    FROM unnest($2::int[], $3::text[], $4::numeric[]) AS t(product_id, unit, quantity)`;
+
+const replaceItems = async (requestId, items, client) => {
+  await client.query(DELETE_ITEMS_SQL, [requestId]);
+  await client.query(INSERT_ITEMS_SQL, [
+    requestId,
+    items.map((i) => i.productId),
+    items.map((i) => i.unit),
+    items.map((i) => i.quantity),
+  ]);
+};
+
+export const CLEAR_FLAG_SQL = `
+  UPDATE public.community_requests SET items_short_at = NULL WHERE id = $1`;
+
+const clearShortFlag = async (id, client) => {
+  await client.query(CLEAR_FLAG_SQL, [id]);
+};
+
+export const DECLINE_SQL = `
+  UPDATE public.community_requests
+     SET outcome = 'declined'::request_outcome,
+         outcome_note = $2,
+         handled_by = COALESCE(handled_by, $3),
+         resolved_at = NOW(),
+         items_short_at = NULL
+   WHERE id = $1 AND outcome IN ('pending'::request_outcome, 'approved'::request_outcome)
+   RETURNING id`;
+
+const markDeclined = async (id, { reason, userId }, client) => {
+  const { rowCount } = await client.query(DECLINE_SQL, [id, reason, userId]);
+  return rowCount > 0;
+};
+
+export const FIND_ASSIGNEE_SQL = `
+  SELECT id FROM public.users
+   WHERE id = $1 AND is_active = TRUE
+     AND role IN ('warehouse_worker', 'manager', 'admin')`;
+
+const findAssignableUser = async (userId, client) => {
+  const { rows } = await client.query(FIND_ASSIGNEE_SQL, [userId]);
+  return rows[0] ?? null;
+};
+
+export const ASSIGN_SQL = `
+  UPDATE public.community_requests
+     SET assigned_to = $2
+   WHERE id = $1 AND outcome = 'approved'::request_outcome
+   RETURNING id`;
+
+const setAssignee = async (id, userId, client) => {
+  const { rowCount } = await client.query(ASSIGN_SQL, [id, userId]);
+  return rowCount > 0;
+};
+
+// One claimer only, and only an approved request that is not waiting
+// for new items. The WHERE is the guard: of two people tapping Claim
+// together, one row updates and the other gets nothing back.
+export const CLAIM_SQL = `
+  UPDATE public.community_requests
+     SET handled_by = $2
+   WHERE id = $1
+     AND outcome = 'approved'::request_outcome
+     AND items_short_at IS NULL
+     AND handled_by IS NULL
+   RETURNING id`;
+
+const claimApproved = async (id, userId, client) => {
+  const { rowCount } = await client.query(CLAIM_SQL, [id, userId]);
+  return rowCount > 0;
+};
+
+export const CONFIRM_SQL = `
+  UPDATE public.community_requests
+     SET outcome = $2::request_outcome,
+         handled_by = COALESCE(handled_by, $3),
+         resolved_at = NOW()
+   WHERE id = $1
+     AND outcome = 'approved'::request_outcome
+     AND items_short_at IS NULL
+   RETURNING id`;
+
+const markConfirmed = async (id, { outcome, userId }, client) => {
+  const { rowCount } = await client.query(CONFIRM_SQL, [id, outcome, userId]);
+  return rowCount > 0;
+};
+
+export const SET_RELEASED_SQL = `
+  UPDATE community_request_items
+     SET quantity_released = $2, updated_at = NOW()
+   WHERE id = $1`;
+
+const setReleased = async (lineId, quantity, client) => {
+  await client.query(SET_RELEASED_SQL, [lineId, quantity]);
+};
+
+// ── Reverse a confirmed request ───────────────────────────────
+// For a request confirmed by mistake, or one the caller never took
+// away. It ends as declined, which already means "nothing went out":
+// no stock is held for it and nothing is counted as given. The reason
+// goes in the note, and the audit log keeps the confirmation it undid.
+export const REVERSE_SQL = `
+  UPDATE public.community_requests
+     SET outcome = 'declined'::request_outcome,
+         outcome_note = $2,
+         resolved_at = NOW()
+   WHERE id = $1
+     AND outcome IN ('fulfilled'::request_outcome, 'partially_fulfilled'::request_outcome)
+   RETURNING id`;
+
+const markReversed = async (id, note, client) => {
+  const { rowCount } = await client.query(REVERSE_SQL, [id, note]);
+  return rowCount > 0;
+};
+
+export const RESET_RELEASED_SQL = `
+  UPDATE community_request_items
+     SET quantity_released = 0, updated_at = NOW()
+   WHERE request_id = $1`;
+
+const resetReleased = async (requestId, client) => {
+  await client.query(RESET_RELEASED_SQL, [requestId]);
+};
+
+// What the ledger says went out for this request, per product, net of
+// anything already put back. Read from stock_movements rather than the
+// released quantities, so putting it back undoes exactly what was
+// taken off, in the unit it was taken off in, and a second reversal
+// finds nothing left to undo.
+export const NET_OUT_SQL = `
+  SELECT product_id, unit, (-SUM(quantity))::numeric AS quantity
+    FROM stock_movements
+   WHERE reference_type = 'community_request' AND reference_id = $1
+   GROUP BY product_id, unit
+  HAVING SUM(quantity) < 0
+   ORDER BY product_id`;
+
+const netStockOut = async (requestId, client) => {
+  const { rows } = await client.query(NET_OUT_SQL, [requestId]);
+  return rows;
+};
+
 const countPending = async (client = pool) => {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS count
@@ -137,7 +363,19 @@ export default {
   listRequests,
   getRequestById,
   createRequest,
-  claimRequest,
-  resolveRequest,
+  lockRequest,
+  getItems,
+  markApproved,
+  replaceItems,
+  clearShortFlag,
+  markDeclined,
+  findAssignableUser,
+  setAssignee,
+  claimApproved,
+  markConfirmed,
+  setReleased,
+  markReversed,
+  resetReleased,
+  netStockOut,
   countPending,
 };

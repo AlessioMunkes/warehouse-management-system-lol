@@ -75,7 +75,7 @@ describe('setItemStatus — guest attribution', () => {
     });
 
     // UPDATE ... confirmed_by = $4
-    expect(itemUpdateParams()[3]).toBeNull();
+    expect(itemUpdateParams()[4]).toBeNull();
   });
 
   it('writes NULL to picking_events.actor_id and puts the volunteer in detail', async () => {
@@ -147,7 +147,7 @@ describe('setItemStatus — staff path unchanged', () => {
       slipId: 132, itemId: 1, status: 'confirmed', packedQuantity: 5, actor: STAFF,
     });
 
-    expect(itemUpdateParams()[3]).toBe(3);
+    expect(itemUpdateParams()[4]).toBe(3);
     for (const e of eventCalls()) {
       expect(e.actorId).toBe(3);
       expect(e.detail).not.toHaveProperty('actor_type');
@@ -161,7 +161,7 @@ describe('setItemStatus — staff path unchanged', () => {
       slipId: 132, itemId: 1, status: 'confirmed', packedQuantity: 5, actorId: 3,
     });
 
-    expect(itemUpdateParams()[3]).toBe(3);
+    expect(itemUpdateParams()[4]).toBe(3);
     expect(eventCalls()[0].actorId).toBe(3);
   });
 

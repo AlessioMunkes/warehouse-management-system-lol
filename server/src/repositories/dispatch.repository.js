@@ -25,8 +25,8 @@
 // ─────────────────────────────────────────────────────────────
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
-import { createNotification } from './notification.repository.js';
 import { DISPATCH_SORTS, buildOrderBy } from '../constants/receiptSort.js';
+import { dispatchDayComplete } from '../features/communications/notices.js';
 
 // ── Audit helper ──────────────────────────────────────────────
 // Dispatch writes into picking_events, not a separate log. The slip
@@ -56,7 +56,7 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
 //                    handled today. A pallet staged for Tuesday that
 //                    nobody fetched is still sitting in the building
 //                    on Thursday, and the gate has to be able to
-//                    release it — the 16:00 sweep marks it
+//                    release it — the 15:00 sweep marks it
 //                    not_collected but explicitly leaves it
 //                    collectable as a late collection.
 //   neither        — no date restriction at all.
@@ -79,11 +79,20 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
     // specific status: no event row yet, or an event that is not one
     // of the two terminal collected states. not_collected is
     // deliberately outstanding — it is written off, not gone.
+    //
+    // A pallet that HAS gone stays on the board for the day it went.
+    // That used to be "booked for today" only, so a pallet booked for
+    // another day (Tuesday's, collected on Sunday) or a late one from
+    // last week vanished the moment it was dispatched: it was no longer
+    // outstanding and was not today's. The person who had just handed
+    // it over saw Dispatched (0). It is the day it was collected that
+    // puts it on today's board, in the warehouse's timezone.
     where.push(`(
          de.id IS NULL
       OR de.status IS NULL
       OR de.status NOT IN ('collected', 'late_collected')
       OR ps.dispatch_date = $${params.length}::date
+      OR (de.collected_at AT TIME ZONE 'Africa/Johannesburg')::date = $${params.length}::date
     )`);
   }
   if (cohort)       { params.push(cohort);       where.push(`ps.cohort = $${params.length}`); }
@@ -288,14 +297,14 @@ const getGateView = async (slipId) => {
 // PWA queues the payload and replays it on reconnect. A replay finds
 // the existing event and returns it instead of deducting twice.
 //
-// Late collection is not a separate path. A pallet the 16:00 sweep
+// Late collection is not a separate path. A pallet the 15:00 sweep
 // already wrote off has a 'not_collected' event; if the driver turns
 // up afterwards this function updates that row to 'late_collected'
 // and deducts as normal. Because non-collection posted no movement,
 // there is nothing to unwind first.
 const collect = async ({
   slipId, driverName, vehicleReg, signature,
-  lines = [], idempotencyKey = null, overrideReason = null,
+  lines = [], idempotencyKey = null,
   actorId,
   // Advisory flags from the service. These do not change what is
   // written to stock or to dispatch_events; they are recorded in the
@@ -330,8 +339,8 @@ const collect = async ({
     const slip = slipResult.rows[0];
     if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
 
-    // The slip must be packed. The service decides whether a manager
-    // may override this; the repository only reports the state.
+    // The slip must be packed. The service refuses this first with
+    // the worker's wording; this is the backstop.
     if (slip.status !== 'complete' && slip.status !== 'dispatched') {
       await client.query('ROLLBACK');
       return { notPacked: true, slipStatus: slip.status };
@@ -351,13 +360,16 @@ const collect = async ({
     const isLate = existing?.status === 'not_collected';
 
     // ── Resolve what actually goes in the vehicle ──────────────
+    // Every line packing dealt with, including one flagged with none
+    // packed. That line loads nothing and deducts nothing, but it stays
+    // on the note with packing's reason: a centre that ordered spinach
+    // and got none should read that on the note, not work it out from
+    // a line that is missing.
     const packedResult = await client.query(
-      `SELECT id, product_id, packed_quantity, unit
+      `SELECT id, product_id, COALESCE(packed_quantity, 0) AS packed_quantity, unit, flag_reason
        FROM picking_slip_items
        WHERE picking_slip_id = $1
          AND status IN ('confirmed', 'flagged')
-         AND packed_quantity IS NOT NULL
-         AND packed_quantity > 0
        ORDER BY product_id ASC, id ASC`,
       [slipId]
     );
@@ -378,33 +390,20 @@ const collect = async ({
                driver_name     = $3,
                vehicle_reg     = $4,
                signature       = $5,
-               override_reason = COALESCE($6, override_reason),
-               override_by     = CASE WHEN $6::text IS NOT NULL THEN $2::integer ELSE override_by END,
-               idempotency_key = COALESCE($7, idempotency_key)
-           WHERE id = $8
+               idempotency_key = COALESCE($6, idempotency_key)
+           WHERE id = $7
            RETURNING *`,
           ['late_collected', actorId, driverName, vehicleReg ?? null,
-           signature ?? null, overrideReason, idempotencyKey, existing.id]
+           signature ?? null, idempotencyKey, existing.id]
         )
       : await client.query(
           `INSERT INTO dispatch_events
              (picking_slip_id, status, collected_at, dispatched_by, driver_name,
-              vehicle_reg, signature, override_reason, override_by, idempotency_key)
-           VALUES ($1, 'collected', NOW(), $2::integer, $3, $4, $5, $6,
-                   -- $2 is deduced as integer from dispatched_by above, then
-                   -- deduced again inside this CASE against an untyped NULL.
-                   -- The two deductions conflict and Postgres raises 42P08
-                   -- ("inconsistent types deduced for parameter $2") — on
-                   -- FIRST-TIME collection only, since the UPDATE branch
-                   -- below has an ELSE override_by, a column with a known
-                   -- type. Casting both arms pins it. Reproduced and fixed
-                   -- against real Postgres 16; the pg mock in the tests
-                   -- cannot see this class of error at all.
-                   CASE WHEN $6::text IS NOT NULL THEN $2::integer
-                        ELSE NULL::integer END, $7)
+              vehicle_reg, signature, idempotency_key)
+           VALUES ($1, 'collected', NOW(), $2::integer, $3, $4, $5, $6)
            RETURNING *`,
           [slipId, actorId, driverName, vehicleReg ?? null,
-           signature ?? null, overrideReason, idempotencyKey]
+           signature ?? null, idempotencyKey]
         );
 
     const event = eventResult.rows[0];
@@ -426,7 +425,8 @@ const collect = async ({
             packed_quantity, loaded_quantity, unit, variance_reason)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [event.id, item.id, item.product_id, item.packed_quantity,
-         loaded, item.unit, override?.varianceReason ?? null]
+         loaded, item.unit,
+         override?.varianceReason ?? (Number(item.packed_quantity) === 0 ? (item.flag_reason ?? null) : null)]
       );
     }
 
@@ -497,7 +497,6 @@ const collect = async ({
       dispatch_event_id: event.id,
       driver_name:       driverName,
       vehicle_reg:       vehicleReg ?? null,
-      override_reason:   overrideReason,
       line_count:        packedResult.rowCount,
     });
     if (shortfalls.length > 0) {
@@ -516,6 +515,36 @@ const collect = async ({
       });
     }
 
+    // ── The day's dispatch is complete ─────────────────────────
+    // When this was the last pallet booked for its day, the managers
+    // are told, once: every pallet for that date has gone. Counted
+    // inside this transaction, so it sees this collection. In a
+    // savepoint: a notice that cannot be written must never cost the
+    // gate the collection it has just recorded.
+    await client.query('SAVEPOINT dispatch_day_notice');
+    try {
+      const day = await client.query(
+        `SELECT ps.dispatch_date::text AS dispatch_date,
+                COUNT(*)::int AS pallets,
+                COUNT(*) FILTER (WHERE de.status IN ('collected', 'late_collected'))::int AS gone,
+                COUNT(*) FILTER (WHERE de.status = 'late_collected')::int AS late
+           FROM picking_slips ps
+           LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+          WHERE ps.dispatch_date = (SELECT dispatch_date FROM picking_slips WHERE id = $1)
+            AND ps.status <> 'cancelled'
+          GROUP BY ps.dispatch_date`,
+        [slipId]
+      );
+      const tally = day.rows[0];
+      if (tally && tally.pallets > 0 && tally.gone === tally.pallets) {
+        await dispatchDayComplete(client, { dispatchDate: tally.dispatch_date, pallets: tally.pallets, late: tally.late });
+      }
+      await client.query('RELEASE SAVEPOINT dispatch_day_notice');
+    } catch (noticeError) {
+      await client.query('ROLLBACK TO SAVEPOINT dispatch_day_notice');
+      console.error('[dispatch] day-complete notice not sent:', noticeError.message);
+    }
+
     await client.query('COMMIT');
     return {
       event,
@@ -532,7 +561,7 @@ const collect = async ({
   }
 };
 
-// ── The 16:00 sweep (BR-14) ───────────────────────────────────
+// ── The 15:00 sweep (BR-14) ───────────────────────────────────
 // Writes a 'not_collected' event for every packed pallet on the given
 // date that nobody has come for. No stock movement is posted, because
 // none was ever posted for the pallet — the goods just stop counting
@@ -541,7 +570,10 @@ const collect = async ({
 // Idempotent by construction: the UNIQUE constraint on
 // picking_slip_id means a second run inserts nothing, so it is safe
 // to call from a scheduler AND opportunistically from the board.
-const sweepNonCollections = async ({ dispatchDate, actorId }) => {
+// `beforeCommit(client, facts)`, when given, runs inside this
+// transaction just before COMMIT — the service's notification goes in
+// with the change or not at all (features/communications/notices.js).
+const sweepNonCollections = async ({ dispatchDate, actorId, beforeCommit }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -567,18 +599,8 @@ const sweepNonCollections = async ({ dispatchDate, actorId }) => {
       });
     }
 
-    // BR-14: "the system must ... notify the Warehouse Manager." This
-    // is that notification — one summary per sweep run, not one per
-    // pallet, matching picking.repository.js's own generateSlips
-    // notification.
-    if (swept.rowCount > 0) {
-      await createNotification(client, {
-        type:  'non_collections_flagged',
-        title: `${swept.rowCount} pallet${swept.rowCount === 1 ? '' : 's'} not collected by 16:00`,
-        body:  `${dispatchDate} — flagged automatically per BR-14.`,
-        entityType: 'dispatch_sweep',
-      });
-    }
+    // BR-14's "notify the Warehouse Manager" — the service's notice.
+    if (beforeCommit) await beforeCommit(client, { flagged: swept.rowCount, dispatchDate });
 
     await client.query('COMMIT');
     return { flagged: swept.rowCount, slipIds: swept.rows.map((r) => r.picking_slip_id) };

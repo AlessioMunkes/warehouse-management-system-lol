@@ -31,9 +31,10 @@
 // the common failure comes back as a clean 404/409 without opening
 // one.
 // ─────────────────────────────────────────────────────────────
+import { assertWholeByProduct } from '../features/units/wholeItems.js';
 import deliveryModel from '../repositories/delivery.repository.js';
 import { isStorageArea } from '../constants/storageAreas.js';
-import { isValidDateString, isPositiveInt, isUuid } from '../utils/validation.js';
+import { isValidDateString, isPositiveInt, isUuid, toQuantity } from '../utils/validation.js';
 import { isOpenPurchaseOrder, CLOSED_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import { DELIVERY_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
@@ -194,6 +195,11 @@ const createDelivery = async (data, userId) => {
   if (!isValidDateString(deliveryDate)) {
     fail(400, 'Delivery date must be a real date in YYYY-MM-DD form.');
   }
+  // A delivery is signed in when it arrives. A later date is a slip of
+  // the picker, and it would sit ahead of every real note in the list.
+  if (deliveryDate > todayInSAST()) {
+    fail(400, 'Delivery date cannot be after today.');
+  }
 
   if (idempotencyKey !== undefined && idempotencyKey !== null && !isUuid(idempotencyKey)) {
     fail(400, 'Invalid request key.');
@@ -250,7 +256,9 @@ const createDelivery = async (data, userId) => {
     seen.add(key);
 
     const expected = Number(po.expected_quantity);
-    const received = Number(line.receivedQuantity);
+    // toQuantity, not Number: a line sent with no count is not a count
+    // of zero.
+    const received = toQuantity(line.receivedQuantity);
 
     if (!Number.isFinite(received) || received < 0) {
       fail(400, `Received quantity for ${po.product_name} must be zero or more.`);
@@ -265,7 +273,7 @@ const createDelivery = async (data, userId) => {
     const variance = received - expected;
 
     if (variance !== 0 && !String(line.discrepancyReason || '').trim()) {
-      fail(400, `A reason is required for ${po.product_name} — received ${received}, expected ${expected}.`);
+      fail(400, `A reason is required for ${po.product_name}: received ${received}, expected ${expected}.`);
     }
     if (variance !== 0) hasDiscrepancy = true;
 
@@ -283,20 +291,21 @@ const createDelivery = async (data, userId) => {
     }
 
     // ── BR-06: FEFO needs a date to sort on ────────────────────
-    // Only perishables carry one — dry goods are picked oldest-first
-    // and have nothing to record. A date is stored as sent; no
-    // timezone conversion, because a use-by date is a calendar date
-    // rather than an instant.
+    // Required for perishables. Dry goods may send one too (the
+    // best-before on a tin), which the expiry warnings then pick up;
+    // without one they are picked oldest-first as before. A date is
+    // stored as sent; no timezone conversion, because a use-by date is
+    // a calendar date rather than an instant.
     let expiryDate = null;
-    if (po.is_perishable) {
-      const raw = String(line.expiryDate || '').trim();
-      if (!raw) {
-        fail(400, `A use-by date is required for ${po.product_name} — it is a perishable product.`);
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(Date.parse(raw))) {
+    const rawExpiry = String(line.expiryDate || '').trim();
+    if (po.is_perishable && !rawExpiry) {
+      fail(400, `A use-by date is required for ${po.product_name}, a perishable product.`);
+    }
+    if (rawExpiry) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(rawExpiry) || Number.isNaN(Date.parse(rawExpiry))) {
         fail(400, `Use-by date for ${po.product_name} must be a calendar date (YYYY-MM-DD).`);
       }
-      expiryDate = raw;
+      expiryDate = rawExpiry;
     }
 
     resolved.push({
@@ -309,9 +318,12 @@ const createDelivery = async (data, userId) => {
       unit:                po.default_unit,
       discrepancyReason:   variance === 0 ? null : String(line.discrepancyReason).trim(),
       storageArea,                     // BR-07
-      expiryDate,                      // BR-06 — null unless perishable
+      expiryDate,                      // BR-06 — required if perishable
     });
   }
+
+  // A part quantity only for a decantable product: 2.5 cans did not arrive.
+  await assertWholeByProduct(resolved.map((l) => ({ productId: l.productId, quantity: l.receivedQuantity })));
 
   const result = await deliveryModel.createDelivery({
     supplierId,
@@ -335,6 +347,9 @@ const createDelivery = async (data, userId) => {
     fail(409, 'That purchase order belongs to a different supplier. Check the order number on the delivery note.');
   }
   if (result.purchaseOrderNotOpen) {
+    if (result.status === 'pending') {
+      fail(409, 'This purchase order has not been approved yet. Ask a manager to approve it before signing the delivery in.');
+    }
     fail(409, 'This purchase order was closed off while you were recording this delivery. Ask a manager to reopen it.');
   }
 
@@ -357,7 +372,14 @@ const createDelivery = async (data, userId) => {
   // getDeliveryById always did, just moved to where it's cheap.
   const { warnings = [] } = result;
   const note = await deliveryModel.getDeliveryById(result.id);
-  return { note, warnings, duplicate: false };
+  // follow_up rides on the note: { required, reason } when this delivery
+  // left the order part received, so the receiving screen can show the
+  // "Follow-up required" flag to the person who counted it in.
+  return {
+    note: note ? { ...note, follow_up: result.follow_up ?? { required: false, reason: null } } : note,
+    warnings,
+    duplicate: false,
+  };
 };
 
 // ── Get suppliers ─────────────────────────────────────────────

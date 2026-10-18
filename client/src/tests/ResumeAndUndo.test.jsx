@@ -18,10 +18,10 @@ vi.mock('react-router-dom', () => ({
   Link: ({ to, children, ...rest }) => <a href={to} {...rest}>{children}</a>,
 }));
 
-const { listDrafts, writeDraft } = await import('../features/staff/hooks/useDraft');
-const { default: UnfinishedWork } = await import('../features/staff/components/UnfinishedWork');
-const { default: useUndo } = await import('../features/staff/hooks/useUndo');
-const { default: WorkList } = await import('../features/staff/components/WorkList');
+const { listDrafts, writeDraft } = await import('../features/staff/useDraft');
+const { default: UnfinishedWork } = await import('../features/staff/UnfinishedWork');
+const { default: useUndo } = await import('../features/staff/useUndo');
+const { default: WorkList } = await import('../features/staff/WorkList');
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* private window */ }
@@ -83,12 +83,20 @@ describe('UnfinishedWork', () => {
     expect(screen.getByText(/S. Ndlovu/)).toBeInTheDocument();
   });
 
-  it('links to the task it belongs to', () => {
+  it('links straight to the unfinished order, not just the task', () => {
     writeDraft('receiving-86', { counted: {} });
     render(<UnfinishedWork />);
 
     expect(screen.getByRole('link', { name: 'Carry on' }))
-      .toHaveAttribute('href', '/noc/procurement');
+      .toHaveAttribute('href', '/noc/procurement?resume=86');
+  });
+
+  it('links straight to the unfinished pallet at the gate', () => {
+    writeDraft('dispatch-115', { loaded: {} });
+    render(<UnfinishedWork />);
+
+    expect(screen.getByRole('link', { name: 'Carry on' }))
+      .toHaveAttribute('href', '/staff/dispatch?pallet=115');
   });
 
   it('throwing one away really removes it', async () => {
@@ -96,7 +104,7 @@ describe('UnfinishedWork', () => {
     writeDraft('receiving-86', { counted: {} });
     render(<UnfinishedWork />);
 
-    await user.click(screen.getByRole('button', { name: 'Throw away' }));
+    await user.click(screen.getByRole('button', { name: 'Release' }));
     expect(screen.queryByText(/Order 86/)).not.toBeInTheDocument();
     expect(listDrafts()).toEqual([]);
   });

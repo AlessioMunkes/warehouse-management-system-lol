@@ -35,7 +35,9 @@ export const fetchTopic = (id) =>
  *   { type:'clarify',     question, options }
  *   { type:'not_covered', closest }
  */
-export const askAssistant = (question, screen) =>
-  apiPost('/api/assistant/ask', { question, screen }).then(unwrap);
+// `previous` is the turn before this one ({ question, topicId }), so a
+// reply like "that's not what I meant" is read as a reply.
+export const askAssistant = (question, screen, previous) =>
+  apiPost('/api/assistant/ask', { question, screen, previous: previous ?? undefined }).then(unwrap);
 
 export default { fetchAssistantCatalog, fetchTopic, askAssistant };

@@ -23,67 +23,34 @@
 import bcrypt from 'bcrypt';
 import repo from '../repositories/user.repository.js';
 import { isPositiveInt } from '../utils/validation.js';
+import {
+  fail, clean, validUsername, validFirstName, validLastName,
+  validRole, validPassword, validOptionalEmail,
+} from '../utils/userAccountFields.js';
 
-const BCRYPT_COST        = 10;
-const MIN_PASSWORD_LENGTH = 8;
-const ROLE_VALUES = ['warehouse_worker', 'manager', 'admin'];
+const BCRYPT_COST = 10;
 
-const fail = (status, message) => {
-  const err = new Error(message);
-  err.status = status;
-  return err;
-};
+// idx_users_email_unique is the last line of defence against two
+// accounts sharing an address; the pre-checks below give the friendly
+// message, this catches the race between check and write.
+const emailTaken = (email) => fail(409, `Another user already has this email address. Use a different one.`);
 
-// ── Value cleaning ────────────────────────────────────────────
-const clean = (value) => {
-  if (value === null || value === undefined) return null;
-  const trimmed = String(value).trim();
-  return trimmed === '' ? null : trimmed;
-};
-
-const capped = (value, max, label) => {
-  const v = clean(value);
-  if (v !== null && v.length > max) {
-    throw fail(400, `${label} must be ${max} characters or fewer.`);
-  }
-  return v;
-};
+const isEmailUniqueViolation = (err) =>
+  err?.code === '23505' && /email/i.test(`${err.constraint ?? ''} ${err.detail ?? ''}`);
 
 const requireId = (id, label = 'User') => {
   if (!isPositiveInt(id)) throw fail(400, `A valid ${label.toLowerCase()} ID is required.`);
   return Number(id);
 };
 
-const validRole = (value) => {
-  if (!ROLE_VALUES.includes(value)) {
-    throw fail(400, `Role must be one of: ${ROLE_VALUES.join(', ')}.`);
-  }
-  return value;
-};
-
-const validPassword = (value) => {
-  if (typeof value !== 'string' || value.length < MIN_PASSWORD_LENGTH) {
-    throw fail(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-  }
-  return value;
-};
-
 // ── User payload (create) ───────────────────────────────────────
-const buildUserPayload = (body = {}) => {
-  const username = clean(body.username);
-  if (!username) throw fail(400, 'Username is required.');
-  if (username.length > 50) throw fail(400, 'Username must be 50 characters or fewer.');
-
-  const firstName = capped(body.firstName, 100, 'First name');
-  if (!firstName) throw fail(400, 'First name is required.');
-
-  const lastName = capped(body.lastName, 100, 'Last name');
-  if (!lastName) throw fail(400, 'Last name is required.');
-
-  const role = validRole(body.role);
-
-  return { username, firstName, lastName, role };
-};
+const buildUserPayload = (body = {}) => ({
+  username:  validUsername(body.username),
+  firstName: validFirstName(body.firstName),
+  lastName:  validLastName(body.lastName),
+  role:      validRole(body.role),
+  email:     validOptionalEmail(body.email),
+});
 
 // ── Reads ─────────────────────────────────────────────────────
 const listUsers = async ({ includeInactive, search } = {}) =>
@@ -107,11 +74,21 @@ const createUser = async (body, actorId) => {
 
   const clash = await repo.findUserByUsername(payload.username);
   if (clash) {
-    throw fail(409, `A user with the username "${clash.username}" already exists${clash.is_active ? '' : ' (currently inactive)'}.`);
+    throw fail(409, `A user with the username "${clash.username}" already exists${clash.warehouse ? ' at another warehouse' : ''}${clash.is_active ? '' : ' (currently inactive)'}.`);
+  }
+
+  if (payload.email) {
+    const emailClash = await repo.findUserByEmail(payload.email);
+    if (emailClash) throw emailTaken(payload.email);
   }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
-  return repo.insertUser({ ...payload, passwordHash }, actorId);
+  try {
+    return await repo.insertUser({ ...payload, passwordHash }, actorId);
+  } catch (err) {
+    if (isEmailUniqueViolation(err)) throw emailTaken(payload.email);
+    throw err;
+  }
 };
 
 // ── Update ────────────────────────────────────────────────────
@@ -127,22 +104,25 @@ const updateUser = async (rawId, body, actorId) => {
   const has = (k) => Object.prototype.hasOwnProperty.call(body, k);
 
   if (has('username')) {
-    const username = clean(body.username);
-    if (!username) throw fail(400, 'Username is required.');
-    if (username.length > 50) throw fail(400, 'Username must be 50 characters or fewer.');
+    const username = validUsername(body.username);
     const clash = await repo.findUserByUsername(username, { excludeId: id });
-    if (clash) throw fail(409, `A user with the username "${clash.username}" already exists.`);
+    if (clash) throw fail(409, `A user with the username "${clash.username}" already exists${clash.warehouse ? ' at another warehouse' : ''}.`);
     patch.username = username;
   }
   if (has('firstName')) {
-    const firstName = capped(body.firstName, 100, 'First name');
-    if (!firstName) throw fail(400, 'First name is required.');
-    patch.firstName = firstName;
+    patch.firstName = validFirstName(body.firstName);
   }
   if (has('lastName')) {
-    const lastName = capped(body.lastName, 100, 'Last name');
-    if (!lastName) throw fail(400, 'Last name is required.');
-    patch.lastName = lastName;
+    patch.lastName = validLastName(body.lastName);
+  }
+  if (has('email')) {
+    // null clears the address.
+    const email = validOptionalEmail(body.email);
+    if (email) {
+      const emailClash = await repo.findUserByEmail(email);
+      if (emailClash && emailClash.id !== id) throw emailTaken(email);
+    }
+    patch.email = email;
   }
   if (has('role')) {
     const role = validRole(body.role);
@@ -156,7 +136,12 @@ const updateUser = async (rawId, body, actorId) => {
 
   if (!Object.keys(patch).length) throw fail(400, 'No changes were supplied.');
 
-  return repo.updateUser(id, patch, existing, actorId);
+  try {
+    return await repo.updateUser(id, patch, existing, actorId);
+  } catch (err) {
+    if (patch.email && isEmailUniqueViolation(err)) throw emailTaken(patch.email);
+    throw err;
+  }
 };
 
 // ── Activate / deactivate ────────────────────────────────────

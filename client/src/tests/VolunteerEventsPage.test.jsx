@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
+vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>Navigation</div>,
 }));
 
@@ -16,6 +16,8 @@ vi.mock('../services/volunteerManagementAPI', () => ({
     cancelEvent: vi.fn(),
     completeEvent: vi.fn(),
     getSpaces: vi.fn(),
+    getEventBooking: vi.fn(),
+    updateTimeslot: vi.fn(),
     validateTimeslot: vi.fn(),
   },
 }));
@@ -27,6 +29,26 @@ const EVENT = {
   id: 'event-1', name: 'Mandela Day', description: 'Pack food parcels',
   eventDate: '2026-10-10', venueName: 'Warehouse', address: 'Cape Town', status: 'SCHEDULED', statusLabel: 'Scheduled',
 };
+const TIMESLOTS = [
+  {
+    id: 'slot-1',
+    eventId: 'event-1',
+    spaceId: 'space-1',
+    startTime: '2026-10-10T09:00:00.000Z',
+    endTime: '2026-10-10T10:00:00.000Z',
+    capacity: 10,
+    status: 'OPEN',
+  },
+  {
+    id: 'slot-2',
+    eventId: 'event-1',
+    spaceId: 'space-1',
+    startTime: '2026-10-10T11:00:00.000Z',
+    endTime: '2026-10-10T12:00:00.000Z',
+    capacity: 20,
+    status: 'OPEN',
+  },
+];
 const FILTER_EVENTS = [
   {
     id: 'draft-1', name: 'Spring Packing', description: 'Fresh produce boxes',
@@ -66,6 +88,8 @@ beforeEach(() => {
   api.cancelEvent.mockResolvedValue({ ...EVENT, status: 'CANCELLED' });
   api.completeEvent.mockResolvedValue({ ...EVENT, status: 'COMPLETED' });
   api.getSpaces.mockResolvedValue([SPACE]);
+  api.getEventBooking.mockResolvedValue({ event: EVENT, timeslots: TIMESLOTS });
+  api.updateTimeslot.mockResolvedValue(TIMESLOTS[0]);
   api.validateTimeslot.mockResolvedValue({ available: true, conflicts: [] });
 });
 
@@ -81,7 +105,7 @@ describe('VolunteerEventsPage', () => {
     expect(await screen.findByText('Mandela Day')).toBeInTheDocument();
     expect(api.getEvents).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/volunteers/events/event-1');
-    expect(screen.getByText('Warehouse — Cape Town')).toBeInTheDocument();
+    expect(screen.getByText('Warehouse (Cape Town)')).toBeInTheDocument();
   });
 
   it('shows an empty state', async () => {
@@ -137,26 +161,29 @@ describe('VolunteerEventsPage', () => {
     await screen.findByText('Spring Packing');
 
     expect(visibleRowText()[0]).toContain('Completed Garden Day');
-    await user.selectOptions(screen.getByLabelText('Sort'), 'desc');
+    expect(screen.getByText('Sorted by date, earliest first')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sort by Date' }));
     expect(visibleRowText()[0]).toContain('Winter Drive');
+    expect(screen.getByText('Sorted by date, latest first')).toBeInTheDocument();
   });
 
   it.each([
-    ['Open Events', ['Spring Packing', 'Winter Drive'], ['Cancelled Kitchen Prep', 'Completed Garden Day']],
-    ['Cancelled', ['Cancelled Kitchen Prep'], ['Spring Packing', 'Winter Drive', 'Completed Garden Day']],
-    ['Completed', ['Completed Garden Day'], ['Spring Packing', 'Winter Drive', 'Cancelled Kitchen Prep']],
-  ])('filters status: %s', async (status, visible, hidden) => {
+    ['Open 2', ['Spring Packing', 'Winter Drive'], ['Cancelled Kitchen Prep', 'Completed Garden Day']],
+    ['Cancelled 1', ['Cancelled Kitchen Prep'], ['Spring Packing', 'Winter Drive', 'Completed Garden Day']],
+    ['Completed 1', ['Completed Garden Day'], ['Spring Packing', 'Winter Drive', 'Cancelled Kitchen Prep']],
+  ])('shows the %s tab', async (tab, visible, hidden) => {
     const user = userEvent.setup();
     api.getEvents.mockResolvedValueOnce(FILTER_EVENTS);
     renderPage();
     await screen.findByText('Spring Packing');
 
-    await user.selectOptions(screen.getByLabelText('Status'), status);
+    await user.click(screen.getByRole('tab', { name: tab }));
+    expect(screen.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
     visible.forEach((name) => expect(screen.getByText(name)).toBeInTheDocument());
     hidden.forEach((name) => expect(screen.queryByText(name)).not.toBeInTheDocument());
   });
 
-  it('combines search, date range, status and sort filters', async () => {
+  it('combines search, date range, tab and sort', async () => {
     const user = userEvent.setup();
     api.getEvents.mockResolvedValueOnce(FILTER_EVENTS);
     renderPage();
@@ -165,8 +192,10 @@ describe('VolunteerEventsPage', () => {
     await user.type(screen.getByLabelText('Search events'), 'packing');
     fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-08-01' } });
     fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-09-30' } });
-    await user.selectOptions(screen.getByLabelText('Status'), 'Open Events');
-    await user.selectOptions(screen.getByLabelText('Sort'), 'Latest to Earliest');
+    // The tab counts follow the search and dates.
+    expect(screen.getByRole('tab', { name: 'Open 1' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Open 1' }));
+    await user.click(screen.getByRole('button', { name: 'Sort by Date' }));
 
     expect(screen.getByText('Spring Packing')).toBeInTheDocument();
     expect(screen.queryByText('Completed Garden Day')).not.toBeInTheDocument();
@@ -181,7 +210,7 @@ describe('VolunteerEventsPage', () => {
 
     await user.type(screen.getByLabelText('Search events'), 'zzzz');
     expect(screen.getByText('No events match your filters')).toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Clear Filters' }).at(-1));
+    await user.click(screen.getByRole('button', { name: 'Clear all filters' }));
 
     expect(screen.getByText('Spring Packing')).toBeInTheDocument();
     expect(screen.getByText('Winter Drive')).toBeInTheDocument();
@@ -216,8 +245,8 @@ describe('VolunteerEventsPage', () => {
       description: 'Community packing day',
       space: { mode: 'existing', spaceId: 'space-1' },
       timeslots: [{
-        startTime: '2026-11-12T09:00:00.000Z',
-        endTime: '2026-11-12T10:00:00.000Z',
+        startTime: '2026-11-12T07:00:00.000Z',
+        endTime: '2026-11-12T08:00:00.000Z',
         capacity: 12,
       }],
     }));
@@ -245,8 +274,8 @@ describe('VolunteerEventsPage', () => {
 
     await waitFor(() => expect(api.createEventWithInitialTimeslot).toHaveBeenCalledWith(expect.objectContaining({
       timeslots: [{
-        startTime: '2026-11-12T10:30:00.000Z',
-        endTime: '2026-11-12T11:30:00.000Z',
+        startTime: '2026-11-12T08:30:00.000Z',
+        endTime: '2026-11-12T09:30:00.000Z',
         capacity: 8,
       }],
     })));
@@ -407,8 +436,8 @@ describe('VolunteerEventsPage', () => {
       eventDate: '2026-11-12',
       spaceId: 'space-1',
       timeslots: [{
-        startTime: '2026-11-12T09:00:00.000Z',
-        endTime: '2026-11-12T10:00:00.000Z',
+        startTime: '2026-11-12T07:00:00.000Z',
+        endTime: '2026-11-12T08:00:00.000Z',
         capacity: 12,
       }],
     }));
@@ -484,12 +513,100 @@ describe('VolunteerEventsPage', () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Edit Mandela Day' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Event details' }));
     const name = screen.getByLabelText('Event name');
     await user.clear(name);
     await user.type(name, 'Mandela Day Updated');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(api.updateEvent).toHaveBeenCalledWith('event-1', expect.objectContaining({ eventName: 'Mandela Day Updated' })));
+    await waitFor(() => expect(api.getEventBooking).toHaveBeenCalledWith('event-1'));
+    await waitFor(() => expect(api.updateEvent).toHaveBeenCalledWith('event-1', { eventName: 'Mandela Day Updated' }));
     await waitFor(() => expect(api.getEvents).toHaveBeenCalledTimes(2));
+  });
+
+  it('edits capacity only through the existing timeslot update flow', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Edit Mandela Day' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Capacity' }));
+    const capacity = screen.getAllByLabelText('Capacity').at(-1);
+    await user.clear(capacity);
+    await user.type(capacity, '15');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(api.updateTimeslot).toHaveBeenCalledWith('event-1', 'slot-1', { capacity: 15 }));
+    expect(api.updateEvent).not.toHaveBeenCalled();
+  });
+
+  it('edits timeslot only without creating duplicate timeslots', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Edit Mandela Day' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Timeslot' }));
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:30' } });
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:30' } });
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(api.updateTimeslot).toHaveBeenCalledWith('event-1', 'slot-1', {
+      startTime: '2026-10-10T07:30:00.000Z',
+      endTime: '2026-10-10T08:30:00.000Z',
+    }));
+    expect(api.createEventWithInitialTimeslot).not.toHaveBeenCalled();
+    expect(api.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('saves multiple selected edit sections and leaves unchecked fields unchanged', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Edit Mandela Day' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Event details' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Description' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Capacity' }));
+    await user.clear(screen.getByLabelText('Event name'));
+    await user.type(screen.getByLabelText('Event name'), 'Mandela Day Updated');
+    await user.clear(screen.getAllByLabelText('Description').at(-1));
+    await user.type(screen.getAllByLabelText('Description').at(-1), 'Updated description');
+    await user.clear(screen.getAllByLabelText('Capacity').at(-1));
+    await user.type(screen.getAllByLabelText('Capacity').at(-1), '18');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(api.updateEvent).toHaveBeenCalledWith('event-1', {
+      eventName: 'Mandela Day Updated',
+      description: 'Updated description',
+    }));
+    expect(api.updateTimeslot).toHaveBeenCalledWith('event-1', 'slot-1', { capacity: 18 });
+    expect(api.updateEvent.mock.calls[0][1]).not.toHaveProperty('eventDate');
+    expect(api.updateEvent.mock.calls[0][1]).not.toHaveProperty('venueName');
+    expect(api.updateEvent.mock.calls[0][1]).not.toHaveProperty('address');
+  });
+
+  it('lets staff choose which timeslot to edit when an event has multiple timeslots', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Edit Mandela Day' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Capacity' }));
+    // Stored 09:00 and 11:00 UTC, shown in South African time.
+    expect(screen.getByText(/2026-10-10 11:00-12:00/)).toBeInTheDocument();
+    expect(screen.getByText(/2026-10-10 13:00-14:00/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText(/Timeslot 2/));
+    await user.clear(screen.getAllByLabelText('Capacity').at(-1));
+    await user.type(screen.getAllByLabelText('Capacity').at(-1), '24');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(api.updateTimeslot).toHaveBeenCalledWith('event-1', 'slot-2', { capacity: 24 }));
+  });
+
+  it('rejects invalid edit capacity beside the capacity field', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Edit Mandela Day' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Capacity' }));
+    await user.clear(screen.getAllByLabelText('Capacity').at(-1));
+    await user.type(screen.getAllByLabelText('Capacity').at(-1), '0');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(screen.getAllByText('Timeslot: capacity must be greater than 0.')).toHaveLength(2);
+    expect(screen.getAllByLabelText('Capacity').at(-1)).toHaveAttribute('aria-invalid', 'true');
+    expect(api.updateTimeslot).not.toHaveBeenCalled();
   });
 
   it.each([

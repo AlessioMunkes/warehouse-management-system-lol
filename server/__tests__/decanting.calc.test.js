@@ -32,10 +32,8 @@ const {
   MARGIN_OF_ERROR,
 } = decantingService;
 
-// The three sizes Ladles of Love actually decants into, per the
-// sponsor's process email and the Decanting Calculator objective.
-// This was [5, 2.5, 1, 0.5, 0.25], which omitted 2 kg entirely.
-const ALL = [2, 1, 0.5];
+// Supported normal bag sizes for the Decanting calculator.
+const ALL = [10, 5, 2, 1, 0.5];
 
 // ── bagLabel ──────────────────────────────────────────────────
 describe('bagLabel', () => {
@@ -96,11 +94,16 @@ describe('resolveSizes', () => {
     expect(resolveSizes([1], '')).toEqual([1]);
   });
 
-  it('rejects a size above the 5 kg handling limit', () => {
-    expect(() => resolveSizes([6], undefined))
+  it('accepts 10 kg and rejects a size above the 10 kg handling limit', () => {
+    expect(resolveSizes([10], undefined)).toEqual([10]);
+    expect(() => resolveSizes([11], undefined))
       .toThrow(`Bag size cannot exceed ${MAX_BAG_SIZE_KG} kg.`);
-    expect(() => resolveSizes([1], 9))
+    expect(() => resolveSizes([1], 11))
       .toThrow(`Bag size cannot exceed ${MAX_BAG_SIZE_KG} kg.`);
+  });
+
+  it('rejects an explicitly empty bag-size selection', () => {
+    expect(() => resolveSizes([], undefined)).toThrow('At least one bag size must be selected.');
   });
 
   it('rejects zero, negative and non-numeric sizes', () => {
@@ -123,7 +126,7 @@ describe('resolveSizes', () => {
 describe('splitIntoBags — exact closest fill', () => {
   it('fills a clean 25 kg target from the largest bag', () => {
     const { counts, packedKg } = splitIntoBags(25, ALL);
-    expect(counts).toEqual({ '2kg': 12, '1kg': 1, '500g': 0 });
+    expect(counts).toEqual({ '10kg': 2, '5kg': 1, '2kg': 0, '1kg': 0, '500g': 0 });
     expect(packedKg).toBe(25);
   });
 
@@ -190,9 +193,10 @@ describe('calculatePlanForProduct', () => {
       productName: 'Rice',
       requiredKg: 25,
       sizesKg: ALL,
-      bags: { '2kg': 12, '1kg': 1, '500g': 0 },
-      totalBags: 13,
+      bags: { '10kg': 2, '5kg': 1, '2kg': 0, '1kg': 0, '500g': 0 },
+      totalBags: 3,
       packedKg: 25,
+      partialBag: null,
       marginError: 0,
       withinMargin: true,
     });
@@ -267,6 +271,111 @@ describe('calculatePlanForProduct', () => {
     const plan = calculatePlanForProduct({ productId: 1, requiredKg: 10 },
                                          { selectedSizes: [5, 1] });
     expect(plan.sizesKg).toEqual([5, 1]);
+  });
+
+  it('rejects an empty item size selection when there is no plan-level fallback', () => {
+    expect(() => calculatePlanForProduct({ productId: 1, requiredKg: 10, selectedSizes: [] }))
+      .toThrow('At least one bag size must be selected.');
+  });
+});
+
+describe('calculatePlanForProduct — Phase 1 bag sizes and partial bags', () => {
+  it('packs 70 kg as seven 10 kg bags with no partial bag', () => {
+    const plan = calculatePlanForProduct({
+      productId: 1,
+      requiredKg: 70,
+      actualBulkKg: 70,
+      selectedSizes: [10],
+    });
+
+    expect(plan.bags).toEqual({ '10kg': 7 });
+    expect(plan.totalBags).toBe(7);
+    expect(plan.packedKg).toBe(70);
+    expect(plan.partialBag).toBeNull();
+    expect(plan.surplusKg).toBe(0);
+    expect(plan.shortfallKg).toBe(0);
+  });
+
+  it('packs 75 kg as seven 10 kg bags plus one 5 kg bag', () => {
+    const plan = calculatePlanForProduct({
+      productId: 1,
+      requiredKg: 75,
+      actualBulkKg: 75,
+      selectedSizes: [10, 5],
+    });
+
+    expect(plan.bags).toEqual({ '10kg': 7, '5kg': 1 });
+    expect(plan.totalBags).toBe(8);
+    expect(plan.packedKg).toBe(75);
+    expect(plan.partialBag).toBeNull();
+  });
+
+  it('accounts for a sub-500 g remainder with one partial 500 g bag', () => {
+    const plan = calculatePlanForProduct({
+      productId: 1,
+      requiredKg: 7.52,
+      actualBulkKg: 7.52,
+      selectedSizes: [5, 2, 0.5],
+    });
+
+    expect(plan.bags).toEqual({ '5kg': 1, '2kg': 1, '500g': 1 });
+    expect(plan.totalBags).toBe(4);
+    expect(plan.packedKg).toBe(7.52);
+    expect(plan.partialBag).toEqual({
+      nominalSizeKg: 0.5,
+      actualWeightKg: 0.02,
+      isPartial: true,
+    });
+    expect(plan.surplusKg).toBe(0);
+    expect(plan.shortfallKg).toBe(0);
+    expect(plan.marginError).toBe(0);
+    expect(plan.withinMargin).toBe(true);
+  });
+
+  it('does not create a partial bag for an unresolved remainder of 500 g or more', () => {
+    const plan = calculatePlanForProduct({
+      productId: 1,
+      requiredKg: 7.52,
+      actualBulkKg: 7.52,
+      selectedSizes: [5, 2],
+    });
+
+    expect(plan.bags).toEqual({ '5kg': 1, '2kg': 1 });
+    expect(plan.totalBags).toBe(2);
+    expect(plan.packedKg).toBe(7);
+    expect(plan.partialBag).toBeNull();
+    expect(plan.surplusKg).toBe(0.52);
+    expect(plan.shortfallKg).toBe(0.52);
+    expect(plan.withinMargin).toBe(false);
+  });
+
+  it('does not create a partial bag when full bags match exactly', () => {
+    const plan = calculatePlanForProduct({
+      productId: 1,
+      requiredKg: 7.5,
+      actualBulkKg: 7.5,
+      selectedSizes: [5, 2, 0.5],
+    });
+
+    expect(plan.bags).toEqual({ '5kg': 1, '2kg': 1, '500g': 1 });
+    expect(plan.packedKg).toBe(7.5);
+    expect(plan.partialBag).toBeNull();
+    expect(plan.surplusKg).toBe(0);
+    expect(plan.shortfallKg).toBe(0);
+  });
+
+  it('never accounts for more than usable bulk', () => {
+    const plan = calculatePlanForProduct({
+      productId: 1,
+      requiredKg: 8,
+      actualBulkKg: 7.52,
+      wastageKg: 0.02,
+      selectedSizes: [5, 2, 0.5],
+    });
+
+    expect(plan.packedKg).toBe(7.5);
+    expect(plan.partialBag).toBeNull();
+    expect(plan.packedKg + plan.wastageKg).toBeLessThanOrEqual(plan.actualBulkKg);
   });
 });
 
@@ -369,7 +478,7 @@ describe('calculateDecantingPlan', () => {
       // 49.5 kg against a 49.6 kg requirement.
       totalPlannedKg:   49.3,
       totalPackedKg:    49.5,
-      totalBags:        26,
+      totalBags:        8,
       totalSurplusKg:   1,
       // Sugar's sack held 24 kg against a 24.3 kg requirement, so the
       // plan is capped at 24 and the 0.3 kg gap is reported here.
@@ -451,8 +560,8 @@ describe('validation messages map to 400 in the controller', () => {
     ['zero required weight',   () => calculatePlanForProduct({ productId: 1, requiredKg: 0 })],
     ['negative required',      () => calculatePlanForProduct({ productId: 1, requiredKg: -5 })],
     ['non-numeric required',   () => calculatePlanForProduct({ productId: 1, requiredKg: 'abc' })],
-    ['oversized bag',          () => calculatePlanForProduct({ productId: 1, requiredKg: 10, selectedSizes: [6] })],
-    ['oversized custom bag',   () => calculatePlanForProduct({ productId: 1, requiredKg: 10, customSizeKg: 9 })],
+    ['oversized bag',          () => calculatePlanForProduct({ productId: 1, requiredKg: 10, selectedSizes: [11] })],
+    ['oversized custom bag',   () => calculatePlanForProduct({ productId: 1, requiredKg: 10, customSizeKg: 11 })],
     ['negative bag size',      () => calculatePlanForProduct({ productId: 1, requiredKg: 10, selectedSizes: [-1] })],
     ['non-numeric bag size',   () => calculatePlanForProduct({ productId: 1, requiredKg: 10, selectedSizes: ['abc'] })],
     ['negative bulk weight',   () => calculatePlanForProduct({ productId: 1, requiredKg: 10, actualBulkKg: -3 })],

@@ -9,6 +9,11 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
+import { recheckProducts } from './communityRequestStock.repository.js';
+import { createNotification } from './notification.repository.js';
+import { convertQuantity, readUnitSizes } from '../features/units/unitConversion.js';
+import { loadShelfLots, todayInSAST } from './shelfLots.repository.js';
+import { earliestLive, daysBetween } from '../features/stock/shelfLots.js';
 
 // ── Adjust stock — the single write path for every stock change ──
 // Must be called with a client already inside BEGIN/COMMIT — either
@@ -26,8 +31,10 @@ import { committedStockSql } from './committedStock.sql.js';
 // Similarly, if the caller's unit doesn't match the unit already on
 // record for this product, the movement still goes through — the
 // ledger's established unit wins so the running total never silently
-// drifts between units — but isUnitMismatch comes back so the caller
-// can surface it. quantity_on_hand is NUMERIC, which node-postgres
+// drifts between units. The quantity is converted into that unit where
+// the two convert (features/units/unitConversion.js); where they do
+// not, it goes in as it stands and isUnitMismatch comes back so the
+// caller can surface it. quantity_on_hand is NUMERIC, which node-postgres
 // returns as a string, not a number — every value read back off it
 // gets an explicit Number() cast below.
 const adjustStock = async (client, { productId, quantityDelta, unit = null, movementType, referenceType = null, referenceId = null, reason = null, performedBy }) => {
@@ -48,7 +55,7 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
     throw new Error('Stock adjustment quantity must be a finite number (received: no value).');
   }
 
-  const delta = Number(quantityDelta);
+  let delta = Number(quantityDelta);
   if (!Number.isFinite(delta)) {
     throw new Error(`Stock adjustment quantity must be a finite number (received: ${quantityDelta}).`);
   }
@@ -57,21 +64,42 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
   }
 
   const existing = await client.query(
-    `SELECT quantity_on_hand, unit FROM stock_levels WHERE product_id = $1 FOR UPDATE`,
+    `SELECT sl.quantity_on_hand, sl.unit, COALESCE(sl.reorder_threshold, 0)::numeric AS reorder_threshold,
+            p.name AS product_name
+       FROM stock_levels sl
+       JOIN products p ON p.id = sl.product_id
+      WHERE sl.product_id = $1
+      FOR UPDATE`,
     [productId]
   );
 
   let before, resolvedUnit;
   let isUnitMismatch = false;
+  let reorderThreshold = 0;
+  let productName = null;
 
   if (existing.rows[0]) {
     before = Number(existing.rows[0].quantity_on_hand);
     resolvedUnit = existing.rows[0].unit;
-    if (unit && unit !== resolvedUnit) isUnitMismatch = true;
+    reorderThreshold = Number(existing.rows[0].reorder_threshold);
+    productName = existing.rows[0].product_name;
+    if (unit && unit !== resolvedUnit) {
+      // Kilograms packed from stock counted in crates: turn the quantity
+      // into the ledger's unit (Settings → Stock rules says what a crate
+      // weighs). Units that do not convert go in as they stand, flagged.
+      const converted = convertQuantity(delta, unit, resolvedUnit, await readUnitSizes(client));
+      if (converted === null) isUnitMismatch = true;
+      else delta = converted;
+    }
   } else {
     if (!unit) throw new Error("Unit is required for a product's first stock movement.");
     before = 0;
     resolvedUnit = unit;
+    const product = await client.query(
+      `SELECT name FROM products WHERE id = $1`,
+      [productId]
+    );
+    productName = product.rows[0]?.name ?? null;
     await client.query(
       `INSERT INTO stock_levels (product_id, quantity_on_hand, unit) VALUES ($1, 0, $2)`,
       [productId, unit]
@@ -109,6 +137,23 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
     [productId, delta, resolvedUnit, movementType, referenceType, referenceId, reason, performedBy]
   );
+
+  // Stock went down: an approved benevolent request may no longer fit.
+  // Pallets come first, so it is the request that gives way. Runs in a
+  // savepoint and never fails the stock change itself.
+  if (delta < 0) {
+    await recheckProducts(client, [productId], { cause: 'stock' });
+  }
+
+  if (reorderThreshold > 0 && before > reorderThreshold && after <= reorderThreshold) {
+    await createNotification(client, {
+      type: 'low_stock',
+      title: 'Low stock',
+      body: `${productName || 'A product'} is at or below its reorder threshold.`,
+      entityType: 'product',
+      entityId: productId,
+    });
+  }
 
   return { before, after, isShortfall: after < 0, isUnitMismatch };
 };
@@ -149,6 +194,21 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
       [productId]
     );
     if (!productCheck.rows[0]) { await client.query('ROLLBACK'); return { productNotFound: true }; }
+
+    // A manual removal cannot take out more than is on hand. adjustStock
+    // itself allows a negative balance, because packing has to be able to
+    // record a shortfall; a person correcting a count does not.
+    if (Number(quantityDelta) < 0) {
+      const level = await client.query(
+        `SELECT quantity_on_hand FROM stock_levels WHERE product_id = $1 FOR UPDATE`,
+        [productId]
+      );
+      const onHand = Number(level.rows[0]?.quantity_on_hand ?? 0);
+      if (onHand + Number(quantityDelta) < 0) {
+        await client.query('ROLLBACK');
+        return { exceedsOnHand: true, onHand };
+      }
+    }
 
     const outcome = await adjustStock(client, {
       productId, quantityDelta, unit,
@@ -193,8 +253,44 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
 //
 // All three come back as NUMERIC, which node-postgres returns as
 // STRINGS — see the Number() casts in client/src/services/stockAPI.js.
+//
+// TWO DATES FOR THE INVENTORY TABS
+//   last_movement_at — the newest stock_movements row. Not
+//                      stock_levels.updated_at, which setStockMeta also
+//                      bumps when someone edits a reorder threshold, so a
+//                      product nobody has touched in months would read as
+//                      "moved today".
+//   earliest_expiry  — the soonest expiry date still today or later among
+//                      the deliveries ESTIMATED to have stock left that a
+//                      manager has not dismissed (shelfLots.repository.js).
+//                      An expiry is recorded per delivery line
+//                      (delivery_note_items), the only place one is kept
+//                      (PO receiving, migration 018; donations record
+//                      none), while stock is one balance a product, so
+//                      which deliveries are still on the shelf is worked
+//                      out by assuming the oldest received goes out
+//                      first. Past dates are left out: a delivery used up
+//                      months ago would otherwise read "Expired" for ever.
+//   earliest_expiry_left — the estimate of how much of that delivery is
+//                      left, in the stock unit.
+// last_movement_at is grouped once and joined, not correlated per
+// product row.
+// What is on hand for some products, in each one's stock unit. A product
+// with no stock row yet comes back with 0 and a null unit.
+const getOnHandForProducts = async (productIds, db = pool) => {
+  const { rows } = await db.query(
+    `SELECT p.id, p.name, COALESCE(sl.quantity_on_hand, 0)::numeric AS on_hand, sl.unit
+       FROM products p
+       LEFT JOIN stock_levels sl ON sl.product_id = p.id
+      WHERE p.id = ANY($1::int[])
+      ORDER BY p.name ASC`,
+    [productIds]
+  );
+  return rows;
+};
+
 const getManifest = async () => {
-  const result = await pool.query(
+  const [result, shelf] = await Promise.all([pool.query(
     `SELECT
        p.id, p.name, p.stock_keeping_unit AS sku,
        p.category, p.storage_type, p.is_perishable,
@@ -209,14 +305,61 @@ const getManifest = async () => {
        (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0))
          <= COALESCE(sl.reorder_threshold, 0)
          AS is_low_stock,
-       sl.updated_at
+       sl.updated_at,
+       lm.last_movement_at
      FROM products p
      LEFT JOIN stock_levels sl ON sl.product_id = p.id
      LEFT JOIN (${committedStockSql()}) c ON c.product_id = p.id
+     LEFT JOIN (
+       SELECT product_id, MAX(created_at) AS last_movement_at
+       FROM stock_movements
+       GROUP BY product_id
+     ) lm ON lm.product_id = p.id
      WHERE p.is_active = true
      ORDER BY p.name ASC`
-  );
-  return result.rows;
+  ), loadShelfLots()]);
+  const today = todayInSAST();
+  return result.rows.map((row) => {
+    const lot = earliestLive(shelf.get(row.id)?.lots ?? [], today);
+    return { ...row, earliest_expiry: lot?.expiryDate ?? null, earliest_expiry_left: lot?.left ?? null };
+  });
+};
+
+// ── Expiry by delivery, for one product's detail panel ─────────
+// The deliveries ESTIMATED to be still on the shelf (shelfLots.js),
+// soonest expiry first, each with how much of it is probably left beside
+// what came in. A delivery a manager has dismissed the warning for is
+// included, with who dismissed it and why, so it can be restored.
+// Deliveries estimated to be used up are not listed.
+//
+// Lots that expired more than EXPIRED_GRACE_DAYS ago are dropped:
+// after a month the stock is almost certainly gone (written off without
+// a ledger entry) and listing it is noise. Inside the window they stay,
+// because "this expired last week" is exactly what a manager checking
+// the shelf needs to see.
+const EXPIRED_GRACE_DAYS = 30;
+
+const getExpiryBatches = async (productId) => {
+  const shelf = await loadShelfLots({ productIds: [Number(productId)] });
+  const today = todayInSAST();
+  return (shelf.get(Number(productId))?.lots ?? [])
+    .map((lot) => ({ lot, daysLeft: daysBetween(today, lot.expiryDate) }))
+    .filter(({ daysLeft }) => daysLeft >= -EXPIRED_GRACE_DAYS)
+    .sort((a, b) => a.lot.expiryDate.localeCompare(b.lot.expiryDate) || a.lot.lineId - b.lot.lineId)
+    .map(({ lot, daysLeft }) => ({
+      id: lot.lineId,
+      expiry_date: lot.expiryDate,
+      received_quantity: lot.received,
+      quantity_left: lot.left,
+      unit: lot.unit,
+      received_on: lot.receivedOn,
+      supplier_name: lot.supplierName,
+      days_left: daysLeft,
+      estimated: true,
+      dismissal: lot.dismissal && {
+        id: lot.dismissal.id, by_name: lot.dismissal.byName, at: lot.dismissal.at, reason: lot.dismissal.reason,
+      },
+    }));
 };
 
 // ── Movement history for one product ───────────────────────────
@@ -266,7 +409,7 @@ const setStockMeta = async (client, { productId, seedUnit, unit = null, reorderT
     throw new Error('setStockMeta requires the caller\'s transaction client.');
   }
   if (!seedUnit) {
-    throw new Error('setStockMeta requires a seed unit — stock_levels.unit is NOT NULL.');
+    throw new Error('setStockMeta requires a seed unit. stock_levels.unit is NOT NULL.');
   }
 
   const { rows } = await client.query(
@@ -355,6 +498,14 @@ const ledgerWhere = (filters, params, alias) => {
   return where;
 };
 
+// REFERENCES, RESOLVED TO WHAT A MANAGER CAN OPEN
+// A movement's reference_id points at the row that caused it, which is
+// not always a screen: a dispatch movement points at a dispatch_events
+// row, a receipt at a delivery_notes row. The two joins below follow
+// those one step to the picking slip and the purchase order, so the
+// ledger can link to them. Both are keyed on reference_type as well as
+// the id — ids are only unique within their own table.
+//
 // One extra row is requested beyond the caller's limit. If it comes
 // back there is another page; it is dropped before returning, so the
 // caller never sees it. Cheaper and more honest than a COUNT(*) over
@@ -378,10 +529,21 @@ const getLedger = async ({ limit = 50, cursor = null, ...filters } = {}) => {
             w.balance_after,
             p.name               AS product_name,
             p.stock_keeping_unit AS sku,
-            u.first_name         AS performed_by_name
+            u.first_name         AS performed_by_name,
+            de.picking_slip_id   AS picking_slip_id,
+            ecd.name             AS picking_slip_name,
+            dn.purchase_order_id AS purchase_order_id,
+            po.po_number         AS po_number
      FROM walked w
      JOIN products p       ON p.id = w.product_id
      LEFT JOIN users u     ON u.id = w.performed_by
+     LEFT JOIN dispatch_events de
+            ON w.reference_type = 'dispatch_event' AND de.id = w.reference_id
+     LEFT JOIN picking_slips ps   ON ps.id  = de.picking_slip_id
+     LEFT JOIN ecd_centres ecd    ON ecd.id = ps.ecd_id
+     LEFT JOIN delivery_notes dn
+            ON w.reference_type = 'delivery_note' AND dn.id = w.reference_id
+     LEFT JOIN purchase_orders po ON po.id = dn.purchase_order_id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
      ORDER BY w.created_at DESC, w.id DESC
      LIMIT $${params.length}`,
@@ -545,4 +707,4 @@ const getStockTrends = async ({ days = 30 } = {}) => {
 export default {
   getStockTrends,
   getLedger, getLedgerSummary, getReconciliation, getLedgerActors,
-  adjustStock, manualAdjust, getManifest, getMovements, setStockMeta };
+  adjustStock, manualAdjust, getOnHandForProducts, getManifest, getMovements, getExpiryBatches, setStockMeta };

@@ -1,77 +1,78 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/components/layout/StaffTabBar.jsx
+// @sentinel script-49-staff-tabbar-in-app
+// @sentinel script-51-staff-tabbar-shared-tasks
+// @sentinel script-52-illustrated-icons
 //
-// How warehouse staff move between their four tasks.
+// The bottom tab bar for warehouse workers: Home, Receiving, Donation,
+// Packing, Decanting and Dispatch (listed in staffTasks.js, which the
+// dashboard shares). It stays on screen during a task, so a packer can
+// switch to the gate and come back.
 //
-// This app is installed as a PWA and used on a phone, so the
-// navigation lives at the bottom where the thumb already is. A
-// sidebar was the other candidate and was rejected: on a phone it
-// has to collapse behind a hamburger, which hides all four
-// destinations behind a tap and gives no sense of where you are.
-//
-// The tab bar is present on EVERY staff page including mid-task, so
-// a packer interrupted by a driver at the gate can switch to
-// dispatch and come back. Task pages keep their own progress in
-// component state, and the step flows re-enter at step 1 — a
-// deliberate simplification for Milestone 3, noted in HANDOFF.md.
+// Less frequent tasks (Feed the Soil, Benevolent Requests) are in the
+// menu instead. The Packing tab shows a dot while spare pallets are
+// waiting on the floor.
 // ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { STAFF_TABS } from './staffTasks';
 import { STAFF } from '../../routes/paths';
+import { useT } from '../../translations';
 
-// Order matches the shift: goods come in, get packed, get decanted,
-// go out.
-//
-// Icons follow the landing page's convention — /icons/*.svg served from
-// client/public, the same as noc-icon.svg and the rest. The Canva task
-// icons were exported as PNG, so ICON_EXT is one place to change if you
-// keep them that way rather than converting.
-//
-// Each tab falls back to a Tabler glyph if its image 404s, so a wrong
-// path can never leave a tab unlabelled.
-const ICON_EXT = 'svg';
-const TABS = [
-  { label: 'Home',      to: STAFF.home,      icon: null,               glyph: 'ti ti-home' },
-  { label: 'Receiving', to: STAFF.receiving, icon: 'receiving-icon',   glyph: 'ti ti-truck-delivery' },
-  { label: 'Packing',   to: STAFF.packing,   icon: 'packing-icon',     glyph: 'ti ti-package' },
-  { label: 'Decanting', to: STAFF.decanting, icon: 'decanting-icon',   glyph: 'ti ti-flask' },
-  { label: 'Dispatch',  to: STAFF.dispatch,  icon: 'dispatch-icon',    glyph: 'ti ti-clipboard-check' },
-];
 
-const isCurrent = (pathname, to) =>
-  pathname === to || pathname.startsWith(`${to}/`);
+const isCurrent = (pathname, to, exact) =>
+  pathname === to || (!exact && pathname.startsWith(`${to}/`));
 
-export default function StaffTabBar() {
+// The tab's drawing, falling back to its lucide icon if the image fails to load.
+function TabIcon({ tab }) {
+  const [broken, setBroken] = useState(false);
+  const Icon = tab.icon;
+  if (tab.image && !broken) {
+    return (
+      <img
+        className="stf-tab-icon"
+        src={tab.image}
+        alt=""
+        aria-hidden="true"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <span className="stf-tab-glyph" aria-hidden="true">
+      <Icon className="size-5" />
+    </span>
+  );
+}
+
+// packingBadge: how many unclaimed pallets are on the floor (from
+// useSpareSlipAlert). Packing is the only tab with a badge.
+export default function StaffTabBar({ packingBadge = 0 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const t = useT();
 
   return (
-    <nav className="stf-tabbar" aria-label="Warehouse tasks">
-      {TABS.map((tab) => {
-        const current = isCurrent(pathname, tab.to);
+    <nav className="stf-tabbar" aria-label={t('tabs.label')}>
+      {STAFF_TABS.map((tab) => {
+        const current = isCurrent(pathname, tab.to, tab.exact);
+        const hasBadge = tab.to === STAFF.packing && packingBadge > 0;
+        const label = t(tab.key);
         return (
           <button
             key={tab.to}
             type="button"
             className={`stf-tab${current ? ' is-current' : ''}`}
-            // aria-current is what a screen reader announces; the
-            // border on .is-current is only visible to sighted users.
+            // aria-current tells screen readers which tab is open.
             aria-current={current ? 'page' : undefined}
+            aria-label={hasBadge ? t('tabs.new', { label, n: packingBadge }) : undefined}
             onClick={() => navigate(tab.to)}
           >
-            {tab.icon ? (
-              <img
-                className="stf-tab-icon"
-                src={`/icons/${tab.icon}.${ICON_EXT}`}
-                alt=""
-                aria-hidden="true"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              />
-            ) : (
-              <span className="stf-tab-glyph" aria-hidden="true">
-                <i className={tab.glyph} />
-              </span>
-            )}
-            <span>{tab.label}</span>
+            <span className="stf-tab-icon-wrap">
+              <TabIcon tab={tab} />
+              {hasBadge ? <span className="stf-tab-badge" aria-hidden="true" /> : null}
+            </span>
+            <span>{label}</span>
           </button>
         );
       })}

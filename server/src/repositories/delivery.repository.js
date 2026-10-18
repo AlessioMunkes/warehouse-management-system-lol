@@ -30,12 +30,13 @@
 // ─────────────────────────────────────────────────────────────
 import pool       from "../config/db.js";
 import stockModel from "./stock.repository.js";
+import { purchaseOrderDeliveredShort } from "../features/communications/notices.js";
 import { DELIVERY_SORTS, buildOrderBy } from "../constants/receiptSort.js";
 import {
-  isOpenPurchaseOrder,
-  OPEN_PO_STATUSES,
+  isReceivablePurchaseOrder,
+  RECEIVABLE_PO_STATUSES,
   PO_STATUS_FULLY_RECEIVED,
-  PO_STATUS_PARTIALLY_RECEIVED,   // eslint-disable-line no-unused-vars -- see createDelivery
+  PO_STATUS_PARTIALLY_RECEIVED,
 } from "../constants/purchaseOrderStatus.js";
 
 // ── The goods-in archive ──────────────────────────────────────
@@ -142,6 +143,7 @@ const getDeliveryById = async (id) => {
        dn.created_at,
        dn.signature,
        dn.purchase_order_id,
+       po.po_number,
        s.name           AS supplier_name,
        s.address        AS supplier_address,
        s.contact_phone  AS supplier_phone,
@@ -149,6 +151,7 @@ const getDeliveryById = async (id) => {
      FROM delivery_notes dn
      LEFT JOIN suppliers s ON s.id = dn.supplier_id
      LEFT JOIN users u ON u.id = dn.received_by
+     LEFT JOIN purchase_orders po ON po.id = dn.purchase_order_id
      WHERE dn.id = $1`,
     [id],
   );
@@ -339,7 +342,11 @@ const createDelivery = async ({
     // below offered pending/in_transit/partially_received. The two disagreed,
     // so every order the dropdown offered was rejected here and the only
     // orders that passed were ones the dropdown never showed.
-    if (!isOpenPurchaseOrder(purchaseOrder.status)) {
+    //
+    // 'pending' is refused too: it is open, but nobody has approved it
+    // yet (RECEIVABLE_PO_STATUSES). The two lists below read the same
+    // constant, so what is offered and what is accepted cannot disagree.
+    if (!isReceivablePurchaseOrder(purchaseOrder.status)) {
       await client.query("ROLLBACK");
       return { purchaseOrderNotOpen: true, status: purchaseOrder.status };
     }
@@ -408,7 +415,7 @@ const createDelivery = async ({
           line.unit,
           line.discrepancyReason,
           line.storageArea,   // BR-07 — migration 018
-          line.expiryDate,    // BR-06 — null for anything not perishable
+          line.expiryDate,    // BR-06 — required if perishable, optional otherwise
         ],
       );
 
@@ -445,15 +452,77 @@ const createDelivery = async ({
     // status only moves when the receiver ticks the box, which means a PO
     // that has had three partial deliveries still reads 'pending'. The
     // constant is imported and ready if the answer is yes.
-    if (poCompleted) {
+    //
+    // ANSWERED (migration 043). What is still owed on the order, across
+    // every delivery against it including this one, decides where it goes:
+    //
+    //   nothing owed   -> completed, and so is every order it was a
+    //                     follow-up to (they were waiting on this one)
+    //   something owed -> partially_received, with what was short kept as
+    //                     its reason. That pair IS the "follow-up
+    //                     required" flag the floor and the manager see:
+    //                     the status says part of it is in, the flag
+    //                     says the rest needs chasing. The flag clears
+    //                     when a follow-up order is raised, and the
+    //                     status stays until that order is received.
+    const owed = await client.query(
+      `SELECT p.name, p.default_unit AS unit,
+              (poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0))::numeric AS short
+         FROM purchase_order_items poi
+         JOIN products p ON p.id = poi.product_id
+         LEFT JOIN delivery_note_items dni ON dni.purchase_order_item_id = poi.id
+        WHERE poi.purchase_order_id = $1
+        GROUP BY poi.id, p.name, p.default_unit, poi.expected_quantity
+       HAVING poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0) > 0
+        ORDER BY p.name ASC`,
+      [purchaseOrderId],
+    );
+
+    let followUp = { required: false, reason: null };
+    if (poCompleted || owed.rows.length === 0) {
       await client.query(
-        `UPDATE purchase_orders SET status = $2 WHERE id = $1`,
-        [purchaseOrderId, PO_STATUS_FULLY_RECEIVED],
+        `WITH RECURSIVE chain AS (
+           SELECT id, follow_up_of FROM purchase_orders WHERE id = $1
+           UNION ALL
+           SELECT parent.id, parent.follow_up_of
+             FROM purchase_orders parent
+             JOIN chain ON parent.id = chain.follow_up_of
+            WHERE parent.status = $3
+         )
+         UPDATE purchase_orders
+            SET status = $2, status_reason = NULL, status_changed_at = NOW()
+          WHERE id IN (SELECT id FROM chain)`,
+        [purchaseOrderId, PO_STATUS_FULLY_RECEIVED, PO_STATUS_PARTIALLY_RECEIVED],
       );
+    } else {
+      const short = owed.rows.map((r) => `${r.name} ${Number(r.short)} ${r.unit}`).join(', ');
+      const reason = `Delivered short: ${short}.`.slice(0, 500);
+      const flagged = await client.query(
+        `UPDATE purchase_orders
+            SET status = $3, status_reason = $2, status_changed_at = NOW()
+          WHERE id = $1
+        RETURNING id, po_number`,
+        [purchaseOrderId, reason, PO_STATUS_PARTIALLY_RECEIVED],
+      );
+      followUp = { required: true, reason };
+
+      // Tell the managers' bell, in this transaction so the notice and
+      // the flag land together. In a savepoint: a notice that cannot be
+      // written must never cost the floor the delivery it just counted.
+      await client.query('SAVEPOINT follow_up_notice');
+      try {
+        await purchaseOrderDeliveredShort(client, { purchaseOrder: flagged.rows[0], reason });
+        await client.query('RELEASE SAVEPOINT follow_up_notice');
+      } catch (noticeError) {
+        await client.query('ROLLBACK TO SAVEPOINT follow_up_notice');
+        console.error('[delivery] follow-up notice not sent:', noticeError.message);
+      }
     }
 
     await client.query("COMMIT");
-    return { ...noteResult.rows[0], warnings };
+    // follow_up tells the receiving screen to show the flag to the
+    // person who just counted the delivery in.
+    return { ...noteResult.rows[0], warnings, follow_up: followUp };
   } catch (err) {
     // ONE rollback. There were two here. In the happy failure case the
     // second is a harmless Postgres warning, but if the first throws —
@@ -498,7 +567,7 @@ const getSuppliers = async () => {
 
 // ── Get suppliers with at least one order still open ──────────
 // For the Form view's supplier picker: no point offering a supplier
-// there is nothing to receive from. Reads OPEN_PO_STATUSES, the same
+// there is nothing to receive from. Reads RECEIVABLE_PO_STATUSES, the same
 // list listOpenPurchaseOrders below uses, so the two can never
 // disagree about what counts as open. It used to hard-code
 // status = 'approved', which stopped matching anything the moment
@@ -513,7 +582,7 @@ const getSuppliersWithOpenOrders = async () => {
      WHERE po.status = ANY($1)
        AND s.is_active = true
      ORDER BY s.name ASC`,
-    [OPEN_PO_STATUSES],
+    [RECEIVABLE_PO_STATUSES],
   );
   return result.rows;
 };
@@ -521,7 +590,7 @@ const getSuppliersWithOpenOrders = async () => {
 // ── Get all active products ───────────────────────────────────
 const getProducts = async () => {
   const result = await pool.query(
-    `SELECT id, name, stock_keeping_unit AS sku, weight_kg, default_unit
+    `SELECT id, name, stock_keeping_unit AS sku, weight_kg, default_unit, is_decantable
      FROM products
      WHERE is_active = true
      ORDER BY name ASC`,
@@ -531,7 +600,7 @@ const getProducts = async () => {
 
 // ── Get purchase orders for a supplier ───────────────────────
 // Only returns orders still expecting goods — can't receive against
-// one already closed off. Reads the same OPEN_PO_STATUSES as
+// one already closed off, or not yet approved. Reads the same RECEIVABLE_PO_STATUSES as
 // getSuppliersWithOpenOrders above, so the two agree by construction
 // rather than by two people remembering to edit both.
 // supplierId is OPTIONAL. Passed, this is the old per-supplier list;
@@ -553,6 +622,7 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
   const result = await pool.query(
     `SELECT
        po.id,
+       po.po_number,
        po.status,
        po.supplier_id,
        s.name AS supplier_name,
@@ -565,7 +635,7 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
      WHERE ($1::int IS NULL OR po.supplier_id = $1::int)
        AND po.status = ANY($2)
      ORDER BY po.expected_delivery_date ASC NULLS LAST, po.id ASC`,
-    [supplierId ?? null, OPEN_PO_STATUSES],
+    [supplierId ?? null, RECEIVABLE_PO_STATUSES],
   );
   return result.rows;
 };
@@ -574,12 +644,21 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
 // Returns product name, expected quantity and weight so the form can
 // auto-populate. default_unit is what the stock ledger is keyed on —
 // without it, a product's first movement has no unit to record.
+//
+// expected_quantity is what is STILL OWED on the line, not what was
+// ordered. They are the same until something has been received; they
+// differ on a part-received order a manager reopened, and offering the
+// full order again there put the first delivery into stock twice the
+// moment someone pressed "Everything as ordered". ordered_quantity and
+// received_to_date are the two numbers it comes from.
 const getPurchaseOrderItems = async (purchaseOrderId) => {
   const result = await pool.query(
     `SELECT
        poi.id                  AS purchase_order_item_id,
        poi.product_id,
-       poi.expected_quantity,
+       GREATEST(poi.expected_quantity - COALESCE(got.received, 0), 0) AS expected_quantity,
+       poi.expected_quantity   AS ordered_quantity,
+       COALESCE(got.received, 0) AS received_to_date,
        poi.expected_weight_kg,
        poi.unit_price,
        p.name                  AS product_name,
@@ -589,6 +668,11 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
        p.is_perishable
      FROM purchase_order_items poi
      JOIN products p ON p.id = poi.product_id
+     LEFT JOIN LATERAL (
+       SELECT SUM(dni.received_quantity) AS received
+         FROM delivery_note_items dni
+        WHERE dni.purchase_order_item_id = poi.id
+     ) got ON TRUE
      WHERE poi.purchase_order_id = $1
      ORDER BY p.name ASC`,
     [purchaseOrderId],

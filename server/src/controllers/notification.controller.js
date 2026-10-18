@@ -16,7 +16,7 @@ const respondError = (res, err, label, fallback) => {
 const list = async (req, res) => {
   try {
     const data = await notificationService.listNotifications(req.user, {
-      unreadOnly: req.query.unreadOnly,
+      unreadOnly: req.query.unreadOnly, limit: req.query.limit, offset: req.query.offset,
     });
     res.status(200).json({ success: true, data });
   } catch (err) {
@@ -54,4 +54,39 @@ const markAllRead = async (req, res) => {
   }
 };
 
-export default { list, unreadCount, markRead, markAllRead };
+// ── GET /api/notifications/floor?unreadOnly= ────────────────────
+const listFloor = async (req, res) => {
+  try {
+    const data = await notificationService.listFloorNotifications(req.user, {
+      unreadOnly: req.query.unreadOnly, limit: req.query.limit, offset: req.query.offset,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'listFloorNotifications', 'Failed to retrieve notifications.');
+  }
+};
+
+// ── GET /api/notifications/floor/unread-count ───────────────────
+const floorUnreadCount = async (req, res) => {
+  try {
+    const count = await notificationService.getFloorUnreadCount(req.user);
+    res.status(200).json({ success: true, data: { count } });
+  } catch (err) {
+    respondError(res, err, 'getFloorUnreadCount', 'Failed to retrieve the unread count.');
+  }
+};
+
+// ── POST /api/notifications/floor/read-all ──────────────────────
+const markAllFloorRead = async (req, res) => {
+  try {
+    await notificationService.markAllFloorRead(req.user);
+    res.status(200).json({ success: true, data: null });
+  } catch (err) {
+    respondError(res, err, 'markAllFloorRead', 'Failed to mark notifications read.');
+  }
+};
+
+export default {
+  list, unreadCount, markRead, markAllRead,
+  listFloor, floorUnreadCount, markAllFloorRead,
+};

@@ -1,12 +1,38 @@
 // ─────────────────────────────────────────────────────────────
 // server/index.js
 // ─────────────────────────────────────────────────────────────
-import 'dotenv/config';
+// .env.local is loaded by the "dev"/"start" npm scripts themselves
+// (node --env-file-if-exists=.env.local), NOT from inside this file.
+// An earlier attempt tried dotenv.config({ path: '.env.local' })
+// called here, textually above the imports below — that does not
+// work in an ES module: a plain statement like a function call always
+// runs after ALL of this file's own static imports have finished
+// loading, no matter where it is written relative to them, because
+// import declarations are resolved during module instantiation,
+// which completes before any of the module's own top-level code
+// (including that call) runs at all. express, cors and — critically —
+// every local route file below (which transitively imports
+// config/db.js, which reads process.env.DATABASE_URL at ITS OWN top
+// level) had therefore already loaded before that dotenv.config()
+// call ever executed, so it was always too late.
+//
+// The plain `import 'dotenv/config'` below doesn't have that problem
+// — it's a real import, evaluated in encounter order like any other,
+// so it runs before express/cors/the route files as long as it's the
+// first one in the file. It only loads a file literally named `.env`
+// though, which is why it's a fallback here and not the primary
+// mechanism: for anyone who runs `node index.js` directly, bypassing
+// the npm scripts and their .env.local support, entirely.
+//
+// config/env.js is that import, pointed at server/.env by path so it
+// is found whatever directory node was started from.
+import './src/config/env.js';
 import express          from 'express';
 import cors             from 'cors';
 import path             from 'path';
 import { fileURLToPath } from 'url';
 import helmet           from 'helmet';
+import compression      from 'compression';
 
 import donationAdminRoutes from './src/routes/donationAdmin.routes.js';
 import donationIntakeRouter from './src/routes/donationIntake.routes.js';
@@ -20,6 +46,7 @@ import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
 import pickingRouter     from './src/routes/picking.routes.js';
 import slipRouter        from './src/routes/slip.routes.js';
+import passwordResetRouter from './src/routes/passwordReset.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
 import pendingDonationRouter from './src/routes/pendingDonation.routes.js';
 import dispatchRouter    from './src/routes/dispatch.routes.js';
@@ -28,14 +55,32 @@ import purchaseOrderRouter from './src/routes/purchaseOrder.routes.js';
 import reportingRouter   from './src/routes/reporting.routes.js';
 import assistantRouter   from './src/routes/assistant.routes.js';
 import userRouter        from './src/routes/user.routes.js';
+import userInviteRouter  from './src/routes/userInvite.routes.js';
 import productRouter     from './src/routes/product.routes.js';
 import dashboardRouter   from './src/routes/dashboard.routes.js';
+import financeRouter     from './src/routes/finance.routes.js';
 import beneficiaryRouter from './src/routes/beneficiary.routes.js';
 import notificationRouter from './src/routes/notification.routes.js';
+import pushRouter        from './src/routes/push.routes.js';
+import ecdCollectionReminderRouter from './src/routes/ecdCollectionReminder.routes.js';
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import gmailRouter from './src/routes/gmail.routes.js';
+import quickbooksRouter from './src/routes/quickbooks.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
+import collectionKitRouter from './src/routes/collectionKit.routes.js';
+import communicationsRouter from './src/routes/communications.routes.js';
+import settingsRouter from './src/routes/settings.routes.js';
+import calendarRouter from './src/routes/calendar.routes.js';
+import recipeRouter from './src/routes/recipe.routes.js';
+import photoRouter from './src/routes/photo.routes.js';
+import publicImpactRouter from './src/routes/publicImpact.routes.js';
+import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
+import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
+import adminRouter       from './src/routes/admin.routes.js';
+import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
+import savedReportsJob   from './src/jobs/savedReports.job.js';
+import { startEmailReminderScheduler } from './src/jobs/ecdCollectionReminder.job.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
 
@@ -48,29 +93,32 @@ if (!process.env.JWT_SECRET) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app  = express();
-app.use((req, res, next) => {
-  console.log(`[REQ] ${req.method} ${req.originalUrl}`);
-  next();
-});
-const port = process.env.PORT || 5000;
-const defaultClientOrigins = new Set([
-  'http://localhost:5173',
-  'http://localhost:5174',
-]);
 
-const isAllowedClientOrigin = (origin) => {
-  console.log(`[CORS] Incoming origin: ${origin}`);
-  console.log(`[CORS] CLIENT_ORIGIN: ${process.env.CLIENT_ORIGIN}`);
-  if (!origin) return true;
-  if (process.env.CLIENT_ORIGIN) {
-    const allowed = origin === process.env.CLIENT_ORIGIN;
-    console.log(`[CORS] Match CLIENT_ORIGIN: ${allowed}`);
-    return allowed;
-  }
-  const allowed = defaultClientOrigins.has(origin);
-  console.log(`[CORS] Match default origins: ${allowed}`);
-  return allowed;
-};
+// Render (and any host like it) sits behind one reverse proxy. Without
+// this, req.ip is the proxy's address for every request, so the login
+// rate limiter counted the whole warehouse as a single client.
+app.set('trust proxy', 1);
+const port = process.env.PORT || 5000;
+// Origins allowed to call the API with the auth cookie.
+//   - dev:                 the Vite server on 5173/5174
+//   - CLIENT_ORIGIN:       an explicit override (e.g. a custom domain)
+//   - RENDER_EXTERNAL_URL: set by Render itself to this service's own
+//                          https URL. The client is served from that
+//                          same origin, and Chrome still sends an Origin
+//                          header on same-origin POSTs and font requests.
+//                          Before this was listed, every login and every
+//                          webfont on Render was rejected here and came
+//                          back as a 500.
+const allowedClientOrigins = new Set([
+  ...(process.env.NODE_ENV === 'production'
+    ? []
+    : ['http://localhost:5173', 'http://localhost:5174']),
+  process.env.CLIENT_ORIGIN,
+  process.env.RENDER_EXTERNAL_URL,
+].filter(Boolean));
+
+const isAllowedClientOrigin = (origin) =>
+  !origin || allowedClientOrigins.has(origin);
 
 // helmet sets 11 HTTP headers that protect against common attacks.
 // Must be first — before cors, routes, everything.
@@ -99,12 +147,26 @@ app.use(helmet({
 }));
 
 // ── Middleware ────────────────────────────────────────────────
-app.use(express.json({ limit: '1mb' }));
+// Responses go out compressed: lists of centres, stock and slips are
+// repetitive JSON and shrink to about a tenth, and in production so do
+// the app's own files (served just below). Streams are left alone: a
+// compressed event stream is held back until its buffer fills.
+app.use(compression({
+  filter: (req, res) => {
+    if (String(req.headers.accept || '').includes('text/event-stream')) return false;
+    if (String(res.getHeader('Content-Type') || '').includes('text/event-stream')) return false;
+    return compression.filter(req, res);
+  },
+}));
+app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 app.use(cors({
   origin:      (origin, callback) => {
     if (isAllowedClientOrigin(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
+    console.warn(`[CORS] blocked origin: ${origin}`);
+    const err = new Error(`CORS blocked for origin: ${origin}`);
+    err.status = 403;
+    return callback(err);
   },
   credentials: true,
 }));
@@ -115,13 +177,30 @@ app.use(cors({
 // preflight is involved. In dev the Vite server on :5173 handles this.
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
-  app.use(express.static(clientDist));
+  // Files under /assets carry a hash of their contents in the name, so
+  // a browser may keep one for a year without asking again: a changed
+  // file is a new name. Everything else (index.html, the service
+  // worker, the manifest) is checked every time, so a new release is
+  // picked up at once. Without this each screen's file was re-checked
+  // with the server on every visit.
+  app.use(express.static(clientDist, {
+    setHeaders: (res, filePath) => {
+      const hashed = /[\\/]assets[\\/]/.test(filePath);
+      res.setHeader('Cache-Control', hashed ? 'public, max-age=31536000, immutable' : 'no-cache');
+    },
+  }));
 }
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// ── Multi-warehouse: pages reached without a staff login ──────
+// A pallet QR code, an emailed invite or 18A form, volunteer sign-in
+// and the Gmail callback run in the warehouse their link belongs to.
+// Must come before the routers. Does nothing with one database.
+app.use(publicWarehouse);
 
 // ── Routes ────────────────────────────────────────────────────
 app.use('/api/login',      loginRateLimiter, loginRouter);
@@ -139,6 +218,10 @@ app.use('/api/picking',    pickingRouter);
 // authenticated guest routes do not, and the limiter it uses counts
 // only failures so a warehouse behind one NAT address is not locked out.
 app.use('/api/slip',       slipRouter);
+// Public by necessity — nobody has a session at any point in this
+// flow. Rate limiting is applied per-route inside this router, same
+// reasoning as slip.routes.js above.
+app.use('/api/password-reset', passwordResetRouter);
 app.use('/api/dispatch',   dispatchRouter);
 app.use('/api/donations',  pendingDonationRouter);
 app.use('/api/donations',  donationRouter);
@@ -149,14 +232,29 @@ app.use('/api/purchase-orders', purchaseOrderRouter);
 app.use('/api/reporting',  reportingRouter);
 app.use('/api/assistant',  assistantRouter);
 app.use('/api/users',      userRouter);
+app.use('/api/admin',      adminRouter);
+app.use('/api/invites',    userInviteRouter);
 app.use('/api/products',   productRouter);
 app.use('/api/dashboard',  dashboardRouter);
+app.use('/api/finance',    financeRouter);
 app.use('/api/beneficiaries', beneficiaryRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/push',          pushRouter);
+app.use('/api/collection-reminders', ecdCollectionReminderRouter);
 app.use('/api/love-activism', loveActivismRouter);
 app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
+app.use('/api/quickbooks', quickbooksRouter);
 app.use('/api/certificate-settings', certificateSettingsRouter);
+app.use('/api/collection-kits', collectionKitRouter);
+app.use('/api/communications', communicationsRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/calendar', calendarRouter);
+app.use('/api/recipes', recipeRouter);
+// Photos a worker takes of a flagged item or a delivery.
+app.use('/api/photos', photoRouter);
+app.use('/api/public/warehouses', publicWarehousesRouter);
+app.use('/api/public',      publicImpactRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can
@@ -169,9 +267,20 @@ if (process.env.NODE_ENV === 'production') {
 
 // ── Central error handler ─────────────────────────────────────
 // Must be after all routes. Four arguments = Express error handler.
+//
+// req.path is logged raw for every other route, but /api/password-reset/*
+// carries the raw reset token as a path segment (GET /:token and POST
+// /:token/confirm) — an unhandled error on either would otherwise
+// print a live, single-use credential to server logs. Redacted only
+// for this one prefix; every other route's logging is unchanged.
+const loggableRequestPath = (req) =>
+  req.path.startsWith('/api/password-reset/')
+    ? req.path.replace(/^(\/api\/password-reset\/)[^/]+/, '$1[REDACTED]')
+    : req.path;
+
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(`[error] ${req.method} ${req.path} —`, err.message);
+  console.error(`[error] ${req.method} ${loggableRequestPath(req)} —`, err.message);
   const status = err.status || err.statusCode || 500;
   res.status(status).json({
     success: false,
@@ -187,4 +296,12 @@ app.listen(port, () => {
   console.log(`[env] CLIENT_ORIGIN: ${process.env.CLIENT_ORIGIN}`);
   console.log(`[env] PORT: ${process.env.PORT || 5000}`);
   console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
+  expiryWarningJob.startExpiryWarningJob();
+  if (process.env.NODE_ENV !== 'test' && process.env.SAVED_REPORTS_SCHEDULER !== 'false') {
+    savedReportsJob.startSavedReportsJob();
+  }
 });
+
+if (process.env.NODE_ENV !== 'test' && process.env.ECD_REMINDER_SCHEDULER !== 'false') {
+  startEmailReminderScheduler();
+}

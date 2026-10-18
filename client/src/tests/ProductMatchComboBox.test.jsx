@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ProductMatchCombobox } from '../features/donation/components/ProductMatchComboBox';
+import { ProductMatchCombobox } from '../features/donation/ProductMatchComboBox';
 
 afterEach(() => {
   vi.restoreAllMocks();

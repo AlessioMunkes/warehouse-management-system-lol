@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import AssistantLauncher from '../features/assistant/components/AssistantLauncher';
+import AssistantLauncher from '../features/assistant/AssistantLauncher';
 
 // Shows where the router actually is, so "it takes you there" can be
 // asserted rather than inferred from a link's href.
@@ -120,7 +120,7 @@ describe('knowing which screen you are on', () => {
     await userEvent.type(within(panel).getByRole('textbox', { name: /ask/i }), 'the truck is here');
     await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
     await waitFor(() =>
-      expect(api.askAssistant).toHaveBeenCalledWith('the truck is here', 'receiving'));
+      expect(api.askAssistant).toHaveBeenCalledWith('the truck is here', 'receiving', null));
   });
 
   // A deep route is still the screen it belongs to — someone inside
@@ -131,7 +131,7 @@ describe('knowing which screen you are on', () => {
     await userEvent.type(within(panel).getByRole('textbox', { name: /ask/i }), 'what goes on this');
     await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
     await waitFor(() =>
-      expect(api.askAssistant).toHaveBeenCalledWith('what goes on this', 'packing'));
+      expect(api.askAssistant).toHaveBeenCalledWith('what goes on this', 'packing', null));
   });
 
   it('falls back to the general suggestions on a screen it does not know', async () => {
@@ -233,7 +233,7 @@ describe('the four things an answer can be', () => {
     await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
 
     await userEvent.click(await within(panel).findByRole('button', { name: 'Receiving' }));
-    await waitFor(() => expect(api.askAssistant).toHaveBeenLastCalledWith('Receiving', 'receiving'));
+    await waitFor(() => expect(api.askAssistant).toHaveBeenLastCalledWith('Receiving', 'receiving', expect.objectContaining({ question: expect.any(String) })));
   });
 
   it('says it does not know, and says who will', async () => {
@@ -267,6 +267,59 @@ describe('not spending a model call when the catalog already knows', () => {
     await userEvent.click(await within(panel).findByRole('button', { name: /count does not match/i }));
     await waitFor(() => expect(api.fetchTopic).toHaveBeenCalledWith('receiving-discrepancy'));
     expect(api.askAssistant).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('when the server has no API key', () => {
+  // What happened on the hosted site: render.yaml never declared
+  // GEMINI_API_KEY, so provider.isEnabled() was false and every typed
+  // question came back "the help assistant is not switched on" — after
+  // the person had typed it.
+  //
+  // The catalogue needs no key, so most of the panel still works. It
+  // now says so up front instead of letting someone hit a wall.
+  const offline = () => api.fetchAssistantCatalog.mockResolvedValue({
+    enabled: false,
+    suggestions: { receiving: [{ id: 'receiving-record', title: 'Recording a delivery' }] },
+  });
+
+  it('says so up front rather than after you have typed', async () => {
+    offline();
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    expect(await within(panel).findByText(/switched off on this server/i)).toBeInTheDocument();
+  });
+
+  it('will not let you type a question it cannot answer', async () => {
+    offline();
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    await waitFor(() =>
+      expect(within(panel).getByRole('textbox', { name: /ask/i })).toBeDisabled());
+    expect(within(panel).getByRole('button', { name: /send/i })).toBeDisabled();
+  });
+
+  // The important half: the help itself is a catalogue read, so it
+  // keeps working with no key at all.
+  it('still answers from the suggestions, which need no key', async () => {
+    offline();
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    await userEvent.click(await within(panel).findByRole('button', { name: 'Recording a delivery' }));
+
+    await waitFor(() => expect(api.fetchTopic).toHaveBeenCalledWith('receiving-record'));
+    // The BODY, not the title: tapping a chip echoes its label as the
+    // question too, so the title is legitimately on screen twice.
+    expect(await within(panel).findByText(/The system shows what was expected/))
+      .toBeInTheDocument();
+    expect(api.askAssistant).not.toHaveBeenCalled();
+  });
+
+  it('takes questions normally when the key is there', async () => {
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    await waitFor(() =>
+      expect(within(panel).getByRole('textbox', { name: /ask/i })).toBeEnabled());
   });
 });
 

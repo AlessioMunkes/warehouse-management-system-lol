@@ -6,7 +6,7 @@
 // exercised end-to-end through the hook.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import ReconciliationTab from '../features/donationManagement/components/ReconciliationTab';
+import ReconciliationTab from '../features/donationManagement/ReconciliationTab';
 import { RECONCILIATION_STATUSES } from '../services/donationManagementAPI';
 
 vi.mock('../services/donationManagementAPI', async (importOriginal) => {
@@ -80,7 +80,7 @@ describe('ReconciliationTab', () => {
     await renderWith([]);
 
     expect(screen.getByText('Nothing needs reconciling right now.')).toBeInTheDocument();
-    expect(screen.getByText('0 donations stuck in a commit failure state.')).toBeInTheDocument();
+    expect(screen.queryByText(/stuck in a commit failure state/)).not.toBeInTheDocument();
   });
 
   it('renders each donation row with donor name, value and status', async () => {
@@ -94,7 +94,7 @@ describe('ReconciliationTab', () => {
     expect(screen.getByText('Commit failed')).toBeInTheDocument();
     expect(screen.getByText('Commit incomplete')).toBeInTheDocument();
     // Summary count line.
-    expect(screen.getByText('2 donations stuck in a commit failure state.')).toBeInTheDocument();
+    expect(screen.queryByText(/stuck in a commit failure state/)).not.toBeInTheDocument();
   });
 
   it('shows the resolved-count line for commit_incomplete rows, computed from .items', async () => {
@@ -162,7 +162,7 @@ describe('ReconciliationTab', () => {
     // The queue was NOT replaced by a top-level banner (isolation behaviour):
     // exactly one error banner is present.
     expect(screen.getAllByText('Retry failed server-side').length).toBe(1);
-    expect(screen.getByText('2 donations stuck in a commit failure state.')).toBeInTheDocument();
+    expect(screen.queryByText(/stuck in a commit failure state/)).not.toBeInTheDocument();
   });
 
   it('shows a top-level error banner with a Try again action when the initial load fails', async () => {

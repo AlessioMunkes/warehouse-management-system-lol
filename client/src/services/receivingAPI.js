@@ -75,6 +75,15 @@ export const getPurchaseOrders = async (supplierId) => {
   return res.data ?? [];
 };
 
+// GET /api/purchase-orders?status=pending
+// Orders raised but not yet approved. They cannot be received against;
+// the receiving screen names them so a worker looking for one knows
+// why it is not in the list.
+export const getOrdersAwaitingApproval = async () => {
+  const res = await apiGet('/api/purchase-orders?status=pending&limit=500');
+  return res.data ?? [];
+};
+
 // GET /api/deliveries/purchase-orders/:id/items
 // Returns { id, product_id, expected_quantity, expected_weight_kg,
 // unit_price, product_name, sku } — the expected column on the
@@ -213,6 +222,7 @@ export default {
   getSuppliers,
   getSuppliersWithOpenOrders,
   getPurchaseOrders,
+  getOrdersAwaitingApproval,
   getPurchaseOrderItems,
   getProducts,
   recordDelivery,

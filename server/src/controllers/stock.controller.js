@@ -15,6 +15,7 @@
 // didn't — it does.)
 // ─────────────────────────────────────────────────────────────
 import stockService from '../services/stock.service.js';
+import expiryDismissalService from '../services/expiryDismissal.service.js';
 
 // ── Get the current manifest ─────────────────────────────────────
 // GET /api/stock
@@ -152,9 +153,70 @@ const getStockTrends = async (req, res) => {
   }
 };
 
+// ── Expiry by receipt line for one product ───────────────────────
+// GET /api/stock/:id/batches
+// Returns: the deliveries for that product estimated to be still on the
+// shelf, soonest expiry first, with how much of each is probably left —
+// see stock.repository.js getExpiryBatches.
+const getExpiryBatches = async (req, res) => {
+  try {
+    const batches = await stockService.getExpiryBatches(req.params.id);
+    res.status(200).json({ success: true, data: batches });
+  } catch (err) {
+    console.error('[getExpiryBatches]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve expiry dates for this product.',
+    });
+  }
+};
+
+// ── Dismiss or restore one delivery's expiry warning (manager/admin) ──
+// POST   /api/stock/:id/batches/:lineId/dismissal   Body: { reason }
+// DELETE /api/stock/:id/batches/:lineId/dismissal
+// :lineId is the delivery line, as listed by getExpiryBatches. See
+// expiryDismissal.service.js.
+const dismissExpiryWarning = async (req, res) => {
+  try {
+    const row = await expiryDismissalService.dismiss(
+      { productId: req.params.id, lineId: req.params.lineId, reason: req.body?.reason },
+      req.user.id
+    );
+    res.status(201).json({ success: true, data: row });
+  } catch (err) {
+    console.error('[dismissExpiryWarning]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to dismiss the expiry warning.',
+    });
+  }
+};
+
+const restoreExpiryWarning = async (req, res) => {
+  try {
+    const row = await expiryDismissalService.restore(
+      { productId: req.params.id, lineId: req.params.lineId },
+      req.user.id
+    );
+    res.status(200).json({ success: true, data: row });
+  } catch (err) {
+    console.error('[restoreExpiryWarning]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to restore the expiry warning.',
+    });
+  }
+};
+
 export default {
   getManifest,
   getMovements,
+  getExpiryBatches,
+  dismissExpiryWarning,
+  restoreExpiryWarning,
   adjustManually,
   getStockTrends,
   getLedger,

@@ -26,7 +26,13 @@ export const withTransaction = async (work) => {
     await client.query('COMMIT');
     return result;
   } catch (err) {
-    await client.query('ROLLBACK');
+    // A ROLLBACK that fails (a dropped connection, usually) must not
+    // replace the error that caused it; that one says what went wrong.
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackErr) {
+      console.error('[withTransaction] rollback failed:', rollbackErr.message);
+    }
     throw err;
   } finally {
     client.release();

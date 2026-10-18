@@ -49,6 +49,19 @@ export const isPositiveInt = (value) => {
   return Number.isInteger(n) && n > 0;
 };
 
+// ── Quantities from a client ──────────────────────────────────
+// Number() alone is too generous for a measurement: Number(null),
+// Number('') and Number(false) are all 0, Number(true) is 1 and
+// Number([5]) is 5, so a missing or malformed value reads as a real
+// count. Only a finite number, or a non-blank string that is one,
+// counts here; anything else comes back as NaN for the caller's own
+// Number.isFinite check to refuse.
+export const toQuantity = (value) => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
+};
+
 // ── Stock units ───────────────────────────────────────────────
 // This list is not a preference, it is a CHECK constraint:
 // stock_levels_unit_check and stock_movements_unit_check both allow
@@ -79,4 +92,4 @@ const UUID_PATTERN =
 
 export const isUuid = (value) => typeof value === 'string' && UUID_PATTERN.test(value);
 
-export default { isValidDateString, isPositiveInt, isUuid, STOCK_UNITS, isStockUnit };
+export default { isValidDateString, isPositiveInt, toQuantity, isUuid, STOCK_UNITS, isStockUnit };

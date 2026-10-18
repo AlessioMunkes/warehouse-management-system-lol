@@ -42,6 +42,17 @@ const isValidUrl = (url) => {
   }
 };
 
+const isValidLogoDataUrl = (value) => {
+  if (!value) return true;
+  const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(String(value));
+  if (!match) return false;
+  const bytes = Buffer.from(match[2], 'base64');
+  if (match[1] === 'png') {
+    return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  }
+  return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+};
+
 // ── Validation ─────────────────────────────────────────────────
 // Validate required fields for certificate settings.
 // Returns an array of error messages, or empty array if valid.
@@ -78,6 +89,10 @@ const validateSettings = (data, isUpdate = false) => {
   // Optional email validations
   if (data.reply_to_email && !isValidEmail(data.reply_to_email)) {
     errors.push('Reply-To Email must be a valid email address.');
+  }
+
+  if (data.logo_url && !isValidLogoDataUrl(data.logo_url)) {
+    errors.push('Logo must be a JPG or PNG file.');
   }
 
   return errors;

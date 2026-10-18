@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const repoMock = {
   getManifest:  vi.fn(),
   getMovements: vi.fn(),
+  getExpiryBatches: vi.fn(),
   manualAdjust: vi.fn(),
   adjustStock:  vi.fn(),
 };
@@ -32,6 +33,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   repoMock.getManifest.mockResolvedValue([]);
   repoMock.getMovements.mockResolvedValue([]);
+  repoMock.getExpiryBatches.mockResolvedValue([]);
   repoMock.manualAdjust.mockResolvedValue(OUTCOME);
 });
 
@@ -68,6 +70,19 @@ describe('getMovements', () => {
 
   it('returns an empty history without complaint', async () => {
     await expect(stockService.getMovements(7)).resolves.toEqual([]);
+  });
+});
+
+// ── getExpiryBatches ──────────────────────────────────────────
+describe('getExpiryBatches', () => {
+  it('passes the product id through', async () => {
+    await stockService.getExpiryBatches(7);
+    expect(repoMock.getExpiryBatches).toHaveBeenCalledWith(7);
+  });
+
+  it('requires a product id', async () => {
+    await expect(stockService.getExpiryBatches(undefined)).rejects.toMatchObject({ status: 400 });
+    expect(repoMock.getExpiryBatches).not.toHaveBeenCalled();
   });
 });
 

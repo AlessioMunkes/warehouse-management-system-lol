@@ -1,0 +1,284 @@
+// ─────────────────────────────────────────────────────────────
+// server/src/features/reporting/toolSchema.js
+//
+// Builds the model's function declarations and system prompt FROM
+// reportCatalog.js at module load.
+//
+// This is the grounding layer. The model gets the list of reports
+// that exist, each described in the business English a manager would
+// use, and an enum of legal values for every parameter. It cannot
+// name a metric that does not exist because the metric name IS an
+// enum, and if it somehow did, validateSpec rejects it before pg is
+// touched.
+//
+// Nothing here is hand-maintained. Add a metric to the catalog and
+// the model can answer questions about it on the next restart.
+// ─────────────────────────────────────────────────────────────
+import { DATASETS } from './customQuery.js';
+import {
+  METRICS, DIMENSIONS, COHORTS, BENEFICIARY_KINDS,
+  MOVEMENT_TYPES, DONATION_CATEGORIES, MAX_RANK_LIMIT,
+} from './reportCatalog.js';
+import { COMPARISONS, COMPARISON_IDS } from './reportComparisons.js';
+
+const STRING = 'STRING', INTEGER = 'INTEGER', ARRAY = 'ARRAY', OBJECT = 'OBJECT';
+
+// The ask box is only ever rendered on the Operations Analytics page —
+// there is no AI box on the Impact Calculator. Grounding the model in
+// operational metrics only means a manager typing an impact-shaped
+// question ("how many children did we reach?") into the operations ask
+// box gets told that lives on a different screen, rather than the
+// model quietly answering it here and blurring the split those two
+// screens exist to keep. See buildSystemPrompt's IMPACT REPORTS
+// section for how the model is told what exists without being able to
+// run it.
+const OPERATIONAL_METRICS   = Object.values(METRICS).filter((m) => !m.impactOnly);
+const OPERATIONAL_METRIC_IDS = OPERATIONAL_METRICS.map((m) => m.id);
+const IMPACT_METRICS = Object.values(METRICS).filter((m) => m.impactOnly);
+
+// Union of every dimension any OPERATIONAL metric declares.
+// Per-metric legality is enforced by validateSpec — encoding it here
+// would need one function per metric and a far larger prompt.
+const ALL_DIMENSIONS = [...new Set(OPERATIONAL_METRICS.flatMap((m) => m.dimensions))];
+
+// How the Operations page can DRAW a report. A display hint only:
+// it never changes the query, and the page falls back to the
+// default view when the data cannot take the shape asked for (a
+// donut of a trend, say).
+// Custom reports: every name the model may use, flattened. The
+// service checks each against its dataset (customQuery.validateCustom).
+const CUSTOM_DATASET_IDS = Object.keys(DATASETS);
+const CUSTOM_GROUP_IDS   = [...new Set(Object.values(DATASETS).flatMap((d) => Object.keys(d.groups)))];
+const CUSTOM_MEASURE_IDS = [...new Set(Object.values(DATASETS).flatMap((d) => Object.keys(d.measures)))];
+const CUSTOM_FILTER_IDS  = [...new Set(Object.values(DATASETS).flatMap((d) => Object.entries(d.filters).filter(([, f]) => f.values).map(([k]) => k)))];
+
+export const CHART_VIEWS = ['bar', 'hbar', 'line', 'area', 'donut', 'pareto', 'stacked', 'heatmap', 'funnel', 'waterfall', 'sankey', 'table'];
+
+export const buildTools = () => ([
+  {
+    name: 'run_report',
+    description:
+      'Run one report and show it to the user as a chart. Use this when the question ' +
+      'maps to one of the available reports and you can work out the date range.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        metric:    { type: STRING, enum: OPERATIONAL_METRIC_IDS, description: 'Which report to run.' },
+        dimension: {
+          type: STRING, enum: ALL_DIMENSIONS,
+          description:
+            'How to break the figure down. Use "none" for a single total. Only some ' +
+            'breakdowns are valid per report; an invalid one is rejected with the ' +
+            'valid list, and you can try again.',
+        },
+        date_from: { type: STRING, description: 'Start date, YYYY-MM-DD. Omit for live reports.' },
+        date_to:   { type: STRING, description: 'End date, YYYY-MM-DD. Omit for live reports.' },
+        cohort:            { type: STRING, enum: COHORTS,            description: 'Optional. One fortnightly cohort.' },
+        beneficiary_kind:  { type: STRING, enum: BENEFICIARY_KINDS,  description: 'Optional. One kind of beneficiary.' },
+        movement_type:     { type: STRING, enum: MOVEMENT_TYPES,     description: 'Optional. One kind of stock movement.' },
+        donation_category: { type: STRING, enum: DONATION_CATEGORIES,description: 'Optional. One donation category.' },
+        po_status: { type: STRING, description: 'Optional. One exact order status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        slip_status: { type: STRING, description: 'Optional. One exact slip status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        outcome: { type: STRING, description: 'Optional. One exact request outcome, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        s18a_status: { type: STRING, description: 'Optional. One exact certificate status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        routing_status: { type: STRING, description: 'Optional. One exact routing status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        product_category: { type: STRING, description: 'Optional. One exact product category, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        storage_type: { type: STRING, description: 'Optional. One exact storage type, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        limit: { type: INTEGER, description: `Optional. Rows for ranked reports. Max ${MAX_RANK_LIMIT}.` },
+        chart_type: {
+          type: STRING, enum: CHART_VIEWS,
+          description:
+            'Optional. Only when the user asks for a kind of chart: donut or pie for shares, ' +
+            'pareto for "which few cause most", stacked or heatmap for a two-way month breakdown, ' +
+            'funnel for a pipeline by status, waterfall for stock_flow, sankey for donation_routing by ' +
+            'category_flow, area or line for trends, table for the raw figures.',
+        },
+      },
+      required: ['metric'],
+    },
+  },
+  {
+    name: 'run_comparison',
+    description:
+      'Show a scatter plot comparing two measures, one dot per item. Use this when the user ' +
+      'asks for a scatter plot, or to compare two things against each other per centre, ' +
+      'supplier, product or packer, and one of the comparisons matches.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        comparison: { type: STRING, enum: COMPARISON_IDS, description: 'Which comparison to show.' },
+        date_from: { type: STRING, description: 'Start date, YYYY-MM-DD.' },
+        date_to:   { type: STRING, description: 'End date, YYYY-MM-DD.' },
+      },
+      required: ['comparison'],
+    },
+  },
+  {
+    name: 'run_custom_report',
+    description:
+      'Count or total records from one dataset, grouped by up to two fields, optionally filtered ' +
+      'to one status or value. Use this when no report above answers the question: above all for ' +
+      '"how many X by status", "which statuses", or a combination the prepared reports do not cover. ' +
+      'Prefer run_report when a prepared report answers it.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        dataset:    { type: STRING, enum: CUSTOM_DATASET_IDS, description: 'What to count.' },
+        group_by:   { type: STRING, enum: CUSTOM_GROUP_IDS, description: 'Optional. The first way to break it down. Must be one of the dataset\'s groups.' },
+        group_by_2: { type: STRING, enum: CUSTOM_GROUP_IDS, description: 'Optional. A second breakdown, drawn stacked (put a time one, like month, first).' },
+        measure:    { type: STRING, enum: CUSTOM_MEASURE_IDS, description: 'Optional. count (default), or a total the dataset offers.' },
+        filter_field: { type: STRING, enum: CUSTOM_FILTER_IDS, description: 'Optional. Restrict to one value of this field.' },
+        filter_value: { type: STRING, description: 'The value for filter_field, exactly as listed for the dataset.' },
+        date_from: { type: STRING, description: 'Start date, YYYY-MM-DD. Omit for datasets marked "as it stands".' },
+        date_to:   { type: STRING, description: 'End date, YYYY-MM-DD.' },
+        chart_type: { type: STRING, enum: CHART_VIEWS, description: 'Optional, only when the user asks for a kind of chart.' },
+      },
+      required: ['dataset'],
+    },
+  },
+  {
+    name: 'ask_clarification',
+    description:
+      'Ask the user one short question when the request is genuinely ambiguous and ' +
+      'guessing would give them the wrong number. Prefer a sensible default over ' +
+      'asking. Never ask more than one question.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        question: { type: STRING, description: 'One short question in plain English.' },
+        options: {
+          type: ARRAY, items: { type: STRING },
+          description: 'Two to four short answers the user can tap. Not sentences.',
+        },
+      },
+      required: ['question', 'options'],
+    },
+  },
+  {
+    name: 'no_matching_report',
+    description:
+      'Use this when no available report answers the question: it asks for something the ' +
+      'warehouse does not record, for an impact figure, or for donor, caller or volunteer ' +
+      'details. Do not force the question onto a report that answers something else.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        reason: {
+          type: STRING,
+          description:
+            'One or two short, friendly sentences for the manager: what you cannot show and, ' +
+            'if one exists, the closest report that is available.',
+        },
+        closest_metric: {
+          type: STRING, enum: OPERATIONAL_METRIC_IDS,
+          description: 'Optional. The nearest available report, if one is genuinely close.',
+        },
+      },
+      required: ['reason'],
+    },
+  },
+]);
+
+// The catalog descriptions carry the rules the schema can't express:
+// children are counted once per period, late collections still count,
+// and centres collect weekly on a fixed day (Tuesday or Thursday).
+export const buildSystemPrompt = (todayISO) => {
+  const live  = [];
+  const timed = [];
+
+  for (const m of OPERATIONAL_METRICS) {
+    const dims = m.dimensions.map((d) => `${d} (${DIMENSIONS[d].label})`).join(', ');
+    const filters = m.filters.length ? `
+  Filters: ${m.filters.join(', ')}` : '';
+    const entry = `- ${m.id}\n  What it is: ${m.description}\n  Measured in: ${m.unit}\n  Valid breakdowns: ${dims}${filters}`;
+    (m.temporal === 'snapshot' ? live : timed).push(entry);
+  }
+
+  const impactList = IMPACT_METRICS.map((m) => `${m.id} (${m.label})`).join(', ');
+  const comparisons = Object.values(COMPARISONS)
+    .map((c) => `- ${c.id}\n  What it is: ${c.description}\n  x: ${c.x.label}, y: ${c.y.label}`)
+    .join('\n\n');
+
+  const custom = Object.entries(DATASETS).map(([id, d]) => {
+    const groups = Object.entries(d.groups).map(([k, g]) => `${k} (${g.label})`).join(', ');
+    const measures = Object.entries(d.measures).map(([k, m]) => `${k} (${m.label}, ${m.unit})`).join(', ');
+    const filters = Object.entries(d.filters).filter(([, f]) => f.values)
+      .map(([k, f]) => `${k}: ${f.values.join(' | ')}`).join('; ');
+    return `- ${id}: ${d.description}${d.date ? '' : ' As it stands: no dates.'}\n  Group by: ${groups}\n  Measures: ${measures}${filters ? `\n  Filters: ${filters}` : ''}`;
+  }).join('\n\n');
+
+  return `You help a warehouse manager at Ladles of Love, a Cape Town food charity, look at their own OPERATIONAL data: what moved, what it cost, what broke. You translate a question into ONE report request. You never write SQL and you never invent figures.
+
+Today's date is ${todayISO} (South African time).
+
+REPORTS OVER A PERIOD: these need date_from and date_to
+${timed.join('\n\n')}
+
+LIVE REPORTS: the current position. Do NOT send dates for these
+${live.join('\n\n')}
+
+COMPARISONS: scatter plots, one dot per item. Use run_comparison
+${comparisons}
+
+CUSTOM REPORTS: use run_custom_report when no report above answers the question
+${custom}
+
+Use a custom report for "how many by status" questions (purchase orders by status, slips by packing status, collections by outcome, deliveries flagged, donations by Section 18A status, requests by outcome, compost by status, events by status, stock movements by type, centres active or inactive), and for simple counts or totals the prepared reports do not break down that way. Group by a status field to show every status; use filter_field and filter_value to show just one.
+
+A scatter plot is only available for the comparisons above. If the user asks for a scatter of two things that are not listed, use no_matching_report and name the closest comparison.
+
+CHART TYPES
+If the user names a kind of chart (pie, donut, stacked, heatmap, pareto, funnel, waterfall, sankey, area, table), pass it as chart_type on run_report. Choose a breakdown that suits it: donut and pareto need a category breakdown, stacked and heatmap need a two-way breakdown such as month_supplier.
+
+Workload and staffing: workload breaks recorded work down by hour_weekday (an hour of the day by weekday heatmap) or weekday, filtered by work_area (receiving, packing, gate) or for the whole floor. Use it for workload, busiest hours, peak times and rostering, with chart_type heatmap.
+Busiest days: dispatch_volume, goods_received and stock_movement_volume break down by weekday (Monday to Sunday) and by week_weekday (a week by day heatmap). Use weekday for "which day is busiest", and week_weekday with chart_type heatmap for "a heatmap of days".
+Pipelines (purchase_order_pipeline by po_status, slip_pipeline by slip_status, section18a_pipeline by s18a_status) are drawn as a funnel by default.
+stock_flow is a waterfall from opening to closing stock. days_of_cover forecasts when each product runs out. donation_routing by category_flow is a flow diagram from donation category to where the items ended up.
+
+IMPACT REPORTS ARE OUT OF SCOPE HERE: DO NOT RUN THEM
+${impactList} are beneficiary-impact figures, not operational ones. None of
+them is in run_report's metric enum, so calling run_report with one of these
+names will fail. If asked about any of them (how many children/adults were
+reached, meals enabled, paper saved, compost processed), do NOT attempt a
+report; call no_matching_report and tell the user in plain language that
+this lives on the separate Impact Calculator (Impact Report) page.
+
+HOW THIS ORGANISATION WORKS
+- Beneficiary centres collect food every week on a fixed pickup day, in two cohorts: tuesday and thursday. A calendar month contains about four collections per centre.
+- A collection after 16:00 is late but still counts as collected.
+- Goods come IN from suppliers (receiving) and go OUT to beneficiaries (dispatch). "Deliveries" from a supplier means receiving; "deliveries" to a centre means dispatch. If a question is ambiguous between the two, ask.
+
+PRIVACY: NOT NEGOTIABLE
+Donation and volunteer reports are aggregate only. There is no report that breaks figures down by donor name, by caller, or by individual volunteer, and no combination of parameters produces one. If asked for that, call no_matching_report, say it is not available and name the aggregate report instead.
+
+RESOLVING DATES
+- "Today" means date_from and date_to are both today's date. "Yesterday" is the day before, for both.
+- "This week" means Monday of the current week to today. "Last week" means the Monday to Sunday before that.
+- "Last 7 days" or "past week" means today and the six days before it. "Last N days" works the same way.
+- "This month" means the 1st of the current month to today.
+- "Last month" means the whole of the previous calendar month.
+- A named month ("in September") means that whole month, the most recent one that has started.
+- "This year" means 1 January to today.
+- A range never ends after today.
+- With no period mentioned, use the last three months. Never widen a period the user named: a question about today is answered for today only, even if there may be little to show.
+- For period reports, always supply both date_from and date_to.
+- For live reports, omit both even if the user mentions a period.
+
+QUESTIONS WITH MORE THAN ONE PART
+You can show one report, so choose the one that covers the most of the question.
+- Stock that came in AND stock that went out (received and dispatched, in and out): stock_movement_volume by movement_type shows both in one chart. Do not answer with only goods_received or only dispatch_volume.
+- If the user wants that per product, use stock_movement_volume by product, or run_custom_report on stock_movements grouped by product and type.
+- Otherwise answer the first part with the best report. The page offers the others underneath.
+
+CHOOSING A BREAKDOWN
+- A trend or change over time takes month or week. For a period of two weeks or less, use day where the report offers it.
+- Product reports also break down by product_category and storage_type; use those for "by category" or "dry versus cold".
+- A question naming or ranking centres, suppliers or products takes that dimension.
+- A single overall figure takes none.
+- If your breakdown is invalid for that report you will be told which are valid, and can call run_report again.
+
+Prefer answering with a sensible default over asking. Only use ask_clarification when guessing would genuinely mislead.
+If nothing above answers the question, use no_matching_report rather than running a report that answers a different question.`;
+};
+
+export default { buildTools, buildSystemPrompt };

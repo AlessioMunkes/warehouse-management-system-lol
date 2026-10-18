@@ -11,10 +11,17 @@
 // widened range, or a prompt injection buried in a centre name all
 // fail at validateSpec() before pg is touched.
 // ─────────────────────────────────────────────────────────────
-import provider          from '../features/reporting/ai/provider.js';
-import { buildTools, buildSystemPrompt } from '../features/reporting/ai/toolSchema.js';
+import provider          from '../features/reporting/provider.js';
+import { buildTools, buildSystemPrompt } from '../features/reporting/toolSchema.js';
 import reportingService  from './reporting.service.js';
+import insightService    from './reportingInsight.service.js';
+import { CHART_VIEWS }   from '../features/reporting/toolSchema.js';
+import { matchQuestion, rankReports, asksInAndOut } from '../features/reporting/keywordFallback.js';
+import { singlePeriod }  from '../features/reporting/periods.js';
 import logRepo           from '../repositories/reportingLog.repository.js';
+import { DATASETS }      from '../features/reporting/customQuery.js';
+import { redactText }    from '../features/privacy/redact.js';
+import knownPeople       from '../repositories/knownPeople.repository.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -26,7 +33,8 @@ const fail = (status, message) => {
 // argument the model invents is dropped rather than passed along.
 const argsToSpec = (args) => {
   const filters = {};
-  for (const k of ['cohort', 'beneficiary_kind', 'movement_type', 'donation_category']) {
+  for (const k of ['cohort', 'beneficiary_kind', 'movement_type', 'donation_category',
+    'po_status', 'slip_status', 'outcome', 's18a_status', 'routing_status', 'product_category', 'storage_type']) {
     if (args[k]) filters[k] = args[k];
   }
   return {
@@ -40,10 +48,33 @@ const argsToSpec = (args) => {
   };
 };
 
-// Metrics declare which filters they accept and validateSpec rejects
-// the rest. Rather than burn a retry, drop unsupported filters and
-// tell the caller — "decanting wastage for week1" is a reasonable
-// thing to say even though wastage is not cohort-scoped.
+// A custom report's flat arguments → { custom, dateRange }. A dated
+// dataset with no dates gets the last three months, like run_report.
+const customArgsToSpec = (a, todayISO) => {
+  const ds = DATASETS[a.dataset];
+  const groupBy = [a.group_by, a.group_by_2].filter(Boolean);
+  const filters = a.filter_field && a.filter_value ? { [a.filter_field]: a.filter_value } : {};
+  let dateRange = a.date_from && a.date_to ? { from: a.date_from, to: a.date_to } : undefined;
+  let defaultedRange = false;
+  if (ds?.date && !dateRange) {
+    const to = new Date(`${todayISO}T00:00:00Z`);
+    const from = new Date(to);
+    from.setUTCDate(1);
+    from.setUTCMonth(from.getUTCMonth() - 2);
+    dateRange = { from: from.toISOString().slice(0, 10), to: todayISO };
+    defaultedRange = true;
+  }
+  return {
+    custom: { dataset: a.dataset, groupBy, measure: a.measure || 'count', filters },
+    dateRange: ds?.date ? dateRange : undefined,
+    chartType: undefined,
+    defaultedRange,
+  };
+};
+
+// Each metric only accepts certain filters. Rather than fail, drop the
+// ones it doesn't support and say so: "decanting wastage for Tuesday
+// centres" is a fair question even though wastage isn't split by day.
 const stripUnsupportedFilters = (spec, catalog) => {
   const metric = catalog.metrics.find((m) => m.id === spec.metric);
   if (!metric) return { spec, dropped: [] };
@@ -75,7 +106,77 @@ const applyDefaultRange = (spec, catalog, todayISO) => {
   };
 };
 
-export const ask = async ({ question, userId }) => {
+// Not an error. A question the catalog cannot answer is a normal
+// outcome, so it comes back as a 200 the page shows as a gentle note
+// with a way forward, rather than a red failure. `closest` is only
+// passed on when it names a real operational report.
+const noMatch = (catalog, reason, closestId) => {
+  const operational = catalog.metrics.filter((m) => !m.impactOnly);
+  const closest = operational.find((m) => m.id === closestId);
+  const message = typeof reason === 'string' && reason.trim()
+    ? reason.trim().slice(0, 300)
+    : "I couldn't match that to one of the operational reports.";
+  return {
+    type: 'no_match',
+    message,
+    closest: closest ? { id: closest.id, label: closest.label } : null,
+  };
+};
+
+// Upstream conditions — every model in the chain out of quota,
+// overloaded, unreachable or timing out. Not our bug, and not the
+// manager's question being wrong, so the keyword matcher steps in.
+const PROVIDER_DOWN = new Set([429, 502, 503, 504]);
+
+// Every model failed: answer with the closest keyword match instead
+// of an error. Labelled so the page says "closest match".
+const keywordAnswer = async ({ question, todayISO, reason, log }) => {
+  const match = matchQuestion(question, todayISO);
+  if (!match) {
+    await log('error', { errorMessage: `provider down, no keyword match: ${reason}` });
+    return {
+      type: 'no_match',
+      message: "The AI assistant is busy right now and I couldn't match that question by its keywords. " +
+        'Try one of the suggested questions, or pick a report from Browse all reports.',
+      closest: null,
+    };
+  }
+  try {
+    if (match.kind === 'comparison') {
+      const result = await insightService.runComparison({ id: match.id, dateRange: match.dateRange });
+      await log('ok', { metric: `comparison:${match.id}`, spec: { comparison: match.id }, errorMessage: `keyword fallback: ${reason}` });
+      return { ...result, matchedBy: 'keyword', aiUnavailable: true };
+    }
+    const report = await reportingService.runReport(match.spec);
+    await log('ok', { metric: report.spec.metric, spec: report.spec, errorMessage: `keyword fallback: ${reason}` });
+    return {
+      type: 'report',
+      ...report,
+      meta: { ...report.meta, matchedBy: 'keyword', aiUnavailable: true, chartHint: match.chartHint },
+    };
+  } catch (err) {
+    await log('error', { errorMessage: `keyword fallback failed: ${err.message}` });
+    throw err;
+  }
+};
+
+// "Not what you meant? Try:" — the next closest answers, minus the one
+// shown. Offered under every answer; the page draws them as buttons.
+const alternativesFor = (question, result) => {
+  const shown = result.type === 'comparison' ? `comparison:${result.id}`
+    : result.spec?.custom ? `custom:${result.spec.custom.dataset}` : result.spec?.metric;
+  try { return rankReports(question, { exclude: shown, limit: 3 }); } catch { return []; }
+};
+
+export const ask = async (input) => {
+  const result = await askInner(input);
+  if (result && (result.type === 'report' || result.type === 'comparison')) {
+    return { ...result, alternatives: alternativesFor(input.question, result) };
+  }
+  return result;
+};
+
+const askInner = async ({ question, userId }) => {
   if (!provider.isEnabled()) {
     throw fail(503, 'The AI assistant is not available. Use the report builder below.');
   }
@@ -105,12 +206,36 @@ export const ask = async ({ question, userId }) => {
   // a near miss, and the manager is waiting.
   let lastError = null;
 
+  // The period the question names, worked out here. When there is
+  // exactly one ("today", "last week", "in September") it replaces the
+  // dates the model sent: a model that drifts to a wider range cannot
+  // answer a question about today with three months of figures.
+  const named = singlePeriod(question, todayISO);
+  const heldRange = named ? { from: named.from, to: named.to } : null;
+
+  // The model gets the question with people, phone numbers, emails
+  // and ID numbers taken out. Reports never need them, and this is
+  // the last point before the question leaves our server.
+  const { names, keep } = await knownPeople.listNames();
+  const safe = redactText(question, names, keep).text;
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const userMessage = attempt === 0
-      ? question
-      : `${question}\n\nYour previous attempt was rejected: ${lastError}\nTry again, choosing a valid combination.`;
+      ? safe
+      : `${safe}\n\nYour previous attempt was rejected: ${lastError}\nTry again, choosing a valid combination.`;
 
-    const call = await provider.callWithTools({ systemPrompt: system, userMessage, tools });
+    let call;
+    try {
+      call = await provider.callWithTools({ systemPrompt: system, userMessage, tools });
+    } catch (err) {
+      // Logged either way, so outages show up in reporting_queries
+      // instead of vanishing (they used to be thrown before logging).
+      if (PROVIDER_DOWN.has(err.status)) {
+        return keywordAnswer({ question, todayISO, reason: err.message, log });
+      }
+      await log('error', { errorMessage: err.message });
+      throw err;
+    }
 
     if (call.name === 'ask_clarification') {
       const options = Array.isArray(call.args.options)
@@ -128,12 +253,70 @@ export const ask = async ({ question, userId }) => {
       continue;
     }
 
+    if (call.name === 'no_matching_report') {
+      // Logged under the existing 'unresolved' outcome, so the log
+      // table needs no new value; the prefix tells the two apart.
+      await log('unresolved', { errorMessage: `no_matching_report: ${call.args?.reason ?? ''}` });
+      return noMatch(catalog, call.args?.reason, call.args?.closest_metric);
+    }
+
+    if (call.name === 'run_comparison') {
+      try {
+        const a = call.args ?? {};
+        const result = await insightService.runComparison({
+          id: a.comparison,
+          dateRange: heldRange ?? (a.date_from && a.date_to ? { from: a.date_from, to: a.date_to } : undefined),
+        });
+        await log('ok', { metric: `comparison:${result.id}`, spec: { comparison: result.id, dateRange: result.dateRange } });
+        return { ...result, answeredByAI: true };
+      } catch (err) {
+        if (!err.status || err.status >= 500) { await log('error', { errorMessage: err.message }); throw err; }
+        lastError = err.message;
+        continue;
+      }
+    }
+
+    if (call.name === 'run_custom_report') {
+      try {
+        const a = call.args ?? {};
+        const spec = customArgsToSpec(a, todayISO);
+        if (heldRange && spec.dateRange) { spec.dateRange = heldRange; spec.defaultedRange = false; }
+        const report = await reportingService.runReport(spec);
+        await log('ok', { metric: report.spec.metric, spec: report.spec });
+        return {
+          type: 'report',
+          ...report,
+          meta: {
+            ...report.meta,
+            answeredByAI: true,
+            defaultedRange: spec.defaultedRange || undefined,
+            period: heldRange && spec.dateRange ? named.label : undefined,
+            chartHint: CHART_VIEWS.includes(a.chart_type) ? a.chart_type : undefined,
+          },
+        };
+      } catch (err) {
+        if (!err.status || err.status >= 500) { await log('error', { errorMessage: err.message }); throw err; }
+        lastError = err.message;
+        continue;
+      }
+    }
+
     if (call.name !== 'run_report') { lastError = `Unknown function: ${call.name}`; continue; }
 
     try {
-      const raw = argsToSpec(call.args);
+      let raw = argsToSpec(call.args);
+      // Asked for what came in AND what went out, the model sometimes
+      // answers half of it. Stock movements by type shows both, so a
+      // one-sided pick is widened to that; the dates are untouched.
+      if (asksInAndOut(question) && ['goods_received', 'dispatch_volume'].includes(raw.metric)
+        && catalog.metrics.some((m) => m.id === 'stock_movement_volume')) {
+        raw = { ...raw, metric: 'stock_movement_volume', dimension: 'movement_type', filters: {} };
+      }
       const { spec: cleaned, dropped } = stripUnsupportedFilters(raw, catalog);
-      const withRange = applyDefaultRange(cleaned, catalog, todayISO);
+      const ranged = catalog.metrics.find((m) => m.id === cleaned.metric)?.temporal !== 'snapshot';
+      const withRange = heldRange && ranged
+        ? { ...cleaned, dateRange: heldRange }
+        : applyDefaultRange(cleaned, catalog, todayISO);
       const report = await reportingService.runReport(withRange);
 
       await log('ok', { metric: report.spec.metric, spec: report.spec });
@@ -148,6 +331,10 @@ export const ask = async ({ question, userId }) => {
           // broader than the question, and the manager should know.
           droppedFilters: dropped.length ? dropped : undefined,
           defaultedRange: withRange.defaultedRange || undefined,
+          // The period read from the question itself, e.g. "today".
+          period: heldRange && ranged ? named.label : undefined,
+          // Display only: how the manager asked to see it.
+          chartHint: CHART_VIEWS.includes(call.args.chart_type) ? call.args.chart_type : undefined,
         },
       };
     } catch (err) {
@@ -162,10 +349,7 @@ export const ask = async ({ question, userId }) => {
   }
 
   await log('unresolved', { errorMessage: lastError });
-  const names = catalog.metrics.map((m) => m.label).join(', ');
-  throw fail(422,
-    `I could not turn that into one of the available reports. I can show: ${names}. ` +
-    `Try rephrasing, or use the report builder below.`);
+  return noMatch(catalog);
 };
 
 export default { ask };

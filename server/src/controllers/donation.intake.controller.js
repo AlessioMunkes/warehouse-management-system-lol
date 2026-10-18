@@ -4,8 +4,8 @@
 // Hardened to 10/10 Production Security Standard with Conversational Comments
 // ─────────────────────────────────────────────────────────────
 import donationIntakeService from '../services/donation.intake.service.js';
-import productRepo from '../repositories/product.repository.js';
-import { ROLES } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP } from '../constants/permissions.js';
+import { DONATION_CATEGORIES } from '../constants/donationCategories.js';
 
 /**
  * POST /api/donations/intake
@@ -28,14 +28,12 @@ export const handleDonationIntake = async (req, res, next) => {
       });
     }
 
-    // Pulls role strings from the shared ROLES constant (auth.middleware.js)
-    // instead of hardcoding them here. This used to check against
+    // The same group the route guards with (constants/permissions.js),
+    // not a list of its own. This used to check against
     // ['admin', 'warehouse_manager'] — 'warehouse_manager' isn't a real
     // role in the users.role CHECK constraint, so this check was
-    // permanently unpassable until fixed. Now it reads from the same
-    // source of truth as the requireRole() middleware at the route level.
-    const allowedRoles = [ROLES.ADMIN, ROLES.MANAGER];
-    if (!allowedRoles.includes(req.user.role)) {
+    // permanently unpassable until fixed.
+    if (!MANAGERS_UP.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Insufficient privileges for donation intake.',
@@ -66,7 +64,7 @@ export const handleDonationIntake = async (req, res, next) => {
     }
 
     // Whitelist category strings if provided by client
-    const allowedCategories = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non_food'];
+    const allowedCategories = DONATION_CATEGORIES;
     const sanitizedCategory = category ? String(category).trim() : null;
     if (sanitizedCategory && !allowedCategories.includes(sanitizedCategory)) {
       return res.status(400).json({
@@ -134,8 +132,7 @@ export const handleUnrecognizedDonationIntake = async (req, res, next) => {
       });
     }
 
-    const allowedRoles = [ROLES.ADMIN, ROLES.MANAGER];
-    if (!allowedRoles.includes(req.user.role)) {
+    if (!MANAGERS_UP.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Insufficient privileges for donation intake.',
@@ -194,7 +191,7 @@ export const handleUnrecognizedDonationIntake = async (req, res, next) => {
 export const searchProducts = async (req, res, next) => {
   try {
     const term = typeof req.query.name === 'string' ? req.query.name : '';
-    const rows = await productRepo.searchProductsByName(term);
+    const rows = await donationIntakeService.searchProducts(term);
     return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     return next(error);

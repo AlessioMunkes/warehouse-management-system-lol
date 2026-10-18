@@ -1,11 +1,17 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { DonationDraftContext, emptyDraft } from '../features/donation/context/DonationDraftContext';
+import { DonationDraftContext, emptyDraft } from '../features/donation/DonationDraftContext';
 import { DonationDetailsPage } from '../pages/DonationDetailsPage';
 import { ReviewPage } from '../pages/ReviewPage';
+
+// The donation pages sit in the worker shell, which reads the
+// signed-in user. Same stand-in DispatchWiring.test.jsx uses.
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 1, firstName: 'M', role: 'warehouse_worker' }, logout: vi.fn() }),
+}));
 
 vi.mock('../services/donationAPI', () => ({
   createPendingDonation: vi.fn(),
@@ -13,7 +19,7 @@ vi.mock('../services/donationAPI', () => ({
 
 const { createPendingDonation } = await import('../services/donationAPI');
 
-const validDraft = () => ({
+const validDraft = (overrides = {}) => ({
   ...emptyDraft(),
   items: [{
     id: 'line-1',
@@ -30,6 +36,8 @@ const validDraft = () => ({
   donorContact: 'donor@example.com',
   contactMethod: 'email',
   contactDetails: 'donor@example.com',
+  donorConsentGiven: true,
+  ...overrides,
 });
 
 function LocationProbe({ onChange }) {
@@ -63,6 +71,50 @@ function renderDonationFlow({ draft = validDraft(), updateDraft = vi.fn(), reset
 }
 
 describe('Donation backend validation UX', () => {
+  it('offers the estimated value with or without Section 18A, and keeps it when switched to no', async () => {
+    const user = userEvent.setup();
+    const updateDraft = vi.fn();
+
+    render(
+      <MemoryRouter initialEntries={['/donations/new']}>
+        <DonationDraftContext.Provider value={{
+          draft: validDraft({ donorConsentGiven: false, estimatedValueZar: '' }),
+          updateDraft,
+          resetDraft: vi.fn(),
+          emptyItem: vi.fn(),
+        }}>
+          <Routes>
+            <Route path="/donations/new" element={<DonationDetailsPage />} />
+          </Routes>
+        </DonationDraftContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByLabelText(/Estimated value \(ZAR\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Optional\. Leave blank/)).toBeInTheDocument();
+    cleanup();
+
+    render(
+      <MemoryRouter initialEntries={['/donations/new']}>
+        <DonationDraftContext.Provider value={{
+          draft: validDraft({ donorConsentGiven: true, estimatedValueZar: '250' }),
+          updateDraft,
+          resetDraft: vi.fn(),
+          emptyItem: vi.fn(),
+        }}>
+          <Routes>
+            <Route path="/donations/new" element={<DonationDetailsPage />} />
+          </Routes>
+        </DonationDraftContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByLabelText(/Estimated value \(ZAR\)/i)).toHaveValue(250);
+    expect(screen.getByText(/Needed for the Section 18A certificate/)).toBeInTheDocument();
+    await user.click(within(screen.getByRole('group', { name: /Section 18A/i })).getByRole('radio', { name: /^No$/i }));
+    expect(updateDraft).toHaveBeenCalledWith({ donorConsentGiven: false });
+  });
+
   it('moves from donation intake to the donation summary page when valid', async () => {
     const user = userEvent.setup();
     const onLocation = vi.fn();
@@ -120,7 +172,7 @@ describe('Donation backend validation UX', () => {
 });
 
 describe('Donation completion navigation', () => {
-  it('sends Go to Taskboard to the staff taskboard after a successful donation', async () => {
+  it('sends "Go to home" to the staff home screen after a successful donation', async () => {
     const user = userEvent.setup();
     const onLocation = vi.fn();
     const resetDraft = vi.fn();
@@ -133,7 +185,7 @@ describe('Donation completion navigation', () => {
     renderDonationFlow({ onLocation, resetDraft });
 
     await user.click(screen.getByRole('button', { name: /Yes, submit/i }));
-    await user.click(await screen.findByRole('button', { name: /Go to Taskboard/i }));
+    await user.click(await screen.findByRole('button', { name: /Go to home/i }));
 
     expect(resetDraft).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(onLocation).toHaveBeenLastCalledWith(

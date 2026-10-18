@@ -9,24 +9,34 @@
 // deep link to a gate check is not something anyone needs, and the
 // back action has to be one tap from a phone at a gate.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { takeUrlParam } from '../features/staff/resumeParam';
 import StaffShell from '../components/layout/StaffShell';
-import GateQueue from '../features/dispatch/components/GateQueue';
-import PalletCheck from '../features/dispatch/components/PalletCheck';
+import GateQueue from '../features/dispatch/GateQueue';
+import PalletCheck from '../features/dispatch/PalletCheck';
 import { STAFF } from '../routes/paths';
 
 export default function DispatchPage() {
-  const [palletId, setPalletId] = useState(null);
+  // ?pallet=<id> (from "Carry on" on the dashboard) opens that pallet
+  // directly; the parameter is then dropped so Back goes to the queue.
+  const [palletId, setPalletId] = useState(() => takeUrlParam('pallet'));
   // Bumped when a collection completes, so the queue refetches and
   // the collected pallet drops out of it.
   const [queueKey, setQueueKey] = useState(0);
+  // Same crumb/progress wiring ReceivingPage/DecantingPage already
+  // use — this page never had it at all before, so the crumb just
+  // said "this pallet" regardless of which of PalletCheck's two
+  // screens was open.
+  const [step, setStep] = useState({ label: 'Which pallet', step: 1, total: 2 });
+  const handleCrumb = useCallback((next) => setStep(next), []);
 
   const backToQueue = () => setPalletId(null);
 
   return (
     <StaffShell
-      crumb={palletId ? 'Dispatch / this pallet' : 'Dispatch'}
+      crumb={palletId ? `Dispatch / ${step.label}` : 'Dispatch'}
+      progress={palletId && step.step ? { step: step.step, total: step.total } : null}
       onBack={palletId ? backToQueue : undefined}
       backLabel="Gate queue"
       actions={
@@ -43,6 +53,7 @@ export default function DispatchPage() {
           palletId={palletId}
           onBack={backToQueue}
           onCollected={() => { setQueueKey((k) => k + 1); backToQueue(); }}
+          onCrumbChange={handleCrumb}
         />
       ) : (
         <GateQueue key={queueKey} onOpenPallet={setPalletId} />

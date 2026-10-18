@@ -1,0 +1,243 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/lib/statusStyles.js
+//
+// How every status in every list is drawn, in one place.
+//
+// THREE SIGNALS, SO NO TWO STATUSES LOOK ALIKE
+//   tone   — the colour, which is the MEANING and is shared on purpose:
+//            green done · amber needs someone · red gone wrong ·
+//            blue on its way · grey nothing to do
+//   strong — solid fill or soft tint, to tell apart two statuses that
+//            share a meaning (pending approval vs partly received are
+//            both amber; one is soft, one solid)
+//   icon   — each status's own picture, so it never rests on colour
+//            alone (ACC-03) and survives a colour-blind reader or a
+//            greyscale printout
+//
+// StatusStyles.test.js fails if any two statuses in the same list
+// share all three.
+// ─────────────────────────────────────────────────────────────
+import {
+  AlarmClock, Ban, Check, BadgeCheck, Boxes, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleDashed,
+  CircleOff, CircleX, ClipboardList, DoorOpen, Clock, FileCheck, Flag, Forward, Gift, HeartHandshake, History,
+  House, Link2, Lock, LogOut, Mail, Megaphone, PackageCheck, PackageOpen, PackagePlus, PencilLine, Scale, ShieldCheck,
+  ShoppingCart, SlidersHorizontal, Split, Sprout, Trash2, Send, TriangleAlert, Truck, Undo2, Unlink, UserCheck,
+  Users,
+} from 'lucide-react';
+
+const s = (tone, icon, strong = false) => ({ tone, icon, strong });
+
+export const STATUS_STYLES = {
+  purchaseOrder: {
+    pending:            s('warn', Clock),                 // waiting on a sign-off
+    partially_received: s('warn', PackageOpen, true),     // some in, rest to chase
+    approved:           s('info', BadgeCheck),            // signed off, not sent yet
+    in_transit:         s('info', Truck, true),           // on its way
+    completed:          s('good', CheckCheck, true),
+    follow_up_required: s('bad', TriangleAlert),
+    returned:           s('bad', Undo2, true),
+  },
+  delivery: {
+    recorded: s('good', FileCheck),
+    closed:   s('good', Lock, true),
+    flagged:  s('bad', Flag, true),
+  },
+  dispatch: {
+    awaiting:       s('info', Clock),
+    collected:      s('good', CheckCheck, true),
+    late_collected: s('warn', History),
+    not_collected:  s('bad', CircleX, true),
+    cancelled:      s('neutral', Ban),
+  },
+  kit: {
+    assigned:   s('warn', House),                         // with the household
+    logged:     s('info', Scale),                         // compost in, to go out
+    dispatched: s('good', Truck, true),
+  },
+  volunteerEvent: {
+    DRAFT:     s('warn', PencilLine),
+    SCHEDULED: s('info', CalendarClock),
+    PUBLISHED: s('good', Megaphone, true),
+    COMPLETED: s('neutral', CheckCheck),
+    CANCELLED: s('bad', Ban, true),
+  },
+  ledger: {
+    received:   s('good', PackageCheck, true),
+    donated:    s('good', Gift),
+    dispatched: s('info', Truck, true),
+    picked:     s('info', ClipboardList),
+    wastage:    s('bad', Trash2, true),
+    adjustment: s('warn', SlidersHorizontal),
+    decanted:   s('neutral', Split),
+  },
+  communityRequest: {
+    pending:             s('warn', Clock),                // awaiting approval
+    approved:            s('info', BadgeCheck),           // items chosen, stock set aside
+    needs_items:         s('warn', TriangleAlert),        // approved, but its stock was used
+    fulfilled:           s('good', CheckCheck, true),
+    partially_fulfilled: s('good', CircleDashed),
+    referred:            s('info', Forward),
+    declined:            s('bad', CircleX, true),
+  },
+  // A slip's place in the week, as the Picking Slips list shows it —
+  // see features/pickingSlips/slipViews.js slipState, which folds the
+  // gate's outcome (dispatch_events) in over the slip's own status.
+  pickingSlip: {
+    pending:       s('neutral', CircleDashed),            // on the floor, nobody has it
+    in_progress:   s('info', PackageOpen),                // being packed
+    complete:      s('warn', PackageCheck),               // packed, waiting at the gate
+    dispatched:    s('good', Truck),
+    collected:     s('good', CheckCheck, true),
+    not_collected: s('bad', CircleX, true),
+    cancelled:     s('neutral', Ban, true),
+  },
+  // An outbound email's outcome (features/communications on the server),
+  // and the same outcome where a screen shows one email: Section 18A's
+  // certificate emails and a purchase order's Finance email.
+  message: {
+    sent:      s('good', CheckCheck, true),
+    delivered: s('good', BadgeCheck),
+    pending:   s('warn', Clock),                          // queued, not tried yet
+    stubbed:   s('neutral', CircleDashed),                // sending switched off; nothing left
+    unsent:    s('neutral', Mail),                        // never tried
+    failed:    s('bad', CircleX, true),
+    bounced:   s('bad', Undo2),                           // sent, then refused by the inbox
+  },
+  // A purchase order's send to QuickBooks (features/purchaseOrders/QuickbooksSync.jsx).
+  quickbooks: {
+    none:        s('neutral', Clock),
+    sending:     s('info', Send),
+    needs_match: s('warn', TriangleAlert),                // a name not found there; a person has to act
+    refused:     s('warn', Ban),                          // QuickBooks said no to the order; a person has to act
+    failed:      s('bad', CircleX, true),
+  },
+  // Derived from AVAILABLE server-side (stock.repository.js getManifest).
+  // All soft: on a list of sixty products a solid red pill per row
+  // shouts over the numbers. The row's coloured edge carries urgency.
+  inventory: {
+    in_stock:  s('good', Check),
+    low_stock: s('warn', TriangleAlert),
+    shortfall: s('bad', CircleX),
+  },
+  // A receipt line's expiry date, against today.
+  expiry: {
+    ok:      s('neutral', CalendarCheck),
+    soon:    s('warn', Clock),                            // 15 to 30 days
+    urgent:  s('bad', AlarmClock),                        // 14 days or less
+    expired: s('bad', CalendarX, true),
+  },
+  // The dashboard's stock outlook: when a product runs out at the rate
+  // it is used, when its next use-by date comes first, and an order
+  // that should have arrived.
+  outlook: {
+    runs_short: s('bad', CalendarX),
+    may_expire: s('warn', AlarmClock),
+    overdue:    s('warn', Truck),
+  },
+  // A closed day on the operating calendar.
+  closure: {
+    public_holiday: s('info', Flag),
+    closure:        s('warn', CalendarX),
+  },
+  // Settings → Connections: one outside service's health.
+  connection: {
+    ok:      s('good', Check),
+    warning: s('warn', TriangleAlert),
+    down:    s('bad', CircleX, true),
+    off:     s('neutral', CircleDashed),
+  },
+  // A collection reminder's email or WhatsApp leg.
+  reminder: {
+    pending:   s('neutral', Clock),
+    sending:   s('info', Send),
+    sent:      s('good', CheckCheck),
+    failed:    s('bad', CircleX, true),
+    cancelled: s('neutral', Ban),
+  },
+  // A visit in the door log (Volunteer log).
+  visit: {
+    on_site: s('good', DoorOpen),
+    closed:  s('neutral', LogOut),
+  },
+  // Any record that can be switched off rather than deleted — a user,
+  // a product, a supplier. Active is the normal case, so it is quiet;
+  // inactive is the one worth a glance.
+  record: {
+    active:     s('neutral', Check),
+    inactive:   s('warn', CircleOff),
+    unapproved: s('warn', Clock),                         // waiting on a sign-off
+  },
+  // Admin, Archive: amber can be switched back on, red is gone for good.
+  archive: {
+    deactivated: s('warn', CircleOff),
+    deleted:     s('bad', Trash2),
+  },
+  // Activity log: which part of the warehouse an entry belongs to,
+  // keyed by the name the server sends. Not a status, so the colour
+  // groups instead of judging: blue is goods coming in, amber is
+  // stock being handled, green is food and people going out, grey is
+  // the system itself.
+  activityArea: {
+    Purchasing:            s('info', ShoppingCart),
+    Receiving:             s('info', PackagePlus),
+    Donations:             s('info', Gift),
+    Stock:                 s('warn', Boxes),
+    Decanting:             s('warn', Split),
+    Packing:               s('good', ClipboardList),
+    Dispatch:              s('good', Truck),
+    'Benevolent requests': s('good', HeartHandshake),
+    'Feed the Soil':       s('good', Sprout),
+    Volunteers:            s('good', Users),
+    Admin:                 s('neutral', ShieldCheck),
+  },
+  // A supplier the buyer is still talking to (Suppliers, prospects).
+  prospect: {
+    open:      s('neutral', CircleDashed),
+    contacted: s('info', Send),
+    rejected:  s('bad', CircleX),
+    converted: s('good', CheckCheck, true),
+  },
+  // A volunteer's booking on an event, and whether they turned up.
+  booking: {
+    CONFIRMED:  s('good', Check),
+    CANCELLED:  s('neutral', Ban),
+    checked_in: s('good', UserCheck, true),
+  },
+  // The booking system's last sync for an event.
+  sync: {
+    SYNCED:  s('good', CheckCheck),
+    PENDING: s('neutral', Clock),
+    FAILED:  s('bad', CircleX, true),
+  },
+  timeslot: {
+    OPEN:      s('good', DoorOpen),
+    FULL:      s('warn', Users),
+    CLOSED:    s('neutral', Lock),
+    CANCELLED: s('neutral', Ban),
+  },
+  // A donation that did not finish saving (Donations, reconciliation).
+  donationCommit: {
+    commit_incomplete: s('warn', TriangleAlert),
+    commit_failed:     s('bad', CircleX, true),
+  },
+  // Where a flagged donated item came from.
+  donationFlag: {
+    from_donation: s('info', Gift),
+    standalone:    s('warn', PackageOpen),
+    placeholder:   s('neutral', CircleDashed),
+  },
+  // A purchase order's link to the accounts system.
+  accountsLink: {
+    linked:   s('good', Link2),
+    unlinked: s('neutral', Unlink),
+  },
+};
+
+// "3 short" beside a line: less arrived, or is set aside, than was asked.
+export const SHORT_STYLE = s('warn', TriangleAlert);
+
+// A "N variances" tag beside a status, not a status itself.
+export const VARIANCE_STYLE = s('warn', Scale);
+
+/** The style for a status, or a plain grey one if it is not listed. */
+export const statusStyle = (kind, status) => STATUS_STYLES[kind]?.[status] ?? s('neutral', null);

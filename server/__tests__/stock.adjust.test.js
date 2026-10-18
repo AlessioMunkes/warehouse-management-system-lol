@@ -43,8 +43,15 @@ const makeClient = ({ existing = null } = {}) => {
     release: vi.fn(),
     query: vi.fn(async (sql, params) => {
       calls.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
-      if (/SELECT quantity_on_hand, unit FROM stock_levels/i.test(sql)) {
+      if (/SELECT[\s\S]*quantity_on_hand[\s\S]*reorder_threshold[\s\S]*FROM stock_levels/i.test(sql)) {
         return { rows: existing && existing !== 'no-product' ? [existing] : [] };
+      }
+      // manualAdjust's own look at the balance before a removal.
+      if (/SELECT quantity_on_hand FROM stock_levels/i.test(sql)) {
+        return { rows: existing && existing !== 'no-product' ? [{ quantity_on_hand: existing.quantity_on_hand }] : [] };
+      }
+      if (/SELECT name FROM products/i.test(sql)) {
+        return { rows: [{ name: 'Rice' }] };
       }
       if (/SELECT id FROM products/i.test(sql)) {
         return { rows: existing === 'no-product' ? [] : [{ id: 1 }] };
@@ -175,7 +182,7 @@ describe('adjustStock — locking and write order', () => {
     const client = makeClient({ existing: { quantity_on_hand: '100', unit: 'kg' } });
     await adjustStock(client, { ...BASE, quantityDelta: 5, unit: 'kg' });
 
-    expect(client.calls[0].sql).toMatch(/SELECT quantity_on_hand, unit FROM stock_levels .* FOR UPDATE/i);
+    expect(client.calls[0].sql).toMatch(/SELECT .*quantity_on_hand.*unit.*FROM stock_levels .* FOR UPDATE/i);
   });
 
   it('reads, then updates the level, then appends the movement', async () => {
@@ -183,7 +190,7 @@ describe('adjustStock — locking and write order', () => {
     await adjustStock(client, { ...BASE, quantityDelta: 5, unit: 'kg' });
 
     const order = sqlOf(client);
-    expect(order[0]).toMatch(/SELECT quantity_on_hand/i);
+    expect(order[0]).toMatch(/SELECT .*quantity_on_hand/i);
     expect(order[1]).toMatch(/UPDATE stock_levels/i);
     expect(order[2]).toMatch(/INSERT INTO stock_movements/i);
   });
@@ -332,6 +339,63 @@ describe('adjustStock — the movement row', () => {
   });
 });
 
+// ── Low-stock notification ───────────────────────────────────────
+describe('adjustStock — low-stock notification', () => {
+  it('creates a notification when stock crosses down to the reorder threshold', async () => {
+    const client = makeClient({
+      existing: {
+        quantity_on_hand: '12',
+        unit: 'kg',
+        reorder_threshold: '10',
+        product_name: 'Rice',
+      },
+    });
+
+    await adjustStock(client, { ...BASE, quantityDelta: -2, unit: 'kg' });
+
+    const insert = findSql(client, /INSERT INTO notifications/i);
+    expect(insert.params).toEqual([
+      'low_stock',
+      'Low stock',
+      'Rice is at or below its reorder threshold.',
+      'product',
+      1,
+      // Low stock is for managers only (default target_roles).
+      ['manager'],
+    ]);
+  });
+
+  it('does not duplicate low-stock notifications while stock is already low', async () => {
+    const client = makeClient({
+      existing: {
+        quantity_on_hand: '10',
+        unit: 'kg',
+        reorder_threshold: '10',
+        product_name: 'Rice',
+      },
+    });
+
+    await adjustStock(client, { ...BASE, quantityDelta: -1, unit: 'kg' });
+
+    expect(findSql(client, /INSERT INTO notifications/i)).toBeUndefined();
+  });
+
+  it('does not create a notification when no reorder threshold is set', async () => {
+    const client = makeClient({
+      existing: {
+        quantity_on_hand: '12',
+        unit: 'kg',
+        reorder_threshold: '0',
+        product_name: 'Rice',
+      },
+    });
+
+    await adjustStock(client, { ...BASE, quantityDelta: -12, unit: 'kg' });
+
+    expect(findSql(client, /INSERT INTO notifications/i)).toBeUndefined();
+  });
+});
+
 // ── manualAdjust ──────────────────────────────────────────────
 describe('manualAdjust — own transaction', () => {
   const runWith = async (client, args = {}) => {
@@ -400,10 +464,28 @@ describe('manualAdjust — own transaction', () => {
   });
 
   it('returns the adjustStock outcome to the caller', async () => {
+    const client = makeClient({ existing: { quantity_on_hand: '5', unit: 'kg' } });
+    const result = await runWith(client, { quantityDelta: -2 });
+
+    expect(result).toMatchObject({ before: 5, after: 3 });
+  });
+
+  it('lets a removal take the balance to exactly zero', async () => {
+    const client = makeClient({ existing: { quantity_on_hand: '5', unit: 'kg' } });
+    const result = await runWith(client, { quantityDelta: -5 });
+
+    expect(result).toMatchObject({ before: 5, after: 0 });
+  });
+
+  it('refuses a removal larger than what is on hand, and writes nothing', async () => {
     const client = makeClient({ existing: { quantity_on_hand: '2', unit: 'kg' } });
     const result = await runWith(client, { quantityDelta: -5 });
 
-    expect(result).toMatchObject({ before: 2, after: -3, isShortfall: true });
+    expect(result).toEqual({ exceedsOnHand: true, onHand: 2 });
+    const order = sqlOf(client);
+    expect(order[order.length - 1]).toMatch(/^ROLLBACK/i);
+    expect(order.some((sql) => /INSERT INTO stock_movements|UPDATE stock_levels/i.test(sql))).toBe(false);
+    expect(client.release).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -511,7 +593,8 @@ describe('regression — balances are summed in NUMERIC, not JS floats', () => {
 // ─────────────────────────────────────────────────────────────
 describe('getManifest — committed stock is part of the answer', () => {
   const runManifest = async () => {
-    poolMock.query.mockResolvedValueOnce({ rows: [] });
+    // The manifest query, then the shelf estimate's reads (nothing dated here).
+    poolMock.query.mockResolvedValue({ rows: [] });
     await stockRepository.getManifest();
     return poolMock.query.mock.calls[0][0].replace(/\s+/g, ' ');
   };

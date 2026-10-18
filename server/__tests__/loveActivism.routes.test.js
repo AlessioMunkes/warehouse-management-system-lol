@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 import { ROLES } from '../src/middleware/auth.middleware.js';
 const eventSvc = { createEvent: vi.fn(), getEvent: vi.fn(), listEvents: vi.fn(), updateEvent: vi.fn(), cancelEvent: vi.fn(), completeEvent: vi.fn() };
 const bookingSvc = { bookEventSpaceAndTimeslots: vi.fn(), createEventWithInitialTimeslot: vi.fn(), updateEventBooking: vi.fn(), getEventBooking: vi.fn(), getTimeslotsForEvent: vi.fn(), validateTimeslotAvailability: vi.fn(), closeTimeslot: vi.fn(), cancelTimeslot: vi.fn(), getCapacitySummary: vi.fn() };
-const volSvc = { getBooking: vi.fn(), getBookingsForTimeslot: vi.fn(), getBookingsForEvent: vi.fn(), createWalkIn: vi.fn(), cancelGuestBooking: vi.fn() };
+const volSvc = { getBooking: vi.fn(), getBookingsForTimeslot: vi.fn(), getBookingsForEvent: vi.fn(), syncBookingsForEvent: vi.fn(), createWalkIn: vi.fn(), cancelGuestBooking: vi.fn() };
 const attSvc = { confirmAttendance: vi.fn(), getAttendanceForBooking: vi.fn(), getAttendanceForTimeslot: vi.fn(), getAttendanceForEvent: vi.fn(), getAttendanceSummary: vi.fn() };
 const syncSvc = { getSyncStatus: vi.fn(), retrySync: vi.fn() };
 const spaceSvc = { listActiveSpaces: vi.fn() };
@@ -33,7 +33,8 @@ beforeEach(() => {
   bookingSvc.getTimeslotsForEvent.mockResolvedValue([]); bookingSvc.validateTimeslotAvailability.mockResolvedValue({ available: true, conflicts: [] }); bookingSvc.closeTimeslot.mockResolvedValue({});
   bookingSvc.cancelTimeslot.mockResolvedValue({}); bookingSvc.getCapacitySummary.mockResolvedValue({});
   volSvc.getBooking.mockResolvedValue({}); volSvc.getBookingsForTimeslot.mockResolvedValue([]);
-  volSvc.getBookingsForEvent.mockResolvedValue([]); volSvc.createWalkIn.mockResolvedValue({});
+  volSvc.getBookingsForEvent.mockResolvedValue([]); volSvc.syncBookingsForEvent.mockResolvedValue({});
+  volSvc.createWalkIn.mockResolvedValue({});
   volSvc.cancelGuestBooking.mockResolvedValue({}); attSvc.confirmAttendance.mockResolvedValue({});
   attSvc.getAttendanceForBooking.mockResolvedValue(null); attSvc.getAttendanceForTimeslot.mockResolvedValue([]);
   attSvc.getAttendanceForEvent.mockResolvedValue([]); attSvc.getAttendanceSummary.mockResolvedValue({});
@@ -47,7 +48,7 @@ const eps = [
   ['post', `${BASE}/events/e1/booking`], ['get', `${BASE}/events/e1/booking`], ['patch', `${BASE}/events/e1/booking`],
   ['get', `${BASE}/events/e1/timeslots`], ['post', `${BASE}/timeslots/validate`], ['patch', `${BASE}/timeslots/t1/close`], ['patch', `${BASE}/timeslots/t1/cancel`],
   ['get', `${BASE}/timeslots/t1/capacity`], ['get', `${BASE}/bookings/b1`], ['get', `${BASE}/events/e1/bookings`],
-  ['get', `${BASE}/timeslots/t1/bookings`], ['post', `${BASE}/timeslots/t1/guests`], ['patch', `${BASE}/bookings/b1/cancel`],
+  ['post', `${BASE}/events/e1/bookings/sync`], ['get', `${BASE}/timeslots/t1/bookings`], ['post', `${BASE}/timeslots/t1/guests`], ['patch', `${BASE}/bookings/b1/cancel`],
   ['put', `${BASE}/bookings/b1/attendance`], ['get', `${BASE}/bookings/b1/attendance`], ['get', `${BASE}/timeslots/t1/attendance`],
   ['get', `${BASE}/events/e1/attendance`], ['get', `${BASE}/timeslots/t1/attendance/summary`],
   ['get', `${BASE}/sync/event_booking/e1`], ['post', `${BASE}/sync/event_booking/e1/retry`],
@@ -128,6 +129,9 @@ describe('love-activism reach + shaping', () => {
     const s = await request(app).post(`${BASE}/sync/event_booking/e1/retry`).set('Cookie', ck(ROLES.MANAGER)).send({});
     expect(s.status).toBe(200);
     expect(syncSvc.retrySync).toHaveBeenCalledWith('event_booking', 'e1');
+    const bs = await request(app).post(`${BASE}/events/e1/bookings/sync`).set('Cookie', ck(ROLES.MANAGER)).send({});
+    expect(bs.status).toBe(200);
+    expect(volSvc.syncBookingsForEvent).toHaveBeenCalledWith('e1');
   });
   it('404 passthrough; 500 masked; summary not shadowed', async () => {
     eventSvc.getEvent.mockRejectedValueOnce(Object.assign(new Error('Event not found.'), { status: 404 }));

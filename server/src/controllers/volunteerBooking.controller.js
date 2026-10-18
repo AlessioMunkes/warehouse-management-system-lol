@@ -29,6 +29,15 @@ const getBookingsForEvent = async (req, res, next) => {
   }
 };
 
+const syncBookingsForEvent = async (req, res, next) => {
+  try {
+    const result = await volunteerBookingService.syncBookingsForEvent(req.params.eventId);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ── GET /api/love-activism/timeslots/:timeslotId/bookings ────
 const getBookingsForTimeslot = async (req, res, next) => {
   try {
@@ -66,6 +75,7 @@ const cancelGuestBooking = async (req, res, next) => {
 export default {
   getBooking,
   getBookingsForEvent,
+  syncBookingsForEvent,
   getBookingsForTimeslot,
   createWalkIn,
   cancelGuestBooking,

@@ -34,4 +34,26 @@ const getMyWork = async (req, res) => {
   }
 };
 
-export default { getSummary, getMyWork };
+// GET /api/dashboard/attention — the counts behind "Needs attention"
+// and the manager sidebar. See dashboard.repository.js getAttention.
+const getAttention = async (req, res) => {
+  try {
+    const data = await dashboardService.getAttention();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'getAttention', 'Failed to load what needs attention.');
+  }
+};
+
+// GET /api/dashboard/insights — weeks of stock left, this week's packing
+// and the centres missing collections. See dashboard.repository.js.
+const getInsights = async (req, res) => {
+  try {
+    const data = await dashboardService.getInsights();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'getInsights', 'Failed to load the dashboard figures.');
+  }
+};
+
+export default { getSummary, getMyWork, getAttention, getInsights };

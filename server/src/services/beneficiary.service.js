@@ -13,7 +13,8 @@
 import repo from '../repositories/beneficiary.repository.js';
 import { isPositiveInt } from '../utils/validation.js';
 
-const COHORTS = ['week1', 'week2'];
+const COHORTS = ['tuesday', 'thursday'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -52,6 +53,25 @@ const validChildCount = (value) => {
   return n;
 };
 
+const validMobileNumber = (value) => {
+  const v = clean(value);
+  if (v === null) return null;
+  const digits = v.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15 || !/^\+?[0-9][0-9\s().-]*$/.test(v)) {
+    throw fail(400, 'Mobile number must be a valid phone number, or left blank.');
+  }
+  return v;
+};
+
+const validEmail = (value) => {
+  const v = clean(value);
+  if (v === null) return null;
+  if (!EMAIL_RE.test(v)) {
+    throw fail(400, 'Email address must be valid, or left blank.');
+  }
+  return v.toLowerCase();
+};
+
 const validCohort = (value) => {
   const v = clean(value);
   if (!COHORTS.includes(v)) throw fail(400, `Cohort must be one of: ${COHORTS.join(', ')}.`);
@@ -68,6 +88,8 @@ const buildBeneficiaryPayload = (body = {}) => {
     name,
     cohort:      validCohort(body.cohort),
     contactName: capped(body.contactName, 100, 'Contact name'),
+    contactEmail: validEmail(body.contactEmail),
+    mobileNumber: validMobileNumber(body.mobileNumber),
     childCount:  validChildCount(body.childCount),
   };
 };
@@ -118,6 +140,8 @@ const updateBeneficiary = async (rawId, body) => {
   }
   if (has('cohort'))      patch.cohort      = validCohort(body.cohort);
   if (has('contactName')) patch.contactName = capped(body.contactName, 100, 'Contact name');
+  if (has('contactEmail')) patch.contactEmail = validEmail(body.contactEmail);
+  if (has('mobileNumber')) patch.mobileNumber = validMobileNumber(body.mobileNumber);
   if (has('childCount'))  patch.childCount  = validChildCount(body.childCount);
 
   if (has('name') && patch.name) {
@@ -155,6 +179,18 @@ const approveBeneficiary = async (rawId) => {
   return repo.approveBeneficiary(id);
 };
 
+// ── Rollback to the other cohort ─────────────────────────────────
+// Moves a centre to the other pickup day this week (see rollbackCohort
+// in beneficiary.repository.js).
+const rollbackCohort = async (rawId, actorId) => {
+  const id = requireId(rawId);
+
+  const existing = await repo.getBeneficiaryById(id);
+  if (!existing) throw fail(404, 'Beneficiary not found.');
+
+  return repo.rollbackCohort(id, actorId);
+};
+
 export default {
   listBeneficiaries,
   getBeneficiary,
@@ -162,4 +198,5 @@ export default {
   updateBeneficiary,
   setBeneficiaryStatus,
   approveBeneficiary,
+  rollbackCohort,
 };

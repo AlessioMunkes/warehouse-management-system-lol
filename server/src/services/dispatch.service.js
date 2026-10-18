@@ -13,31 +13,50 @@
 // upstream by the programme team, not a discrepancy between a number
 // in a database and a number on a shelf.
 //
-// Two things (a pallet booked for another day, and a slip packing has
-// not closed off) proceed on a manager override with a recorded
-// reason, which is what the paper process already does when Grizel
-// signs off an exception at the gate.
+// A pallet packing has not closed off is refused, and the worker is
+// told to finish packing it first. There used to be a manager
+// override for it, but the gate is a worker-only route and the
+// repository refuses an unpacked pallet anyway, so it could never run.
+// The agreed process is "finish packing first".
 //
-// A collection after the 16:00 write-off is NOT one of them. It is
-// recorded — the event becomes 'late_collected' and the day shows it
-// as late — and otherwise proceeds exactly as an on-time collection
-// does, with no override, no manager and no extra taps. The sweep
+// A pallet booked for another day, and a collection after the 16:00
+// write-off, are recorded rather than refused — the event becomes
+// 'late_collected' and the day shows it as late — and otherwise
+// proceed exactly as an on-time collection does, with no manager and
+// no extra taps. The sweep
 // exists to keep the non-collection history honest at the end of a
 // day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
+import { assertWholeBySlipItem } from '../features/units/wholeItems.js';
 import dispatchRepository from '../repositories/dispatch.repository.js';
-import { ROLES }          from '../middleware/auth.middleware.js';
-import { isValidDateString, isPositiveInt } from '../utils/validation.js';
+import { closureOn } from './calendar.service.js';
+import settings from './settings.service.js';
+import notices from '../features/communications/notices.js';
+import { isManagerUp } from '../constants/permissions.js';
+import { isValidDateString, isPositiveInt, toQuantity } from '../utils/validation.js';
 import { DISPATCH_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
-const COHORTS  = ['week1', 'week2'];
+const COHORTS  = ['tuesday', 'thursday'];
 const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'cancelled'];
 
 // BR-14. Kept as a constant rather than a settings row for now — if
-// the sponsor ever wants it configurable, move it to picking_settings
-// alongside cohort_anchor_monday rather than adding a second
-// settings mechanism.
-export const NON_COLLECTION_CUTOFF_HOUR = 16;
+// the sponsor ever wants it configurable, move it to picking_settings.
+//
+// Sponsor feedback (Milestone 2 change request log): "collections
+// generally happen on Thursdays at approximately 15:00" — the URS's
+// 16:00 cutoff was an hour later than the warehouse actually closes
+// the gate. Moved to 15:00 to match. (This same feedback is also the
+// confirming evidence for the Tuesday/Thursday weekly cohort model —
+// see picking.service.js's scheduledCohortFor.)
+//
+// This is the DEFAULT. Admins can move it in Settings
+// (dispatch.nonCollectionCutoffHour); cutoffHour() reads the current
+// value, falling back to this.
+export const NON_COLLECTION_CUTOFF_HOUR = 15;
+const cutoffHour = () => settings.get('dispatch.nonCollectionCutoffHour');
+// The sweep's notice, naming the hour the pallets missed.
+const flagNonCollections = (cutoff) => (client, facts) =>
+  notices.nonCollectionsFlagged(client, { ...facts, cutoffHour: cutoff });
 
 // Signatures arrive as base64 PNG data URLs from a canvas, the same
 // way delivery notes already store them. A signature from a phone
@@ -45,6 +64,8 @@ export const NON_COLLECTION_CUTOFF_HOUR = 16;
 // cannot push a multi-megabyte payload into a TEXT column on every
 // collection.
 const MAX_SIGNATURE_BYTES = 512 * 1024;
+// The canvas only ever produces a PNG, so that is all that is taken.
+const SIGNATURE_PATTERN = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -52,7 +73,8 @@ const fail = (status, message) => {
   throw err;
 };
 
-const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
+// Same group as the routes' MANAGERS_UP — constants/permissions.js.
+const isManager = isManagerUp;
 
 // ─────────────────────────────────────────────────────────────
 // TIME
@@ -133,14 +155,19 @@ export const pgDateToString = (value) => {
 // can never disagree about whether a pallet needs an override. The
 // screen renders these as warnings; collect() below reads the same
 // object to decide what it insists on.
-export const evaluateEligibility = (gateView) => {
+export const evaluateEligibility = (gateView, cutoff = NON_COLLECTION_CUTOFF_HOUR) => {
   const dispatchDay = pgDateToString(gateView.dispatch_date);
 
   return {
-    ecdInactive:      gateView.ecd_is_active === false || gateView.ecd_approved_at === null,
+    // Only an ECD centre has to be active and approved. A soup kitchen
+    // or the Dignity Kitchen has no centre record at all (its name is
+    // on the slip), and "no record" used to read here as "not
+    // approved", which refused every pallet for one at the gate.
+    ecdInactive:      (gateView.beneficiary_kind ?? 'ecd') === 'ecd'
+                        && (gateView.ecd_is_active === false || gateView.ecd_approved_at === null),
     slipNotPacked:    !['complete', 'dispatched'].includes(gateView.slip_status),
     wrongDay:         dispatchDay !== null && dispatchDay !== todayString(),
-    afterCutoff:      currentHour() >= NON_COLLECTION_CUTOFF_HOUR,
+    afterCutoff:      currentHour() >= cutoff,
     writtenOff:       gateView.dispatch_status === 'not_collected',
     alreadyDispatched: ['collected', 'late_collected'].includes(gateView.dispatch_status),
     hasFlaggedLines:  (gateView.items || []).some((i) => i.status === 'flagged'),
@@ -160,9 +187,10 @@ export const evaluateEligibility = (gateView) => {
 // past-or-present date. sweepNonCollections is idempotent, so the two
 // triggers cannot conflict.
 const getBoard = async (query, user) => {
+  const cutoff = await cutoffHour();
   const { dispatchDate, cohort, status, scope } = query;
 
-  if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be week1 or week2.');
+  if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be tuesday or thursday.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid dispatch status filter.');
   if (scope !== undefined && scope !== 'gate') {
     fail(400, "Scope must be 'gate' if supplied.");
@@ -181,19 +209,21 @@ const getBoard = async (query, user) => {
   // knows the service runs in UTC and the warehouse does not.
   const gateToday = (!dispatchDate && scope === 'gate') ? todayString() : undefined;
 
+  // The operating calendar: a day the warehouse is shut is never swept,
+  // so pallets due on it are not written off as not collected.
   if (dispatchDate) {
     const today      = todayString();
     const isPast     = dispatchDate < today;
-    const pastCutoff = currentHour() >= NON_COLLECTION_CUTOFF_HOUR;
-    if (isPast || (dispatchDate === today && pastCutoff)) {
-      await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
+    const pastCutoff = currentHour() >= cutoff;
+    if ((isPast || (dispatchDate === today && pastCutoff)) && !(await closureOn(dispatchDate))) {
+      await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: flagNonCollections(cutoff) });
     }
-  } else if (gateToday && currentHour() >= NON_COLLECTION_CUTOFF_HOUR) {
+  } else if (gateToday && currentHour() >= cutoff && !(await closureOn(gateToday))) {
     // The gate board is the other place the sweep gets triggered from
     // (see the note above this function). Dropping the date filter
     // must not also drop that trigger, or an afternoon where nobody
     // opens the dated board leaves the day unswept.
-    await dispatchRepository.sweepNonCollections({ dispatchDate: gateToday, actorId: user.id });
+    await dispatchRepository.sweepNonCollections({ dispatchDate: gateToday, actorId: user.id, beforeCommit: flagNonCollections(cutoff) });
   }
 
   return await dispatchRepository.getBoard({ dispatchDate, cohort, status, gateToday });
@@ -215,7 +245,7 @@ const getGateView = async (slipId) => {
   const gateView = await dispatchRepository.getGateView(slipId);
   if (!gateView) fail(404, 'Picking slip not found.');
 
-  return { ...gateView, eligibility: evaluateEligibility(gateView) };
+  return { ...gateView, eligibility: evaluateEligibility(gateView, await cutoffHour()) };
 };
 
 // ── Validate the collection payload ───────────────────────────
@@ -230,7 +260,7 @@ const validateCollectBody = (body) => {
   // paper register — a collection recorded without it is worth less
   // than the paper it replaced.
   const signature = body.signature;
-  if (!signature || typeof signature !== 'string' || !signature.startsWith('data:image/')) {
+  if (!signature || typeof signature !== 'string' || !SIGNATURE_PATTERN.test(signature)) {
     fail(400, 'The driver needs to sign before the collection can be recorded.');
   }
   if (Buffer.byteLength(signature, 'utf8') > MAX_SIGNATURE_BYTES) {
@@ -247,7 +277,9 @@ const validateCollectBody = (body) => {
     const itemId = Number(line?.itemId);
     if (!Number.isInteger(itemId) || itemId <= 0) fail(400, 'Each line correction needs a valid item.');
 
-    const loadedQuantity = Number(line.loadedQuantity);
+    // A correction with no count is not a count of zero: zero means
+    // nothing was loaded and nothing is deducted.
+    const loadedQuantity = toQuantity(line.loadedQuantity);
     if (!Number.isFinite(loadedQuantity) || loadedQuantity < 0) {
       fail(400, 'A loaded quantity must be zero or more.');
     }
@@ -267,20 +299,19 @@ const validateCollectBody = (body) => {
     fail(400, 'Invalid request key.');
   }
 
-  const overrideReason = (body.overrideReason || '').trim() || null;
-  if (overrideReason && overrideReason.length > 500) fail(400, 'Override reason is too long.');
-
-  return { driverName, vehicleReg, signature, lines, idempotencyKey, overrideReason };
+  return { driverName, vehicleReg, signature, lines, idempotencyKey };
 };
 
 // ── Record a collection ───────────────────────────────────────
 const collect = async (slipId, body, user) => {
   const payload = validateCollectBody(body);
+  // What was loaded is a whole number unless the product is decantable.
+  await assertWholeBySlipItem(payload.lines.map((l) => ({ itemId: l.itemId, quantity: l.loadedQuantity })));
 
   const gateView = await dispatchRepository.getGateView(slipId);
   if (!gateView) fail(404, 'Picking slip not found.');
 
-  const eligibility = evaluateEligibility(gateView);
+  const eligibility = evaluateEligibility(gateView, await cutoffHour());
 
   // The one hard block.
   if (eligibility.ecdInactive) {
@@ -294,17 +325,17 @@ const collect = async (slipId, body, user) => {
     fail(409, 'This pallet has already been collected.');
   }
 
-  // ── Override-gated exceptions ──────────────────────────────
-  // Each one names what is wrong and what to do about it, in the
-  // words the person at the gate would use (ACC-09). "Requires
-  // authorisation" tells a warehouse worker nothing actionable; "ask
-  // a manager to authorise it" does.
-  const needsOverride = [];
+  // ── Not packed yet ─────────────────────────────────────────
+  // The gate and Packing are both the worker's screens, so the way
+  // out is theirs: close the pallet off, then release it. Said before
+  // the repository is reached so the worker reads what to do, not
+  // "not packed". The repository refuses it too.
   if (eligibility.slipNotPacked) {
-    needsOverride.push('this pallet has not been closed off by the packing team yet');
+    fail(409, 'This pallet has not been closed off by packing yet. Finish packing it first.');
   }
-  // wrongDay is DELIBERATELY not in this list, for the same reason
-  // writtenOff is not (see below).
+
+  // ── Recorded, not refused ──────────────────────────────────
+  // A pallet booked for another day (wrongDay):
   //
   // BR-12 says a pallet is booked for a cohort day. It does not say
   // food may not leave the building on any other day, and a driver
@@ -326,7 +357,8 @@ const collect = async (slipId, body, user) => {
   // reporting and any manager review still see it. Same principle as
   // shortfall and unit mismatch: the system records what happened
   // rather than refusing to let it happen.
-  // writtenOff is DELIBERATELY not in this list.
+  //
+  // A pallet the 16:00 sweep wrote off (writtenOff):
   //
   // BR-14's 16:00 sweep is a bookkeeping act, not a gate closure. It
   // writes a 'not_collected' event so the non-collection history
@@ -345,19 +377,6 @@ const collect = async (slipId, body, user) => {
   // leaving the building over a data disagreement — and the data
   // disagreement here is with a clock.
 
-  if (needsOverride.length > 0) {
-    if (!isManager(user)) {
-      fail(403,
-        `${needsOverride.join(', and ')}. Ask a manager to authorise this collection at the gate.`
-      );
-    }
-    if (!payload.overrideReason) {
-      fail(400,
-        `${needsOverride.join(', and ')}. Record a short reason for authorising it.`
-      );
-    }
-  }
-
   const result = await dispatchRepository.collect({
     slipId,
     driverName:     payload.driverName,
@@ -365,7 +384,6 @@ const collect = async (slipId, body, user) => {
     signature:      payload.signature,
     lines:          payload.lines,
     idempotencyKey: payload.idempotencyKey,
-    overrideReason: payload.overrideReason,
     actorId:        user.id,
     // Advisory, not a gate. Recorded against the collection so a
     // manager reviewing BR-26 can see it went out off-schedule.
@@ -399,7 +417,13 @@ const sweep = async (body, user) => {
     fail(400, 'Dispatch date must be a real date in YYYY-MM-DD form.');
   }
 
-  return await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
+  const closed = await closureOn(dispatchDate);
+  if (closed) {
+    fail(409, `The warehouse is closed on ${dispatchDate} (${closed.label}), so pallets due that day are not written off.`);
+  }
+
+  const cutoff = await cutoffHour();
+  return await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: flagNonCollections(cutoff) });
 };
 
 // ── Dispatch note ─────────────────────────────────────────────
@@ -443,7 +467,7 @@ const listDispatchNotes = async (query = {}) => {
     fail(400, 'Invalid beneficiary.');
   }
   if (cohort && !COHORTS.includes(cohort)) {
-    fail(400, 'Cohort must be week1 or week2.');
+    fail(400, 'Cohort must be tuesday or thursday.');
   }
   // 'awaiting' is excluded deliberately: an awaiting event is a pallet still
   // standing in the yard, which is the board's business, not the archive's.

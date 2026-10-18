@@ -24,11 +24,11 @@
 import express                      from 'express';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import { ALL_STAFF } from '../constants/permissions.js';
 import assistantController          from '../controllers/assistant.controller.js';
 
 const router = express.Router();
 
-const STAFF_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 // Only /ask is limited — it is the one route that costs money per
 // call and draws on a shared free-tier quota.
@@ -38,9 +38,16 @@ const STAFF_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 // mid-task who will rephrase three times in a minute, and hitting a
 // limit at that moment is precisely the experience this feature
 // exists to prevent. Still far below anything that burns the quota.
+// Staff, and guests: what each may be told is decided per role in
+// helpCatalog.js, so letting a guest in here opens only the guest topics.
+const ASK_ROLES = [...ALL_STAFF, ROLES.GUEST];
+
 const askLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 40,
+  // A guest is a volunteer for one shift with a handful of topics:
+  // fifteen is plenty for someone stuck, and little for someone
+  // seeing what it will do.
+  max: (req) => (req.user?.role === ROLES.GUEST ? 15 : 40),
   standardHeaders: 'draft-8',
   legacyHeaders: false,
 
@@ -51,8 +58,12 @@ const askLimiter = rateLimit({
   // ipKeyGenerator is required for the IP fallback — express-rate-limit
   // v8 throws at MODULE LOAD if a custom keyGenerator touches req.ip
   // without it, because raw IPv6 lets a user rotate through a /64.
+  // A guest's id is a volunteer's, a different table from a user's,
+  // so the two are kept apart rather than sharing a count.
   keyGenerator: (req, res) =>
-    req.user?.id ? `u:${req.user.id}` : ipKeyGenerator(req, res),
+    req.user?.id
+      ? `${req.user.role === ROLES.GUEST ? 'g' : 'u'}:${req.user.id}`
+      : ipKeyGenerator(req, res),
 
   message: {
     success: false,
@@ -60,8 +71,8 @@ const askLimiter = rateLimit({
   },
 });
 
-router.get ('/catalog',   auth, requireRole(...STAFF_UP), assistantController.getCatalog);
-router.get ('/topic/:id', auth, requireRole(...STAFF_UP), assistantController.getTopic);
-router.post('/ask',       auth, requireRole(...STAFF_UP), askLimiter, assistantController.ask);
+router.get ('/catalog',   auth, requireRole(...ASK_ROLES), assistantController.getCatalog);
+router.get ('/topic/:id', auth, requireRole(...ASK_ROLES), assistantController.getTopic);
+router.post('/ask',       auth, requireRole(...ASK_ROLES), askLimiter, assistantController.ask);
 
 export default router;

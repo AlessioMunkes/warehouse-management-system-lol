@@ -28,9 +28,9 @@ import { logAudit } from './auditLog.repository.js';
 // the dispatch gate, which both report available (on hand - committed).
 const PRODUCT_COLUMNS = `
   p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg,
-  p.is_active, p.created_at, p.category, p.is_perishable,
+  p.is_active, p.created_at, p.category, p.is_perishable, p.is_decantable,
   p.default_unit, p.storage_type, p.default_location_id,
-  p.archived_at, p.unit_cost,
+  p.archived_at, p.unit_cost, p.quantity_per_meal,
   COALESCE(sl.reorder_threshold, 0) AS reorder_threshold,
   sl.unit AS ledger_unit`;
 
@@ -126,7 +126,7 @@ const findByNameOrSku = async (name, sku, { excludeId = null } = {}) => {
 // same client, inside the same transaction.
 const createProduct = async ({
   name, stockKeepingUnit, weightKg = null,
-  defaultUnit = 'kg', category = null, isPerishable = false,
+  defaultUnit = 'kg', category = null, isPerishable = false, isDecantable = false,
   storageType = null, defaultLocationId = null, reorderThreshold = null,
   unitCost = null,
 }) => {
@@ -141,12 +141,12 @@ const createProduct = async ({
       `INSERT INTO products
          (name, stock_keeping_unit, weight_kg, default_unit, category,
           is_perishable, storage_type, default_location_id, unit_cost,
-          is_active, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, $9, true, NOW())
+          is_decantable, is_active, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, $9, $10, true, NOW())
        RETURNING id`,
       [
         name, stockKeepingUnit, weightKg, defaultUnit, category,
-        isPerishable, storageType, defaultLocationId, unitCost,
+        isPerishable, storageType, defaultLocationId, unitCost, isDecantable,
       ],
     );
     const id = rows[0].id;
@@ -182,9 +182,16 @@ const PRODUCT_PATCH_COLUMNS = {
   defaultUnit:       'default_unit',
   category:          'category',
   isPerishable:      'is_perishable',
+  // Kept loose and portioned out; the only kind of product that can be
+  // a part quantity (features/units/wholeItems.js).
+  isDecantable:      'is_decantable',
   storageType:       'storage_type',
   defaultLocationId: 'default_location_id',
   unitCost:          'unit_cost',
+  // How much of this product one meal/beneficiary needs — drives the
+  // "meals to serve" quantity calculator on Create Slip. Null means
+  // "no ratio set for this product yet," not zero.
+  quantityPerMeal:   'quantity_per_meal',
 };
 
 // Wrapped in a transaction because a patch touching defaultUnit or
@@ -369,14 +376,54 @@ const getProductRoutingDefault = async (productId) => {
     WHERE d.product_id = $1 AND p.is_active = true;
   `;
   const result = await pool.query(query, [productId]);
-  return result.rows[0] || null;
+  if (result.rows[0]) return result.rows[0];
+
+  // Nobody has set a category for this product, but the recipes already
+  // say what it is: an ingredient on a recipe is recipe food. Without
+  // this every donated bag of soya mince or rice went to a manager to
+  // be told so, because only a handful of products had a saved category.
+  if (await isRecipeIngredient(productId)) {
+    return { product_id: Number(productId), donation_category: RECIPE_FOOD, inferred_from: 'recipe' };
+  }
+  return null;
+};
+
+// The donation category an ingredient on any recipe belongs to.
+const RECIPE_FOOD = 'recipe_food';
+
+// True when an active product is a line on a recipe. Read on the pool,
+// never inside a caller's transaction, and never fatal: a database
+// without the recipes tables simply has nothing to infer from.
+const isRecipeIngredient = async (productId) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1
+         FROM recipe_lines rl
+         JOIN products p ON p.id = rl.product_id
+        WHERE rl.product_id = $1 AND p.is_active = true
+        LIMIT 1`,
+      [productId],
+    );
+    return rows.length > 0;
+  } catch (err) {
+    console.error('[product] recipe membership not checked:', err.message);
+    return false;
+  }
 };
 
 /**
  * Searches active products by (partial, case-insensitive) name or SKU for
- * the staff intake "match to stock item" combobox. Wildcard metacharacters
- * in the term are escaped so a literal "%" or "_" in what staff typed is
- * matched literally, not as a pattern. Returns at most `limit` rows.
+ * the "match to stock item" combobox: staff intake, and a manager matching
+ * a flagged donation line in the classification queue. Wildcard
+ * metacharacters in the term are escaped so a literal "%" or "_" in what
+ * staff typed is matched literally, not as a pattern. Returns at most
+ * `limit` rows.
+ *
+ * The placeholder products made for unrecognised intake items are left out
+ * by being inactive with a PENDING- code. This used to also leave out every
+ * product with an open review flag, which hid the real product a flag is
+ * about: a donation line of Soya mince, flagged for review, made Soya mince
+ * itself unsearchable in the very queue that resolves it.
  */
 const searchProductsByName = async (term, { limit = 10 } = {}) => {
   const trimmed = String(term ?? '').trim();
@@ -388,12 +435,6 @@ const searchProductsByName = async (term, { limit = 10 } = {}) => {
     FROM products
     WHERE is_active = true
       AND stock_keeping_unit NOT ILIKE 'PENDING-%'
-      AND NOT EXISTS (
-        SELECT 1
-        FROM warehouse_manager_flags wmf
-        WHERE wmf.product_id = products.id
-          AND wmf.status IN ('pending', 'pending_classification')
-      )
       AND (name ILIKE $1 OR stock_keeping_unit ILIKE $1)
     ORDER BY name ASC
     LIMIT $2;
@@ -406,12 +447,6 @@ const searchProductsByName = async (term, { limit = 10 } = {}) => {
      FROM products
      WHERE is_active = true
        AND stock_keeping_unit NOT ILIKE 'PENDING-%'
-       AND NOT EXISTS (
-         SELECT 1
-         FROM warehouse_manager_flags wmf
-         WHERE wmf.product_id = products.id
-           AND wmf.status IN ('pending', 'pending_classification')
-       )
      ORDER BY name ASC
      LIMIT 250;`
   );
@@ -559,6 +594,7 @@ export default {
   searchProductsByName,
   getAllProductsWithDefaults,
   getProductRoutingDefault,
+  isRecipeIngredient,
   getPendingClassifications,
   upsertProductRoutingDefault,
   deleteProductRoutingDefault,

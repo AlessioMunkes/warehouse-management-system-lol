@@ -31,9 +31,11 @@ import pool from '../config/db.js';
 // leave the others behind — that is how an item list ends up on a
 // public endpoint.
 //
-// beneficiary_name falls back to the ECD's own name: picking_slips
-// carries its own denormalised copy, but it is nullable and most rows
-// have not got one.
+// beneficiary_name is the ECD's own name first, the same name the
+// worker's screen and every report show (COALESCE(e.name,
+// ps.beneficiary_name) elsewhere). picking_slips.beneficiary_name is a
+// nullable copy that only matters for a pallet with no ECD behind it,
+// such as a soup kitchen or community group, so it is the fallback.
 // dispatch_date is cast to text deliberately.
 //
 // node-postgres turns a `date` into a JS Date at LOCAL midnight, which
@@ -46,7 +48,7 @@ const PREVIEW_COLUMNS = `
   ps.dispatch_date::text AS dispatch_date,
   ps.status,
   ps.beneficiary_kind,
-  COALESCE(ps.beneficiary_name, e.name) AS beneficiary_name,
+  COALESCE(e.name, ps.beneficiary_name) AS beneficiary_name,
   (SELECT COUNT(*)::int FROM picking_slip_items i WHERE i.picking_slip_id = ps.id) AS item_count,
   (ps.assigned_volunteer_id IS NOT NULL OR ps.assigned_to IS NOT NULL) AS is_claimed`;
 
@@ -74,7 +76,7 @@ const getPreviewByToken = async (token) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ps.public_token = $1::uuid`,
     [token],
   );
@@ -95,7 +97,7 @@ const findPreviewsByShortCode = async (code) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE RIGHT(ps.public_token::text, 6) = LOWER($1)
       ORDER BY ps.dispatch_date DESC, ps.id DESC`,
     [code],
@@ -110,13 +112,31 @@ const listUnclaimedForDate = async (dispatchDate) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ps.dispatch_date = $1::date
         AND ps.status = ANY($2)
         AND ps.assigned_volunteer_id IS NULL
         AND ps.assigned_to IS NULL
       ORDER BY ps.id ASC`,
     [dispatchDate, CLAIMABLE_STATUSES],
+  );
+  return rows;
+};
+
+// The same list across a run of dispatch dates. A pallet is on the
+// floor from the moment its slip exists, so the guest list covers the
+// week, not only today — soonest first, so today's are still on top.
+const listUnclaimedBetween = async (from, to) => {
+  const { rows } = await pool.query(
+    `SELECT ${PREVIEW_COLUMNS}
+       FROM picking_slips ps
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+      WHERE ps.dispatch_date BETWEEN $1::date AND $2::date
+        AND ps.status = ANY($3)
+        AND ps.assigned_volunteer_id IS NULL
+        AND ps.assigned_to IS NULL
+      ORDER BY ps.dispatch_date ASC, ps.id ASC`,
+    [from, to, CLAIMABLE_STATUSES],
   );
   return rows;
 };
@@ -129,10 +149,16 @@ const listUnclaimedForDate = async (dispatchDate) => {
 // their own pallet succeeds quietly rather than being told it is taken
 // by someone, that someone being themselves.
 //
+// Takes EITHER volunteerId (a guest who already has a session) OR
+// newVolunteerName (someone arriving by QR with no session). The new
+// volunteer is inserted inside this same transaction, after the slip has
+// been checked, so a claim that is refused or fails leaves no volunteer
+// row behind: nobody is recorded as arriving for a pallet they did not get.
+//
 // Does NOT set assigned_to. A guest holds a slip through
 // assigned_volunteer_id; writing a volunteer id into assigned_to would
 // point an FK at users and name a staff member.
-const claimForVolunteer = async ({ slipId, volunteerId }) => {
+const claimForVolunteer = async ({ slipId, volunteerId = null, newVolunteerName = null }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -164,6 +190,37 @@ const claimForVolunteer = async ({ slipId, volunteerId }) => {
       return { takenByVolunteer: true };
     }
 
+    let volunteer = null;
+    if (volunteerId !== null && volunteerId !== undefined) {
+      // One pallet per volunteer. A second would stay locked to them but
+      // out of their sight: the guest screens show only the newest, and
+      // nothing else would ever free the first.
+      // The volunteer's own row is locked first, so two scans from one
+      // phone at once cannot both pass the check below.
+      await client.query('SELECT id FROM volunteers WHERE id = $1 FOR UPDATE', [volunteerId]);
+      const other = await client.query(
+        `SELECT id FROM picking_slips
+          WHERE assigned_volunteer_id = $1 AND id <> $2 AND status = ANY($3)
+          LIMIT 1`,
+        [volunteerId, slipId, CLAIMABLE_STATUSES],
+      );
+      if (other.rows[0]) {
+        await client.query('ROLLBACK');
+        return { alreadyHolding: true, heldSlipId: other.rows[0].id };
+      }
+    } else {
+      // source is always 'guest_login'. It is the only seam that will
+      // later distinguish a walk-in from a VMS-booked volunteer.
+      const inserted = await client.query(
+        `INSERT INTO volunteers (full_name, source)
+         VALUES ($1, 'guest_login')
+         RETURNING id, full_name, signed_in_at`,
+        [newVolunteerName],
+      );
+      volunteer = inserted.rows[0];
+      volunteerId = volunteer.id;
+    }
+
     const result = await client.query(
       `UPDATE picking_slips
           SET assigned_volunteer_id = $1,
@@ -184,7 +241,7 @@ const claimForVolunteer = async ({ slipId, volunteerId }) => {
     );
 
     await client.query('COMMIT');
-    return { slip: result.rows[0], alreadyMine: heldBy !== null };
+    return { slip: result.rows[0], alreadyMine: heldBy !== null, volunteer };
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -208,6 +265,71 @@ const findSlipIdForVolunteer = async (volunteerId) => {
   return rows[0]?.id ?? null;
 };
 
+// ── Release ───────────────────────────────────────────────────
+// A guest handing their pallets back to the floor (they are signing out
+// before finishing, or pressing "return this pallet"). Frees ONLY the
+// pallets this volunteer holds: the WHERE names both the volunteer and a
+// not-yet-finished status, so the write itself is the guard, not a check
+// made beforehand.
+//
+// EVERY pallet they hold, not just the newest. The claim now refuses a
+// second pallet, but a volunteer could hold two from before that rule,
+// and one left behind stays locked to a person who has gone home.
+//
+// Item progress is not touched. The next person, guest or worker, picks
+// up from the first item still pending. started_at is kept for the same
+// reason the manager release keeps it.
+const releaseForVolunteer = async ({ volunteerId }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Locked first so a completion racing this release is serialised.
+    const held = await client.query(
+      `SELECT id FROM picking_slips
+        WHERE assigned_volunteer_id = $1
+          AND status = ANY($2)
+        ORDER BY id DESC
+        FOR UPDATE`,
+      [volunteerId, CLAIMABLE_STATUSES],
+    );
+    if (!held.rows[0]) { await client.query('ROLLBACK'); return { nothingHeld: true }; }
+
+    const slips = [];
+    for (const { id } of held.rows) {
+      const result = await client.query(
+        `UPDATE picking_slips
+            SET assigned_volunteer_id = NULL,
+                status = 'pending'
+          WHERE id = $1
+            AND assigned_volunteer_id = $2
+            AND status = ANY($3)
+          RETURNING *`,
+        [id, volunteerId, CLAIMABLE_STATUSES],
+      );
+      if (!result.rows[0]) continue;
+      slips.push(result.rows[0]);
+
+      // Same event type the claim and the manager release use (the column
+      // is CHECK-constrained); the detail says what happened.
+      await client.query(
+        `INSERT INTO picking_events (picking_slip_id, event_type, actor_id, detail)
+         VALUES ($1, 'assigned', NULL, $2)`,
+        [result.rows[0].id, { actor_type: 'volunteer', volunteer_id: volunteerId, released: true }],
+      );
+    }
+    if (slips.length === 0) { await client.query('ROLLBACK'); return { nothingHeld: true }; }
+
+    await client.query('COMMIT');
+    return { slip: slips[0], slips };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 // Does this volunteer hold this slip? The ownership question on its own,
 // for read paths that do not go through the packing repository's
 // locked write guards.
@@ -228,7 +350,7 @@ const getPreviewById = async (slipId) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ps.id = $1`,
     [slipId],
   );
@@ -255,7 +377,9 @@ export default {
   getPreviewByToken,
   findPreviewsByShortCode,
   listUnclaimedForDate,
+  listUnclaimedBetween,
   claimForVolunteer,
+  releaseForVolunteer,
   findSlipIdForVolunteer,
   volunteerHoldsSlip,
 };

@@ -25,14 +25,14 @@ vi.mock('../services/decantingAPI', () => ({
   getDecantingRecords: vi.fn(),
   getDecantingById: vi.fn(),
 }));
-vi.mock('../features/decanting/components/DecantingSheetPDF', () => ({
+vi.mock('../features/decanting/DecantingSheetPDF', () => ({
   default: () => null,
 }));
 
-const { default: WorkList } = await import('../features/staff/components/WorkList');
-const { default: Paged } = await import('../features/staff/components/Paged');
-const { default: usePaged } = await import('../features/staff/hooks/usePaged');
-const { default: DecantingFlow } = await import('../features/decanting/components/DecantingFlow');
+const { default: WorkList } = await import('../features/staff/WorkList');
+const { default: Paged } = await import('../features/staff/Paged');
+const { default: usePaged } = await import('../features/staff/usePaged');
+const { default: DecantingFlow } = await import('../features/decanting/DecantingFlow');
 const decantingAPI = await import('../services/decantingAPI');
 
 const LINES = [
@@ -284,7 +284,8 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     render(<DecantingFlow products={PRODUCTS} />);
 
-    await user.type(screen.getByLabelText('Search products'), 'sugar');
+    await user.click(screen.getByRole('button', { name: 'Search products' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search products' }), 'sugar');
     expect(screen.getByRole('radio', { name: /Sugar Beans/ })).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Maize Meal/ })).not.toBeInTheDocument();
   });
@@ -293,7 +294,8 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     render(<DecantingFlow products={PRODUCTS} />);
 
-    await user.type(screen.getByLabelText('Search products'), 'zzz');
+    await user.click(screen.getByRole('button', { name: 'Search products' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search products' }), 'zzz');
     expect(screen.getByText(/No products match/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Show everything again' }));
@@ -331,7 +333,7 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     await startASack(user);
 
-    expect(screen.getByText('On the scale')).toBeInTheDocument();
+    expect(screen.getByText('Bulk amount')).toBeInTheDocument();
     expect(screen.getByText('Bag this many')).toBeInTheDocument();
     expect(screen.getByText('What you actually got')).toBeInTheDocument();
   });
@@ -340,7 +342,7 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     await startASack(user);
 
-    expect(screen.getByRole('button', { name: 'Save this sack' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save decanted amount' })).toBeDisabled();
     // And says why, rather than leaving a dead button.
     expect(screen.getByText(/Still needed/)).toBeInTheDocument();
   });
@@ -350,7 +352,7 @@ describe.skip('DecantingFlow', () => {
     decantingAPI.calculateDecantingPlan.mockResolvedValue(PLAN);
     await startASack(user);
 
-    await user.type(screen.getByLabelText('Kilograms on the scale'), '48');
+    await user.type(screen.getByLabelText('Bulk amount on the scale, in kilograms'), '48');
     await user.type(screen.getByLabelText(/Kilograms the centres need/), '30');
     await user.click(screen.getByRole('button', { name: 'Work out the bags' }));
 
@@ -377,12 +379,12 @@ describe.skip('DecantingFlow', () => {
     decantingAPI.recordDecanting.mockResolvedValue({ id: 1 });
     await startASack(user);
 
-    await user.type(screen.getByLabelText('Kilograms on the scale'), '48');
+    await user.type(screen.getByLabelText('Bulk amount on the scale, in kilograms'), '48');
     await user.type(screen.getByLabelText(/Kilograms the centres need/), '30');
     await user.click(screen.getByRole('button', { name: 'Work out the bags' }));
     await screen.findByText('bags of 2kg');
 
-    await user.click(screen.getByRole('button', { name: 'Save this sack' }));
+    await user.click(screen.getByRole('button', { name: 'Save decanted amount' }));
 
     await waitFor(() =>
       expect(decantingAPI.recordDecanting).toHaveBeenCalledWith(

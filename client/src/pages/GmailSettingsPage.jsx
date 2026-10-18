@@ -12,8 +12,9 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+//import { TopNavbar } from '../components/layout/TopNavBar';
 import gmailAPI from '../services/gmailAPI';
+import financeAPI from '../services/financeAPI';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,12 +33,14 @@ import {
   CardHeader,
   CardTitle,
 } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
+import StatusBadge from '../components/ui/status-badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
-export default function GmailSettingsPage() {
+// `embedded`: shown as the Email section of the admin Settings page,
+// which supplies the page's own header and spacing.
+export default function GmailSettingsPage({ embedded = false } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,6 +51,9 @@ export default function GmailSettingsPage() {
   const [confirmDisconnectOpen, setConfirmDisconnectOpen] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savingDisplayName, setSavingDisplayName] = useState(false);
+  const [financeRecipientEmail, setFinanceRecipientEmail] = useState('');
+  const [savingFinanceRecipient, setSavingFinanceRecipient] = useState(false);
+  const [sendingFinanceLink, setSendingFinanceLink] = useState(false);
   const oauthFeedbackShown = useRef(false);
 
   // Initial load. A separate effect refreshes the status after the OAuth
@@ -64,6 +70,12 @@ export default function GmailSettingsPage() {
           // Pre-fill the display name field from the stored value.
           if (nextStatus?.displayName) {
             setDisplayName(nextStatus.displayName);
+          }
+          try {
+            const financeSettings = await financeAPI.getFinanceEmailSettings();
+            if (!cancelled) setFinanceRecipientEmail(financeSettings?.recipientEmail || '');
+          } catch {
+            if (!cancelled) setFeedback({ type: 'error', message: 'Could not load Finance email settings.' });
           }
         }
       } catch (error) {
@@ -160,19 +172,56 @@ export default function GmailSettingsPage() {
     }
   };
 
+  const handleSaveFinanceRecipient = async (event) => {
+    event.preventDefault();
+    setSavingFinanceRecipient(true);
+    setFeedback(null);
+    try {
+      const result = await financeAPI.saveFinanceEmailSettings({
+        recipientEmail: financeRecipientEmail.trim(),
+      });
+      setFinanceRecipientEmail(result?.recipientEmail || financeRecipientEmail.trim());
+      setFeedback({ type: 'success', message: 'Finance recipient saved.' });
+    } catch (error) {
+      setFeedback({ type: 'error', message: error.message || 'Could not save Finance recipient.' });
+    } finally {
+      setSavingFinanceRecipient(false);
+    }
+  };
+
+  const handleSendFinanceReportLink = async () => {
+    if (!financeRecipientEmail.trim()) {
+      setFeedback({
+        type: 'error',
+        message: 'Save a Finance recipient email before sending the report link.',
+      });
+      return;
+    }
+
+    setSendingFinanceLink(true);
+    setFeedback(null);
+    try {
+      await financeAPI.sendFinanceReportLink();
+      setFeedback({ type: 'success', message: 'Finance report link sent.' });
+    } catch (error) {
+      setFeedback({ type: 'error', message: error.message || 'Could not send Finance report link.' });
+    } finally {
+      setSendingFinanceLink(false);
+    }
+  };
+
   const connected = Boolean(status?.connected);
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <TopNavbar />
-      <div className="mx-auto max-w-3xl space-y-6 p-6">
+    <div className={embedded ? '' : 'min-h-screen bg-page'}>
+      <div className={embedded ? 'space-y-6' : 'mx-auto max-w-3xl space-y-6 p-6'}>
         {displayFeedback && (
           <div
             role="status"
             className={
               displayFeedback.type === 'success'
-                ? 'rounded-md border border-good bg-good-soft px-4 py-3 text-sm text-good'
-                : 'rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger'
+                ? 'fx-fade-in rounded-lg border border-good/40 bg-good-soft px-4 py-3 text-sm text-good'
+                : 'fx-fade-in rounded-lg border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-danger'
             }
           >
             {displayFeedback.message}
@@ -181,47 +230,39 @@ export default function GmailSettingsPage() {
 
         <Card className="rounded-lg border border-line shadow-sm">
           <CardHeader>
-            <CardTitle>Gmail Connection</CardTitle>
+            <CardTitle>Gmail account</CardTitle>
             <CardDescription>
               {loading
-                ? 'Checking Gmail connection status...'
+                ? 'Checking the connection…'
                 : connected
-                  ? 'Donation emails are ready to send through the connected account.'
-                  : 'Connect an organisation Gmail account so the Donation system can automatically send thank-you emails.'}
+                  ? 'System emails are sent from this account.'
+                  : 'Connect the account system emails are sent from.'}
             </CardDescription>
             <CardAction>
-              {connected ? <Badge>Connected</Badge> : <Badge variant="outline">Not Connected</Badge>}
+              {connected
+                ? <StatusBadge kind="connection" status="ok">Connected</StatusBadge>
+                : <StatusBadge kind="connection" status="down">Not connected</StatusBadge>}
             </CardAction>
           </CardHeader>
           <CardContent className="space-y-4">
             {loading ? (
-              <p className="text-sm text-muted-foreground">Checking Gmail connection status...</p>
+              <p className="text-sm text-muted-foreground">Checking the connection…</p>
             ) : statusError ? (
               <p className="text-sm text-danger">{statusError}</p>
             ) : (
               <dl className="grid gap-3 text-sm">
-                <div>
-                  <dt className="font-medium text-muted-foreground">Gmail Status</dt>
-                  <dd className="mt-1">
-                    {connected ? (
-                      <Badge className="bg-good-soft text-good hover:bg-good-soft">Connected</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-danger border-danger">Disconnected</Badge>
-                    )}
-                  </dd>
-                </div>
                 {connected && (
                   <>
                     <div>
-                      <dt className="font-medium text-muted-foreground">Connected Email Address</dt>
+                      <dt className="font-medium text-muted-foreground">Email address</dt>
                       <dd className="mt-1 break-words text-ink">{status.email || 'Unknown'}</dd>
                     </div>
                     <div>
-                      <dt className="font-medium text-muted-foreground">Display Name</dt>
+                      <dt className="font-medium text-muted-foreground">Sender name</dt>
                       <dd className="mt-1">
                         <form className="flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={handleSaveDisplayName}>
                           <div className="flex-1">
-                            <Label htmlFor="displayName" className="sr-only">Display Name</Label>
+                            <Label htmlFor="displayName" className="sr-only">Sender name</Label>
                             <Input
                               id="displayName"
                               type="text"
@@ -231,12 +272,12 @@ export default function GmailSettingsPage() {
                               maxLength={255}
                             />
                           </div>
-                          <Button type="submit" variant="secondary" disabled={savingDisplayName || !displayName.trim()}>
-                            {savingDisplayName ? 'Saving...' : 'Save Display Name'}
+                          <Button type="submit" variant="secondary" disabled={savingDisplayName || !displayName.trim()} loading={savingDisplayName}>
+                            {savingDisplayName ? 'Saving…' : 'Save name'}
                           </Button>
                         </form>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          This name appears as the sender in donation emails.
+                          Shown as the sender of system emails.
                         </p>
                       </dd>
                     </div>
@@ -266,9 +307,9 @@ export default function GmailSettingsPage() {
 
         <Card className="rounded-lg border border-line shadow-sm">
           <CardHeader>
-            <CardTitle>Send Test Email</CardTitle>
+            <CardTitle>Test email</CardTitle>
             <CardDescription>
-              Verify that the connected account can send Donation emails.
+              Send a test to check the account can send.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -284,10 +325,43 @@ export default function GmailSettingsPage() {
                   required
                 />
               </div>
-              <Button type="submit" disabled={sendingTest || !connected}>
-                {sendingTest ? 'Sending...' : 'Send Test Email'}
+              <Button type="submit" disabled={sendingTest || !connected} loading={sendingTest}>
+                {sendingTest ? 'Sending…' : 'Send test email'}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border border-line shadow-sm">
+          <CardHeader>
+            <CardTitle>Finance</CardTitle>
+            <CardDescription>
+              Set who receives purchase orders, and send them a read-only link to the warehouse movement report.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form className="flex flex-col gap-4 sm:flex-row sm:items-end" onSubmit={handleSaveFinanceRecipient}>
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="financeRecipientEmail">Finance email address</Label>
+                <Input
+                  id="financeRecipientEmail"
+                  type="email"
+                  value={financeRecipientEmail}
+                  onChange={(event) => setFinanceRecipientEmail(event.target.value)}
+                  placeholder="finance@example.org"
+                  required
+                />
+              </div>
+              <Button type="submit" variant="secondary" disabled={savingFinanceRecipient || !financeRecipientEmail.trim()} loading={savingFinanceRecipient}>
+                {savingFinanceRecipient ? 'Saving…' : 'Save email address'}
+              </Button>
+            </form>
+            <Button
+              type="button"
+              onClick={handleSendFinanceReportLink}
+              disabled={sendingFinanceLink || !connected} loading={sendingFinanceLink}>
+              {sendingFinanceLink ? 'Sending…' : 'Send report link'}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -297,7 +371,7 @@ export default function GmailSettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect Gmail?</AlertDialogTitle>
             <AlertDialogDescription>
-              Donation thank-you emails will stop sending until the account is reconnected.
+              Certificates, reminders, invites and Finance emails stop until you reconnect.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

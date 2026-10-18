@@ -2,22 +2,18 @@
 // src/pages/ReviewPage.jsx
 // Route: /donations/new/review
 //
-// Page 2 of 2. Shows everything captured on DonationDetailsPage,
-// lets the worker correct specific sections via SectionPicker ->
-// EditSectionDialog, then submits. On success, shows CompletionDialog.
-//
-// UPDATED: same .stf-crumb + rail-inside-.stf-main fix as
-// DonationDetailsPage.jsx.
+// Donation intake, page 2 of 2: shows what was captured, lets the worker
+// fix any section, then submits and shows a confirmation.
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-//import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
+import { Link, useNavigate } from "react-router-dom";
+import StaffShell from "../components/layout/StaffShell";
 
-import { useDonationDraft, validateDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { useDonationDraft, validateDonationDraft } from "../features/donation/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
-import { DonationRail } from "../features/donation/components/DonationRail";
-import { ReviewSummary, SectionPicker, EditSectionDialog } from "../features/donation/components/ReviewSummary";
-import { CompletionDialog } from "../features/donation/components/WarningsNotice";
+import { DonationRail } from "../features/donation/DonationRail";
+import { ReviewSummary, SectionPicker, EditSectionDialog } from "../features/donation/ReviewSummary";
+import { CompletionDialog } from "../features/donation/WarningsNotice";
 import { createPendingDonation } from "../services/donationAPI";
 
 export function ReviewPage() {
@@ -56,6 +52,8 @@ export function ReviewPage() {
       const result = await createPendingDonation(draft);
       const items = result?.items || [];
       setCompletionResult({
+        // No signal: the donation is waiting on the phone.
+        queued: Boolean(result?.queued),
         pendingDonationId: result?.id ?? null,
         status: result?.status ?? null,
         resolvedCount: items.filter((it) => it.status === "resolved" || it.status === "committed").length,
@@ -101,58 +99,59 @@ export function ReviewPage() {
   });
 
   return (
-    <div className="stf-shell donation-intake-shell">
-      <div className="stf-crumb">
-        <span>Donations / Review Donation</span>
-        <span className="stf-crumb-meta">{today}</span>
+    <StaffShell
+      crumb="Donations / Review donation"
+      meta={today}
+      // What this worker recorded before, and where it has got to.
+      actions={(
+        <Link to={DONATIONS.history} className="stf-crumb-link">
+          <i className="ti ti-history" aria-hidden="true" />
+          <span>History</span>
+        </Link>
+      )}
+    >
+      <DonationRail currentStep={1} />
+
+      <div className="stf-step">
+        <div className="stf-step-head">
+          <h1 className="stf-step-title">Review donation</h1>
+          <p className="stf-step-sub">Does everything look okay?</p>
+        </div>
+
+        {submitError && (
+          <div className="stf-notice is-warn" role="alert">
+            <span className="stf-notice-mark" aria-hidden="true">!</span>
+            <div className="stf-notice-body"><strong>{submitError}</strong></div>
+          </div>
+        )}
+
+        <ReviewSummary draft={draft} />
+
+        <div className="stf-actions is-row">
+          <button
+            type="button"
+            className="stf-btn stf-btn-secondary"
+            onClick={() => navigate(DONATIONS.new)}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            className="stf-btn stf-btn-warn"
+            onClick={() => setPickerOpen(true)}
+          >
+            No, fix something
+          </button>
+          <button
+            type="button"
+            className="stf-btn stf-btn-primary"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? "Recording..." : "Yes, submit"}
+          </button>
+        </div>
       </div>
-
-      <main className="stf-main donation-intake-main">
-        <DonationRail currentStep={1} />
-
-        <section className="stf-step donation-intake-card">
-          <div className="stf-step-head">
-            <h1 className="stf-step-title">Review Donation</h1>
-            <p className="stf-step-sub">Does everything look okay?</p>
-          </div>
-
-          {submitError && (
-            <div className="stf-notice is-warn" role="alert">
-              <span className="stf-notice-mark" aria-hidden="true">!</span>
-              <div className="stf-notice-body">
-                <strong>{submitError}</strong>
-              </div>
-            </div>
-          )}
-
-          <ReviewSummary draft={draft} />
-
-          <div className="stf-actions is-row donation-intake-actions">
-            <button
-              type="button"
-              className="stf-btn stf-btn-secondary"
-              onClick={() => navigate(DONATIONS.new)}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              className="stf-btn stf-btn-warn"
-              onClick={() => setPickerOpen(true)}
-            >
-              No, fix something
-            </button>
-            <button
-              type="button"
-              className="stf-btn stf-btn-primary"
-              onClick={handleSubmit}
-              disabled={submitting}
-            >
-              {submitting ? "Recording..." : "Yes, submit"}
-            </button>
-          </div>
-        </section>
-      </main>
 
       <SectionPicker
         open={pickerOpen}
@@ -174,9 +173,7 @@ export function ReviewPage() {
         onRecordAnother={handleRecordAnother}
         onGoHome={handleGoHome}
       />
-
-      {/* <MobileBottomNav /> */}
-    </div>
+    </StaffShell>
   );
 }
 

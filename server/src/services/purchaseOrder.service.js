@@ -14,8 +14,25 @@
 // not the stock one.
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/purchaseOrder.repository.js';
-import { isPositiveInt, isValidDateString } from '../utils/validation.js';
-import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
+import supplierRepo from '../repositories/supplier.repository.js';
+import { isPositiveInt, isValidDateString, toQuantity } from '../utils/validation.js';
+import { assertWholeByProduct } from '../features/units/wholeItems.js';
+import {
+  PO_STATUSES as PO_STATUS_LIST, PO_MANUAL_TRANSITIONS, canMovePurchaseOrder,
+} from '../constants/purchaseOrderStatus.js';
+import communications from './communications.service.js';
+import notices from '../features/communications/notices.js';
+import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
+// The Finance recipient managers save in the app (finance_report_email_settings).
+// Replaced financeEmailFallback.service.js, which read FINANCE_EMAIL until
+// feature/notification-fix brought this service onto staging.
+import financeService from './finance.service.js';
+import { FINANCE_EMAIL_ERRORS, safeFinanceEmailError } from '../utils/financeEmailError.js';
+import { lineAmount, orderTotal } from '../utils/poMoney.js';
+import quickbooksService from './quickbooks.service.js';
+import {
+  MAX_IMPORT_ROWS, tooManyRowsMessage, normalizePair, findDuplicateIndexes,
+} from '../utils/quickbooksImport.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -83,12 +100,19 @@ const buildItems = (raw) => {
     }
     seen.add(productId);
 
-    const quantity = Number(line.expectedQuantity);
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      throw fail(400, `Line ${position}: quantity must be a whole number above zero.`);
+    // Up to three decimal places: 12.5 kg of maize meal is an order.
+    // Whether THIS product may be a part quantity is checked against
+    // the catalogue afterwards (assertWholeLines), the same rule
+    // receiving, packing and the gate apply.
+    const quantity = toQuantity(line.expectedQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw fail(400, `Line ${position}: quantity must be above zero.`);
+    }
+    if (Math.abs(Math.round(quantity * 1000) / 1000 - quantity) > 1e-9) {
+      throw fail(400, `Line ${position}: quantity can have at most 3 decimal places.`);
     }
     if (quantity > 1_000_000) {
-      throw fail(400, `Line ${position}: quantity looks like a typo — check it.`);
+      throw fail(400, `Line ${position}: quantity looks like a typo, check it.`);
     }
 
     // Optional and genuinely optional. Dry goods arrive in counted
@@ -161,9 +185,209 @@ const buildPayload = (body = {}) => {
   };
 };
 
+const money = (value) =>
+  `R ${Number(value || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const formatDate = (value) =>
+  value
+    ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
+    : '-';
+
+// One rule for a line and an order's total (utils/poMoney.js), shared
+// with the order list's value and the order sent to QuickBooks. A
+// missing unit price counts as 0 rather than making the total unknown.
+const lineTotal = (item) => lineAmount(item.expected_quantity, item.unit_price);
+const poTotal = (items) => orderTotal(items.map((i) => ({ quantity: i.expected_quantity, unitPrice: i.unit_price })));
+
+// ── Finance email ─────────────────────────────────────────────
+// Sent when a manager approves the order (afterApproval), in one of two
+// voices:
+//   QuickBooks connected   the order is sent across by the system, so the
+//                          email says so, gives the QuickBooks number once
+//                          the order is linked, and asks for nothing.
+//   not connected          the original ask: capture it in QuickBooks and
+//                          type our number into the Memo, which the file
+//                          import then links.
+const buildFinanceEmail = (purchaseOrder, { connected = false, quickbooksNumber = null } = {}) => {
+  const total = poTotal(purchaseOrder.items);
+  const createdBy = purchaseOrder.created_by_name || 'a warehouse manager';
+  const po = purchaseOrder.po_number;
+
+  const subject = connected
+    ? `${po} · ${purchaseOrder.supplier_name} · ${money(total)} · sent to QuickBooks automatically`
+    : `${po} · ${purchaseOrder.supplier_name} · ${money(total)} · capture in QuickBooks`;
+
+  let intro;
+  let closing;
+  if (!connected) {
+    intro = `Purchase order ${po} has been approved and needs to be captured in QuickBooks.`;
+    closing = `Capture this order in QuickBooks and type ${po} into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.`;
+  } else if (quickbooksNumber) {
+    intro = `Purchase order ${po} has been approved and sent to QuickBooks automatically, as QuickBooks PO ${quickbooksNumber}. There is nothing for you to capture.`;
+    closing = 'No need to capture this order: the system has already put it in QuickBooks. If you have already captured it by hand, tell a manager so the two can be matched.';
+  } else {
+    intro = `Purchase order ${po} has been approved. It is being sent to QuickBooks automatically and has not reached it yet; if QuickBooks cannot take it, a manager is told and will sort it out. There is nothing for you to capture.`;
+    closing = 'No need to capture this order: the system sends it to QuickBooks. If you have already captured it by hand, tell a manager so the two can be matched.';
+  }
+
+  const textLines = purchaseOrder.items.map((item) => {
+    const unit = item.default_unit ? ` ${item.default_unit}` : '';
+    const unitPrice = item.unit_price != null ? money(item.unit_price) : 'no unit price';
+    return `  - ${item.product_name}: ${item.expected_quantity}${unit} x ${unitPrice} = ${money(lineTotal(item))}`;
+  }).join('\n');
+
+  const text = `${intro}
+
+Supplier: ${purchaseOrder.supplier_name}
+Created: ${formatDate(purchaseOrder.created_at)} by ${createdBy}
+
+Line items:
+${textLines}
+
+Total: ${money(total)}
+
+${closing}`;
+
+  const rows = purchaseOrder.items.map((item) => `
+    <tr>
+      <td style="${emailStyles.td}">${escapeHtml(item.product_name)}</td>
+      <td style="${emailStyles.td}text-align:right;">${escapeHtml(`${item.expected_quantity} ${item.default_unit || ''}`.trim())}</td>
+      <td style="${emailStyles.td}text-align:right;">${item.unit_price != null ? escapeHtml(money(item.unit_price)) : '&mdash;'}</td>
+      <td style="${emailStyles.td}text-align:right;">${escapeHtml(money(lineTotal(item)))}</td>
+    </tr>`).join('');
+
+  const html = renderLadlesEmail({
+    title: 'Purchase order approved',
+    preheader: connected
+      ? `Purchase order ${po} was sent to QuickBooks automatically. Nothing to capture.`
+      : `Purchase order ${po} needs to be captured in QuickBooks.`,
+    bodyHtml: `
+      <p style="${emailStyles.paragraph}">${escapeHtml(intro)}</p>
+      <p style="${emailStyles.paragraph}"><strong>Supplier:</strong> ${escapeHtml(purchaseOrder.supplier_name)}<br>
+         <strong>Created:</strong> ${escapeHtml(formatDate(purchaseOrder.created_at))} by ${escapeHtml(createdBy)}</p>
+      <table style="${emailStyles.table}">
+        <thead><tr>
+          <th style="${emailStyles.th}">Item</th>
+          <th style="${emailStyles.th}text-align:right;">Qty</th>
+          <th style="${emailStyles.th}text-align:right;">Unit price</th>
+          <th style="${emailStyles.th}text-align:right;">Line total</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td colspan="3" style="${emailStyles.td}text-align:right;font-weight:700;">Total</td>
+          <td style="${emailStyles.td}text-align:right;font-weight:700;">${escapeHtml(money(total))}</td>
+        </tr></tfoot>
+      </table>
+      <p style="${emailStyles.note}">${escapeHtml(closing)}</p>
+    `,
+  });
+  return { subject, text, html };
+};
+
+// Never throws — a Gmail outage must not stop procurement. Status is
+// computed from the send result and written ONLY after it resolves;
+// writing it before (e.g. optimistically as 'sent') is exactly the
+// invite-email bug this must not repeat.
+//
+// A stubbed result (EMAIL_ENABLED=false) is treated the same as no
+// recipient configured: nothing actually left the building, so no
+// status is recorded rather than falsely claiming 'sent'.
+//
+// Returns what happened: 'no_recipient' | 'stubbed' | 'sent' | 'failed'
+// | 'in_progress' (another send for this PO is already running). Only
+// 'sent' and 'failed' touch the status columns.
+//
+// What is stored is a short safe message (utils/financeEmailError.js),
+// never the raw provider text; the raw text goes to the server log.
+//
+// One send per PO at a time: the create-time send and a Resend click
+// cannot overlap and race each other's status write. The flag is
+// always cleared in finally.
+const sendsInFlight = new Set();
+
+const notifyFinance = async (purchaseOrder, sentBy = null) => {
+  if (sendsInFlight.has(purchaseOrder.id)) return 'in_progress';
+  sendsInFlight.add(purchaseOrder.id);
+  try {
+    const { recipientEmail } = await financeService.getEmailSettings();
+    if (!recipientEmail) return 'no_recipient'; // nothing configured — status left as is, no attempt logged
+
+    // With QuickBooks connected the order goes across by itself, so Finance
+    // is told that, and not asked to capture it. Without it, the manual ask.
+    const { subject, text, html } = buildFinanceEmail(purchaseOrder, {
+      connected: await quickbooksService.isConnected(),
+      quickbooksNumber: purchaseOrder.quickbooks_po_id ?? null,
+    });
+
+    let result;
+    try {
+      // Through the communications module so the send lands in message
+      // history. It returns the provider's reply unchanged, so the
+      // result handling below is the same as before.
+      result = await communications.send({
+        type: 'purchase_order_finance',
+        to: recipientEmail, subject, text, html,
+        related: { type: 'purchase_order', id: purchaseOrder.id },
+        sentBy,
+        sendAs: null,
+      });
+    } catch (err) {
+      console.error('[purchaseOrder:financeEmail]', err.message);
+      await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
+        status: 'failed',
+        error: safeFinanceEmailError(err.message) ?? FINANCE_EMAIL_ERRORS.generic,
+        attemptedAt: new Date(),
+      });
+      return 'failed';
+    }
+
+    if (result?.stubbed) return 'stubbed'; // EMAIL_ENABLED=false — no real attempt was made
+
+    const sent = result?.sent === true;
+    if (!sent) {
+      console.error('[purchaseOrder:financeEmail]', result?.error || result?.reason || 'Provider reported a failure.');
+    }
+    await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
+      status: sent ? 'sent' : 'failed',
+      error: sent ? null : (safeFinanceEmailError(result?.error || result?.reason) ?? FINANCE_EMAIL_ERRORS.generic),
+      attemptedAt: new Date(),
+    });
+    return sent ? 'sent' : 'failed';
+  } finally {
+    sendsInFlight.delete(purchaseOrder.id);
+  }
+};
+
+// ── Only what the supplier supplies ───────────────────────────
+// A supplier with products listed against it (Suppliers → Products
+// supplied) can only be ordered from for those. A supplier with none
+// listed is not restricted, so an unfinished list never stops an order.
+// The offending ids go back as missingProductIds, the same field the
+// unknown-product error uses, so the form marks the rows.
+const assertSupplierSupplies = async (payload) => {
+  const allowed = await supplierRepo.getSuppliedProductIds(payload.supplierId);
+  if (allowed.length === 0) return;
+  const offending = [...new Set(payload.items.map((item) => item.productId))]
+    .filter((productId) => !allowed.includes(productId));
+  if (offending.length === 0) return;
+
+  const err = fail(400, offending.length === 1
+    ? 'One item is not something this supplier supplies. Remove it, or add it to the supplier under Suppliers.'
+    : `${offending.length} items are not things this supplier supplies. Remove them, or add them to the supplier under Suppliers.`);
+  err.missingProductIds = offending;
+  throw err;
+};
+
+// A part quantity only for a decantable product: 2.5 crates cannot be
+// ordered, because 2.5 crates can never be received.
+const assertWholeLines = (payload) => assertWholeByProduct(
+  payload.items.map((l) => ({ productId: l.productId, quantity: l.expectedQuantity })));
+
 // ── Create ────────────────────────────────────────────────────
 const createPurchaseOrder = async (body, userId) => {
   const payload = buildPayload(body);
+  await assertWholeLines(payload);
+  await assertSupplierSupplies(payload);
   const result  = await repo.createPurchaseOrder(payload, userId);
 
   if (!result.ok) {
@@ -188,11 +412,19 @@ const createPurchaseOrder = async (body, userId) => {
     throw fail(500, 'Failed to create the purchase order.');
   }
 
+  // Finance is not told yet. A new order is only a request until a manager
+  // approves it, and one that is returned or deleted first should never
+  // reach Finance: the email goes out on approval (afterApproval).
   return result.purchaseOrder;
 };
 
 // ── Read ──────────────────────────────────────────────────────
-const listPurchaseOrders = async ({ status, supplierId } = {}) => {
+// The list page counts its tabs from what it fetched, so it asks for
+// more than the repository's default of 50. Capped: an unbounded limit
+// from a query string is a full-table read on request.
+const MAX_LIST_LIMIT = 500;
+
+const listPurchaseOrders = async ({ status, supplierId, limit } = {}) => {
   const cleanStatus = clean(status);
   if (cleanStatus && !PO_STATUS_LIST.includes(cleanStatus)) {
     throw fail(400, `Unknown status filter "${cleanStatus}".`);
@@ -202,9 +434,14 @@ const listPurchaseOrders = async ({ status, supplierId } = {}) => {
     throw fail(400, 'A valid supplier ID is required.');
   }
 
+  if (limit !== undefined && limit !== null && limit !== ''
+      && (!isPositiveInt(limit) || Number(limit) > MAX_LIST_LIMIT)) {
+    throw fail(400, `Limit must be a whole number from 1 to ${MAX_LIST_LIMIT}.`);
+  }
   return repo.listPurchaseOrders({
     status:     cleanStatus,
     supplierId: isPositiveInt(supplierId) ? Number(supplierId) : null,
+    ...(isPositiveInt(limit) ? { limit: Number(limit) } : {}),
   });
 };
 
@@ -221,7 +458,36 @@ const getPurchaseOrder = async (rawId) => {
 // 'follow_up_required' need the same mechanism and the same
 // mandatory-reason rule the CHECK constraint already enforces on
 // Returned (see PurchaseOrderDetail.jsx's own comment on that).
-const setPurchaseOrderStatus = async (rawId, body = {}) => {
+// The statuses in words, for a refusal a manager reads.
+const PO_STATUS_WORDS = {
+  pending: 'Pending approval', approved: 'Approved', in_transit: 'In transit',
+  partially_received: 'Partially received', completed: 'Completed',
+  returned: 'Returned', follow_up_required: 'Follow-up required',
+};
+
+// What happens once an order is approved, in this order: where QuickBooks
+// is connected the order is sent across first, then Finance is emailed, so
+// the email can say where it ended up (and give the QuickBooks number).
+// Without QuickBooks the email is the ask to capture it. Never throws.
+const afterApproval = (poId, userId = null) => {
+  setImmediate(() => {
+    (async () => {
+      if (await quickbooksService.isConnected()) {
+        // Finance is told whatever happens to the send: a failure here must
+        // not leave them hearing nothing.
+        try { await quickbooksService.pushInBackground(poId); } catch (err) {
+          console.error('[purchaseOrder:financeEmail]', err.message);
+        }
+      }
+      const po = await repo.getPurchaseOrderById(poId);   // fresh: the link may have just been made
+      if (po) await notifyFinance(po, userId);
+    })().catch((err) => {
+      console.error('[purchaseOrder:financeEmail]', err.message);
+    });
+  });
+};
+
+const setPurchaseOrderStatus = async (rawId, body = {}, userId = null) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
 
   // PO_STATUSES is the CHECK constraint verbatim, so anything this
@@ -237,17 +503,279 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   if (status === 'returned' && !reason) {
     throw fail(400, 'A reason is required when marking a purchase order as returned.');
   }
+  // A follow-up is a note to whoever picks it up next; without one it
+  // says only that something is wrong.
+  if (status === 'follow_up_required' && !reason) {
+    throw fail(400, 'Say what needs following up when marking a purchase order for follow-up.');
+  }
 
   const existing = await repo.getPurchaseOrderById(Number(rawId));
   if (!existing) throw fail(404, 'Purchase order not found.');
   if (existing.status === status) return existing;
+  // Reopening a followed-up order returns it to Approved. Allowing a
+  // follow-up on an order nobody has approved yet made that a way to
+  // reach Approved without the approval.
+  if (status === 'follow_up_required' && existing.status === 'pending') {
+    throw fail(400, 'Approve this order before recording a follow-up.');
+  }
 
-  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
+  // The rest of a part-received order is coming on its follow-up order.
+  // Reopening it as well would let the same goods be received twice.
+  if (existing.status === 'partially_received' && status === 'approved') {
+    const coming = (existing.follow_up_orders ?? []).find((o) => o.status !== 'completed' && o.status !== 'returned');
+    if (coming) {
+      throw fail(409, `The rest of this order is on follow-up order ${coming.po_number}. Receive against that order instead.`);
+    }
+  }
+
+  if (!canMovePurchaseOrder(existing.status, status)) {
+    const label = (s) => PO_STATUS_WORDS[s] ?? s;
+    const next = PO_MANUAL_TRANSITIONS[existing.status] ?? [];
+    throw fail(409, next.length === 0
+      ? `This order is ${label(existing.status)} and is closed. Its status cannot be changed.`
+      : `An order that is ${label(existing.status)} cannot be changed to ${label(status)}. It can become: ${next.map(label).join(', ')}.`);
+  }
+
+  const updated = await repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
+    beforeCommit: notices.purchaseOrderNeedsAttention,
+    actorId: userId,
+    from: existing.status,
+  });
+
+  // The approval is saved. Everything that follows (QuickBooks, then
+  // Finance) happens in the background and is never awaited here: the
+  // manager is not kept waiting on Intuit or Gmail, and a failure is
+  // recorded on the order to retry.
+  if (status === 'approved' && existing.status === 'pending') afterApproval(Number(rawId), userId);
+
+  return updated;
+};
+
+// ── Follow-up order ───────────────────────────────────────────
+// What a manager does about an order that came in short: a second
+// order for the remainder (see createFollowUpOrder in the repository
+// and migration 043). The expected date is theirs to give; a week from
+// today when they do not.
+const FOLLOW_UP_DAYS = 7;
+
+const createFollowUpOrder = async (rawId, body = {}, userId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+
+  let expectedDeliveryDate = clean(body.expectedDeliveryDate);
+  if (expectedDeliveryDate && !isValidDateString(expectedDeliveryDate)) {
+    throw fail(400, 'Choose a real date for when the follow-up is expected.');
+  }
+  if (!expectedDeliveryDate) {
+    expectedDeliveryDate = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000)
+      .toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
+  }
+
+  const result = await repo.createFollowUpOrder(Number(rawId), userId, { expectedDeliveryDate });
+  if (!result.ok) {
+    if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
+    if (result.code === 'not_awaiting_follow_up') {
+      throw fail(409, 'A follow-up order can only be raised on an order that is flagged Follow-up required.');
+    }
+    if (result.code === 'has_follow_up') {
+      throw fail(409, `This order already has a follow-up order, ${result.poNumber}.`);
+    }
+    if (result.code === 'supplier_inactive') {
+      throw fail(409, `${result.supplierName} is no longer an active supplier. Raise a new order with another supplier instead.`);
+    }
+    if (result.code === 'nothing_outstanding') {
+      throw fail(409, 'Nothing is outstanding on this order. Reopen it or mark it complete instead.');
+    }
+    throw fail(500, 'Failed to create the follow-up order.');
+  }
+  return repo.getPurchaseOrderById(result.id);
+};
+
+// ── QuickBooks reference ─────────────────────────────────────
+// Same validation as buildPayload's quickbooksPoId at create time,
+// applied again here since this is now the second place a manager can
+// set it. An empty string clears the reference rather than being
+// rejected — a PO can go back to "not linked" if it was entered in
+// error.
+const setQuickbooksReference = async (rawId, body = {}, actorId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const id = Number(rawId);
+
+  const quickbooksPoId = clean(body.quickbooksPoId);
+  if (quickbooksPoId && quickbooksPoId.length > 50) {
+    throw fail(400, 'QuickBooks reference must be 50 characters or fewer.');
+  }
+
+  const found = await repo.setQuickbooksReference(id, quickbooksPoId, actorId);
+  if (!found) throw fail(404, 'Purchase order not found.');
+
+  return repo.getPurchaseOrderById(id);
+};
+
+// ── QuickBooks links import ──────────────────────────────────
+// The client reads the file and finds the pairs; these two endpoints
+// only look up and fill in links. Nothing here creates or deletes a PO.
+// Rows that can't be trusted are given a status and left out of the
+// database round trip — a row's status never depends on a guess.
+const DUPLICATE_MESSAGE =
+  'This PO number or QuickBooks number appears in more than one row. Nothing is linked for it.';
+
+const prepareImportPairs = (body) => {
+  const raw = body?.pairs;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw fail(400, 'Choose a file with at least one PO number in it.');
+  }
+  if (raw.length > MAX_IMPORT_ROWS) throw fail(400, tooManyRowsMessage(raw.length));
+
+  const normalized = raw.map((r) => ({ ...normalizePair(r), overwrite: r?.overwrite === true }));
+  const valid = normalized.filter((n) => !n.invalid);
+  const dupes = findDuplicateIndexes(valid);
+  const checked = valid.filter((_, i) => !dupes.has(i));
+  return { normalized, valid, dupes, checked };
+};
+
+// Walks the submitted order and slots each outcome back in.
+const mergeImportResults = (prepared, checkedResults) => {
+  const byPair = new Map(prepared.checked.map((p, i) => [p, checkedResults[i]]));
+  const dupePairs = new Set([...prepared.dupes].map((i) => prepared.valid[i]));
+  return prepared.normalized.map((n) => {
+    const base = { poNumber: n.poNumber, quickbooksNumber: n.quickbooksNumber };
+    if (n.invalid) return { ...base, status: 'invalid', message: n.invalid };
+    if (dupePairs.has(n)) return { ...base, status: 'duplicate', message: DUPLICATE_MESSAGE };
+    const { poId, displacedPoId, ...outcome } = byPair.get(n); // internal ids stay server-side
+    return { ...base, ...outcome };
+  });
+};
+
+const countByStatus = (rows) => rows.reduce((acc, r) => {
+  acc[r.status] = (acc[r.status] ?? 0) + 1;
+  return acc;
+}, {});
+
+const previewQuickbooksImport = async (body = {}) => {
+  const prepared = prepareImportPairs(body);
+  const checkedResults = prepared.checked.length
+    ? await repo.previewQuickbooksLinks(prepared.checked)
+    : [];
+  const rows = mergeImportResults(prepared, checkedResults);
+  return { rows, counts: countByStatus(rows) };
+};
+
+const applyQuickbooksImport = async (body = {}, actorId) => {
+  const prepared = prepareImportPairs(body);
+  let checkedResults = [];
+  if (prepared.checked.length) {
+    try {
+      checkedResults = await repo.applyQuickbooksLinks(prepared.checked, actorId);
+    } catch (err) {
+      // Someone linked one of these numbers between our check and our
+      // write. The transaction has rolled back, so nothing was changed.
+      if (err?.code === '23505') {
+        throw fail(409, 'A QuickBooks number was linked by someone else while this ran. Nothing was changed. Preview the file again.');
+      }
+      throw err;
+    }
+  }
+  const rows = mergeImportResults(prepared, checkedResults);
+  return { rows, counts: countByStatus(rows) };
+};
+
+// ── Resend the Finance email ─────────────────────────────────
+// Same send + status-write path as creation. Returns the PO as it now
+// stands, so the caller sees the status the attempt left behind.
+const resendFinanceEmail = async (rawId, userId = null) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const id = Number(rawId);
+
+  const purchaseOrder = await repo.getPurchaseOrderById(id);
+  if (!purchaseOrder) throw fail(404, 'Purchase order not found.');
+  // Finance hears about an order when it is approved, so there is nothing to
+  // resend before that, and nothing to say about one that was sent back.
+  if (purchaseOrder.status === 'pending') throw fail(409, 'Approve this order before sending it to Finance.');
+  if (purchaseOrder.status === 'returned') throw fail(409, 'This order was returned, so Finance is not told about it.');
+
+  const outcome = await notifyFinance(purchaseOrder, userId);
+  if (outcome === 'in_progress') {
+    throw fail(409, 'Already sending. Wait a moment, then check the status.');
+  }
+  if (outcome === 'no_recipient') {
+    throw fail(400, FINANCE_EMAIL_ERRORS.noRecipient);
+  }
+  if (outcome === 'stubbed') {
+    throw fail(503, 'Email is turned off. Ask an admin to turn it on.');
+  }
+
+  return repo.getPurchaseOrderById(id);
+};
+
+// ── Update (pending only) ──────────────────────────────────────
+// Reuses buildPayload/buildItems wholesale — an edit is validated
+// exactly as hard as a fresh order, because it produces the same
+// document a receiver will later check a delivery against.
+const updatePurchaseOrder = async (rawId, body, userId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const payload = buildPayload(body);
+  await assertWholeLines(payload);
+  await assertSupplierSupplies(payload);
+  const result  = await repo.updatePurchaseOrder(Number(rawId), payload, userId);
+
+  if (!result.ok) {
+    if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
+    if (result.code === 'not_editable') {
+      throw fail(409,
+        `This purchase order is "${result.status}" and can no longer be edited: ` +
+        'only a pending order, not yet approved, can be changed.');
+    }
+    if (result.code === 'supplier_not_found') {
+      throw fail(404, 'That supplier no longer exists.');
+    }
+    if (result.code === 'supplier_inactive') {
+      throw fail(409,
+        `${result.supplier.name} is deactivated and cannot be ordered from. ` +
+        'Reactivate the supplier first.');
+    }
+    if (result.code === 'unknown_products') {
+      const err = fail(400,
+        'One or more items are not configured stock codes. ' +
+        'Add them under Configure Stock Codes first.');
+      err.missingProductIds = result.missing;
+      throw err;
+    }
+    throw fail(500, 'Failed to update the purchase order.');
+  }
+
+  return result.purchaseOrder;
+};
+
+// ── Delete (pending only, never received against) ─────────────
+const deletePurchaseOrder = async (rawId, userId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const result = await repo.deletePurchaseOrder(Number(rawId), userId);
+
+  if (!result.ok) {
+    if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
+    if (result.code === 'not_deletable') {
+      throw fail(409,
+        `This purchase order is "${result.status}" and can no longer be deleted: ` +
+        'only a pending order, not yet approved, can be removed. Mark it Returned instead.');
+    }
+    if (result.code === 'has_deliveries') {
+      throw fail(409,
+        'This purchase order already has deliveries recorded against it and cannot be deleted.');
+    }
+    throw fail(500, 'Failed to delete the purchase order.');
+  }
 };
 
 export default {
   createPurchaseOrder,
+  createFollowUpOrder,
   listPurchaseOrders,
   getPurchaseOrder,
   setPurchaseOrderStatus,
+  updatePurchaseOrder,
+  deletePurchaseOrder,
+  setQuickbooksReference,
+  previewQuickbooksImport,
+  applyQuickbooksImport,
+  resendFinanceEmail,
 };

@@ -8,12 +8,19 @@
 // Only submissions that carry an idempotency key. A queued request is
 // a request that will be sent later, possibly twice if a flush is
 // interrupted mid-flight, and the only thing that makes that safe is
-// the server recognising the retry. Receiving and dispatch both send
-// one (see newIdempotencyKey and the ON CONFLICT (idempotency_key)
-// insert in delivery.repository.js / dispatch). Decanting does NOT,
-// and decanting cannot be un-recorded, so it is deliberately left out
-// — it fails honestly instead, and the worker's numbers stay on the
-// screen.
+// the server recognising the retry.
+//
+// Receiving, dispatch and donation intake keep the key in a column of
+// their own (see the ON CONFLICT (idempotency_key) insert in
+// delivery.repository.js). Everything else the floor submits (packing
+// an item, logging a pallet packed, a decanting sheet, a benevolent
+// request, a compost weigh-in) goes through offlinePost.js, and the
+// server remembers those keys in one table
+// (server/src/middleware/idempotency.middleware.js).
+//
+// NOT kept: anything whose answer depends on what other people did in
+// the meantime. Claiming or releasing a pallet, and claiming a
+// request, need a signal and say so.
 //
 // WHY IndexedDB AND NOT localStorage
 // A receiving submission carries a signature as a PNG data URL. A few
@@ -31,7 +38,27 @@
 //
 // NOTHING IS SILENT. The count is on the screen whenever it is not
 // zero, so "did that save?" always has an answer a worker can see.
+//
+// NOTHING IS A DEAD END EITHER. Every reason an item is still here has
+// a way out, and the bar's list (OutboxPanel) shows which one applies:
+//
+//   no signal          waits, and goes on its own when the signal is back
+//   signed out         a session that ran out while it waited. It is NOT
+//                      given up on: it goes as soon as the same person
+//                      signs in again. (It used to be retired for good,
+//                      which lost the work with nothing anyone could do.)
+//   somebody else's    recorded by another person on this phone. It is
+//                      never sent under the wrong name; it waits for them
+//   server busy        a rate limit, a timeout, a 5xx, or the same
+//                      submission still being saved: tried again later
+//   refused            the server said no for a reason a retry will not
+//                      change. Kept, shown with the reason, and the
+//                      worker can try it again or discard it
+//   too old            over twelve hours. Not sent on its own; the worker
+//                      can still send it deliberately, or discard it
 // ─────────────────────────────────────────────────────────────
+
+import { getActiveWarehouse, runWithWarehouse } from './warehouse';
 
 const DB_NAME  = 'batches-outbox';
 const STORE    = 'pending';
@@ -45,6 +72,18 @@ const VERSION  = 1;
 const STALE_AFTER_MS = 12 * 60 * 60 * 1000;
 
 let dbPromise = null;
+
+// Who is signed in on this device. Set by useOutbox from the session.
+// An item remembers who recorded it, and is only ever sent as them:
+// the server ties a submission's key to its user, and a delivery
+// recorded by one person must not arrive under another's name.
+let owner = { id: null, name: null };
+export const setOwner = (user) => {
+  owner = user?.id != null
+    ? { id: user.id, name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || null }
+    : { id: null, name: null };
+};
+const ownedByOther = (item, userId) => item.userId != null && userId != null && String(item.userId) !== String(userId);
 
 const openDb = () => {
   if (dbPromise) return dbPromise;
@@ -122,10 +161,22 @@ export const list = async () => {
  * @param {string} item.endpoint  e.g. '/api/deliveries'
  * @param {object} item.body      must contain an idempotency key
  * @param {string} item.label     what a worker should see: 'Order 86'
- * @param {string} item.kind      'delivery' | 'collection'
+ * @param {string} item.kind      'delivery' | 'collection' | 'packing' | 'decanting' | …
+ * @param {object} [item.meta]   what a screen needs to show the work as done while it waits
  */
 export const enqueue = async (item) => {
-  const row = { ...item, savedAt: Date.now(), attempts: 0, error: null };
+  // Multi-warehouse: remember where this was recorded. It is sent there
+  // even if the worker has switched to another warehouse by the time
+  // the signal comes back. Null with one database.
+  const row = {
+    warehouse: getActiveWarehouse(),
+    userId: owner.id,
+    userName: owner.name,
+    ...item,
+    savedAt: Date.now(),
+    attempts: 0,
+    error: null,
+  };
   try {
     await withStore('readwrite', (store) => store.add(row));
   } catch {
@@ -147,24 +198,58 @@ export const remove = async (id) => {
 // `permanent` is the difference between "the server is having a bad
 // moment" and "this request is wrong and always will be". Only the
 // second one is taken out of the retry rotation.
-const markFailed = async (id, message, permanent) => {
+const patch = async (id, change) => {
   try {
     await withStore('readwrite', (store) => {
       const get = store.get(id);
       get.onsuccess = () => {
         const row = get.result;
         if (!row) return;
-        store.put({
-          ...row,
-          attempts: (row.attempts ?? 0) + 1,
-          error: message,
-          permanent: Boolean(permanent),
-        });
+        store.put({ ...row, ...change(row) });
       };
     });
   } catch { /* no storage */ }
   await announce();
 };
+
+// `reason` is why it is still here: 'signin' | 'later' | 'refused' |
+// 'stale'. Only 'refused' and 'stale' are taken out of the retry
+// rotation (`permanent`), and both can be put back by hand.
+const markFailed = (id, message, permanent, reason = permanent ? 'refused' : 'later') =>
+  patch(id, (row) => ({
+    attempts: (row.attempts ?? 0) + 1,
+    error: message,
+    permanent: Boolean(permanent),
+    reason,
+  }));
+
+/**
+ * Put a refused or too-old item back in the queue, on the worker's say
+ * so. `forced` lets it past the twelve-hour rule once: the worker has
+ * looked at it and decided it should still go.
+ */
+export const retry = (id) => patch(id, () => ({ permanent: false, error: null, reason: null, forced: true }));
+
+// Why a failed send did not go, which decides what happens next.
+const classify = (err) => {
+  if (err?.isNetworkError) return 'offline';
+  const status = err?.status ?? 0;
+  // The session ran out while this waited. Signing in again fixes it.
+  if (status === 401) return 'signin';
+  // The server could not take it just now: a timeout, a rate limit, a
+  // bad moment, or this very submission still being saved from an
+  // earlier attempt (`retryable`). All worth another go.
+  if (status === 408 || status === 425 || status === 429 || status >= 500 || err?.retryable) return 'later';
+  // Any other 4xx is this request being wrong: a validation rule, a
+  // pallet somebody else already collected. As wrong in thirty seconds.
+  if (status >= 400) return 'refused';
+  return 'later';
+};
+
+// One flush at a time. The timer, the "online" event and the Send now
+// button can all fire together; two passes over the same queue would
+// send the same item twice at once.
+let flushing = null;
 
 /**
  * The decision every caller would otherwise have to make identically:
@@ -198,13 +283,19 @@ export const queueIfOffline = async (err, item) => {
  *        Injected rather than imported, so this module does not
  *        depend on api.js and api.js can depend on nothing.
  */
-export const flush = async (post) => {
+export const flush = (post) => {
+  if (flushing) return flushing;
+  flushing = runFlush(post).finally(() => { flushing = null; });
+  return flushing;
+};
+
+const runFlush = async (post) => {
   const items = await list();
   const sent = [];
 
   for (const item of items) {
-    // Already refused for a reason a retry cannot fix. It stays in
-    // the list so a person can see it; it is not sent again.
+    // Refused, or too old: it stays in the list with its reason, and
+    // is only sent again if the worker asks (retry()).
     //
     // Skipped rather than breaking the loop: a delivery the server
     // refused and a collection done twenty minutes later are separate
@@ -213,30 +304,37 @@ export const flush = async (post) => {
     // ever reaching the server.
     if (item.permanent) continue;
 
-    if (Date.now() - item.savedAt > STALE_AFTER_MS) {
-      if (!item.error) await markFailed(item.id, 'Too old to send on its own.', true);
+    // Recorded by someone else on this phone. It waits for them.
+    if (ownedByOther(item, owner.id)) continue;
+
+    if (!item.forced && Date.now() - item.savedAt > STALE_AFTER_MS) {
+      await markFailed(item.id, 'Saved more than 12 hours ago, so it was not sent on its own.', true, 'stale');
       continue;
     }
 
     try {
-      await post(item.endpoint, item.body);
+      await runWithWarehouse(item.warehouse, () => post(item.endpoint, item.body));
       await remove(item.id);
       sent.push(item);
     } catch (err) {
+      const why = classify(err);
       // Still no signal. Nothing behind this will go either, so stop.
-      if (err?.isNetworkError) break;
+      if (why === 'offline') break;
 
-      const status = err?.status ?? 0;
-      // 4xx is this request being wrong \u2014 a validation rule, an
-      // expired session, a pallet somebody else already collected. It
-      // will be just as wrong in thirty seconds. 5xx is the server
-      // having a bad moment and is worth another go.
-      const permanent = status >= 400 && status < 500;
-      await markFailed(item.id, err?.message || 'The server refused this.', permanent);
-
-      // A struggling server should not be hammered with the rest of
-      // the queue; a permanently refused item should not hold it up.
-      if (!permanent) break;
+      if (why === 'signin') {
+        // Not this item's fault and not a reason to give up on it.
+        // Everything behind it would be turned away the same, so stop;
+        // it all goes once the worker has signed in again.
+        await markFailed(item.id, 'Sign in again to send this.', false, 'signin');
+        break;
+      }
+      if (why === 'later') {
+        await markFailed(item.id, err?.message || 'The server could not take this just now.', false, 'later');
+        // A struggling server should not be hammered with the rest.
+        break;
+      }
+      // Refused. It should not hold up what is behind it.
+      await markFailed(item.id, err?.message || 'The server refused this.', true, 'refused');
     }
   }
 

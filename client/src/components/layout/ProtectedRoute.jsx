@@ -12,9 +12,10 @@
 // ─────────────────────────────────────────────────────────────
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { homeForRole } from '../../features/taskdashboard/components/navSections';
-import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
-import AssistantLauncher from '../../features/assistant/components/AssistantLauncher';
+import { homeForRole } from './navSections';
+import ManagerLayout from './ManagerLayout';
+import AssistantLauncher from '../../features/assistant/AssistantLauncher';
+import LoadingScreen from '../ui/loading-screen';
 
 // `shell` wraps the whole group in the app shell — sidebar on desktop,
 // hamburger drawer on a phone — so a route group opts in with one word
@@ -31,11 +32,7 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
 
   // Still checking with the server — decide nothing yet.
   if (isLoading) {
-    return (
-      <div className="page-light" role="status" aria-live="polite">
-        <p className="pdf-table-empty">Checking your session…</p>
-      </div>
-    );
+    return <LoadingScreen page label="Checking your session" />;
   }
 
   // Not logged in — send to login
@@ -61,16 +58,15 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
   // landing and login pages for free because they are outside any
   // ProtectedRoute.
   //
-  // Not for guests. A guest is a volunteer signed in with a first
-  // name for one event; they see a single screen, and the server
-  // refuses them the endpoint anyway (assistant.routes.js), so
-  // offering the button would be offering a dead end.
+  // Guests get it too: a volunteer on their first shift needs help the
+  // most. The server gives them a small set of topics of their own, no
+  // screens to open and a tighter limit (assistant.routes.js).
   const content = shell ? <ManagerLayout><Outlet /></ManagerLayout> : <Outlet />;
 
   return (
     <>
       {content}
-      {user.role !== 'guest' && <AssistantLauncher />}
+      <AssistantLauncher role={user.role} />
     </>
   );
 };

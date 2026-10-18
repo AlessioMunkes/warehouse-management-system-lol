@@ -1,11 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // src/pages/GuestLoginPage.jsx
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { listPublicWarehouses } from '../services/publicWarehouseAPI';
 import logo from '../assets/Batches_Logo.jpeg';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
+import { LANDING, LEGAL } from '../routes/paths';
+import { useT } from '../translations';
+import GuestLanguageSwitch from '../features/guest/GuestLanguageSwitch';
 
 // shadcn/ui components
 import { Button } from '@/components/ui/button';
@@ -32,10 +36,38 @@ import {
 const GuestLoginPage = () => {
   const { loginAsGuest } = useAuth();
   const navigate = useNavigate();
+  const t = useT();
 
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── Multi-warehouse: which site is this volunteer at? ─────────
+  // A poster's link can name it (?w=gauteng). Otherwise, if there is
+  // more than one warehouse, the page asks. With one database the list
+  // comes back empty and nothing extra is shown.
+  const [searchParams] = useSearchParams();
+  const fromLink = (searchParams.get('w') || '').trim().toLowerCase();
+  const [sites, setSites] = useState([]);
+  const [warehouse, setWarehouse] = useState(fromLink);
+
+  useEffect(() => {
+    let cancelled = false;
+    listPublicWarehouses()
+      .then((data) => {
+        if (cancelled || !data?.multiWarehouse) return;
+        const list = data.warehouses || [];
+        setSites(list);
+        const known = list.some((w) => w.code === fromLink);
+        if (list.length === 1) setWarehouse(list[0].code);
+        else if (!known) setWarehouse('');
+      })
+      .catch(() => { /* treated as one warehouse; the server still decides */ });
+    return () => { cancelled = true; };
+  }, [fromLink]);
+
+  const linkNamesSite = sites.some((w) => w.code === fromLink);
+  const mustChooseSite = sites.length > 1 && !linkNamesSite;
 
   // There used to be a second, fire-and-forget POST to
   // /api/volunteers/sign-in right here, on the reasoning that a failed
@@ -50,7 +82,11 @@ const GuestLoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('Name is required.');
+      setError(t('guest.login.nameRequired'));
+      return;
+    }
+    if (mustChooseSite && !warehouse) {
+      setError(t('guest.login.siteRequired'));
       return;
     }
     if (isSubmitting) return; // a double tap is two arrivals otherwise
@@ -62,11 +98,11 @@ const GuestLoginPage = () => {
     // is no cookie and no volunteer row, so continuing to /guest-home
     // would strand someone on a screen where every request 401s.
     try {
-      await loginAsGuest(name.trim());
+      await loginAsGuest(name.trim(), warehouse || null);
       navigate('/guest-home', { replace: true });
     } catch (err) {
       console.error('Guest sign-in failed:', err);
-      setError(err?.message || 'Could not sign you in. Please try again.');
+      setError(err?.message || t('guest.login.failed'));
       setIsSubmitting(false);
     }
   };
@@ -98,24 +134,34 @@ const GuestLoginPage = () => {
         {/* ── Guest sign-in card ── */}
         <Card className="login-card">
           <CardHeader className="login-card-header">
-            <CardTitle className="login-title">GUEST LOG IN</CardTitle>
+            <div className="login-field-row">
+              <button
+                type="button"
+                onClick={() => navigate(LANDING)}
+                className="login-forgot-link"
+              >
+                {t('guest.login.back')}
+              </button>
+              {/* First screen a volunteer sees: they may need to switch
+                  before they can read anything else. */}
+              <GuestLanguageSwitch />
+            </div>
+            <CardTitle className="login-title">{t('guest.login.title')}</CardTitle>
             <CardDescription className="login-subtitle">
-              Please fill in your details to continue
+              {t('guest.login.subtitle')}
             </CardDescription>
           </CardHeader>
 
           <CardContent className="login-card-body">
-            <p className="login-section-title">GUEST SIGN IN</p>
-
             {error && (
-              <div className="login-notice-error">⚠ {error.toUpperCase()}</div>
+              <div className="login-notice-error">⚠ {error}</div>
             )}
 
             <form onSubmit={handleSubmit} className="login-form">
 
               {/* Full name field — the only field on this page */}
               <div className="login-field">
-                <Label htmlFor="name" className="login-label">FULL NAME</Label>
+                <Label htmlFor="name" className="login-label">{t('guest.login.nameLabel')}</Label>
                 <Input
                   id="name"
                   type="text"
@@ -124,14 +170,36 @@ const GuestLoginPage = () => {
                     setName(e.target.value);
                     setError('');
                   }}
-                  placeholder="e.g. THABO MOKOENA"
+                  placeholder={t('guest.login.namePlaceholder')}
                   className="login-input"
                 />
               </div>
 
+              {/* Multi-warehouse only: which site the volunteer is at */}
+              {mustChooseSite && (
+                <div className="login-field">
+                  <Label htmlFor="warehouse" className="login-label">{t('guest.login.warehouse')}</Label>
+                  <select
+                    id="warehouse"
+                    value={warehouse}
+                    onChange={(e) => {
+                      setWarehouse(e.target.value);
+                      setError('');
+                    }}
+                    // Same shape as the name field above (components/ui/input.jsx).
+                    className="login-input h-9 w-full rounded-3xl border border-input bg-input/50 px-3 py-1 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
+                  >
+                    <option value="">{t('guest.login.warehouseChoose')}</option>
+                    {sites.map((site) => (
+                      <option key={site.code} value={site.code}>{site.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Primary sign-in button */}
-              <Button type="submit" className="login-btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? 'SIGNING IN…' : 'LOGIN'}
+              <Button type="submit" className="login-btn-primary" disabled={isSubmitting} loading={isSubmitting}>
+                {isSubmitting ? t('guest.login.signingIn') : t('guest.login.signIn')}
               </Button>
 
               {/* Back to employee sign-in */}
@@ -141,9 +209,16 @@ const GuestLoginPage = () => {
                 onClick={() => navigate('/login')}
                 className="login-btn-guest"
               >
-                ← BACK TO EMPLOYEE SIGN IN
+                {t('guest.login.staff')}
               </Button>
             </form>
+
+            {/* English only: the policy pages are not translated yet. */}
+            <p className="login-legal-links">
+              <Link to={LEGAL.privacy}>Privacy Policy</Link>
+              <span aria-hidden="true">·</span>
+              <Link to={LEGAL.terms}>Terms of Service</Link>
+            </p>
           </CardContent>
         </Card>
       </div>

@@ -20,43 +20,30 @@
 // volunteers.signed_out_at, which is what the volunteer-hours report is
 // built on. Before Phase 0.3 nothing set it and the metric was empty.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  GuestShell, GuestScreen, Button, Notice, HelpNote,
-} from '../features/guest/components/GuestPrimitives';
-import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf } from '../features/guest/guestFormat';
+  GuestShell, GuestScreen, Button, Notice, HelpNote, SignOutConfirm, Rich,
+} from '../features/guest/GuestPrimitives';
+import { useGuestSignOut } from '../features/guest/useGuestSignOut';
+import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf, mark } from '../features/guest/guestFormat';
+import { useT } from '../translations';
 
 const GuestDonePage = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const { user } = useAuth();
+  const t = useT();
 
   const summary = state?.summary ?? null;
-  const name = displayName(user?.firstName);
+  const name = displayName(user?.firstName, t);
 
-  // Navigate BEFORE clearing the session, not after.
-  //
-  // This screen sits inside ProtectedRoute, which renders
-  // <Navigate to="/login"> the moment the user becomes null. Awaiting
-  // logout() first therefore handed the volunteer to the staff login —
-  // "EMPLOYEE LOG IN · AUTHORISED PERSONNEL ONLY" — as the last thing
-  // they saw after giving up their morning. Leaving the protected route
-  // first means that redirect never has a chance to fire.
-  //
-  // The landing page, not /guest: it carries "I'm volunteering today",
-  // so a volunteer coming back tomorrow has a way in, and it reads as
-  // the front door rather than a form.
-  //
-  // logout() is still awaited so the visit is properly signed out; it
-  // just is not what decides where they end up.
-  const signOut = async () => {
-    setBusy(true);
-    navigate('/', { replace: true });
-    await logout();               // closes the visit AND clears the cookie
-  };
+  // Sign-out lives in useGuestSignOut: it lands on the front door
+  // (navigating BEFORE the session is cleared, so ProtectedRoute never
+  // bounces the volunteer to the staff login) and asks first if they
+  // somehow still hold a pallet.
+  const flow = useGuestSignOut();
+  const busy = flow.busy || flow.confirming || flow.checkFailed;
 
   // Reached without state — a refresh, or a direct link. Say thank you
   // properly rather than inventing numbers to fill the space.
@@ -64,16 +51,17 @@ const GuestDonePage = () => {
     return (
       <GuestShell>
         <GuestScreen
-          title={`Thank you, ${name}`}
-          lede="Your pallet is finished and on its way."
+          title={t('guest.done.thanks', { name })}
+          lede={t('guest.done.finishedLede')}
         >
-          <Button onClick={signOut} disabled={busy}>
-            {busy ? 'Signing you out…' : 'Sign out'}
+          <SignOutConfirm flow={flow} />
+          <Button onClick={() => navigate('/guest-home')} disabled={busy}>
+            {t('guest.done.another')}
           </Button>
-          <Button variant="ghost" onClick={() => navigate('/guest-home')}>
-            Pack another pallet
+          <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
+            {flow.busy ? t('guest.nav.signingOut') : t('guest.nav.signOut')}
           </Button>
-          <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
+          <HelpNote>{t('guest.done.help')}</HelpNote>
         </GuestScreen>
       </GuestShell>
     );
@@ -84,36 +72,31 @@ const GuestDonePage = () => {
     itemsPacked, itemsFlagged, unitsPacked,
   } = summary;
 
-  const kind = beneficiaryKindOf(beneficiaryKind);
+  const kind = beneficiaryKindOf(beneficiaryKind, t);
 
   return (
     <GuestShell>
       <GuestScreen
-        title={<>Thank you, <span className="gst-underline">{name}</span></>}
-        lede="That pallet is packed and ready to go out. Here is what you did."
+        title={t('guest.done.thanks', { name })}
+        lede={t('guest.done.lede')}
       >
         {/* The headline figure — what they physically packed. */}
-        <div className="gst-card gst-animate-pop" style={{ textAlign: 'center' }}>
+        <div className="gst-celebrate gst-animate-pop">
+          <span className="gst-seal" aria-hidden="true">✓</span>
           <span className="gst-figure">{unitsPacked || itemsPacked}</span>
           <span className="gst-figure-label">
-            {unitsPacked
-              ? `items packed into this pallet`
-              : `things checked off this pallet`}
+            {unitsPacked ? t('guest.done.unitsLabel') : t('guest.done.checkedLabel')}
           </span>
         </div>
 
         <div className="gst-figure-row">
-          <div className="gst-card">
-            <span className="gst-figure" style={{ fontSize: '2.5rem' }}>{itemsPacked}</span>
-            <span className="gst-figure-label">things packed</span>
+          <div className="gst-card gst-stat">
+            <span className="gst-figure gst-figure-sm is-packed">{itemsPacked}</span>
+            <span className="gst-figure-label">{t('guest.done.thingsPacked')}</span>
           </div>
-          <div className="gst-card">
-            <span className="gst-figure" style={{ fontSize: '2.5rem', color: 'var(--gst-ink)' }}>
-              {itemsFlagged}
-            </span>
-            <span className="gst-figure-label">
-              {itemsFlagged === 1 ? 'problem reported' : 'problems reported'}
-            </span>
+          <div className="gst-card gst-stat">
+            <span className="gst-figure gst-figure-sm">{itemsFlagged}</span>
+            <span className="gst-figure-label">{t.n('guest.done.problems', itemsFlagged)}</span>
           </div>
         </div>
 
@@ -121,38 +104,39 @@ const GuestDonePage = () => {
             Only states the child count when the data actually has one;
             a made-up number here would be the worst kind. */}
         <div className="gst-card gst-card-quiet">
-          <h2 className="gst-card-title">Where it’s going</h2>
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)' }}>
-            This pallet goes to <strong>{beneficiary}</strong>
-            {`, ${kind.article} ${kind.noun}`}
-            {childCount ? <> that feeds <strong>{childCount} children</strong></> : ''}
-            . It leaves {formatDay(dispatchDate)}.
+          <h2 className="gst-card-title">{t('guest.done.whereTitle')}</h2>
+          <p className="gst-card-meta gst-text-ink">
+            <Rich
+              text={t(childCount ? 'guest.done.goesToFeeds' : 'guest.done.goesTo', {
+                beneficiary: mark('beneficiary'),
+                kind,
+                children: mark('children'),
+                day: formatDay(dispatchDate, t),
+              })}
+              parts={{ beneficiary, children: t('common.children', { n: childCount }) }}
+            />
           </p>
         </div>
 
         {itemsFlagged > 0 ? (
-          <Notice tone="info">
-            The {itemsFlagged === 1 ? 'problem' : 'problems'} you reported {itemsFlagged === 1 ? 'has' : 'have'} been
-            passed to a staff member. Thank you for flagging {itemsFlagged === 1 ? 'it' : 'them'} —
-            that is genuinely useful.
-          </Notice>
+          <Notice tone="info">{t.n('guest.done.flagged', itemsFlagged)}</Notice>
         ) : null}
 
-        <div className="gst-card gst-card-quiet">
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)', textAlign: 'center' }}>
-            Ladles of Love could not do this without people giving up their time.
-            Thank you for giving yours today.
-          </p>
+        <div className="gst-card gst-card-quiet gst-thanks">
+          <p className="gst-card-meta gst-text-ink">{t('guest.done.gratitude')}</p>
         </div>
 
-        <Button onClick={signOut} disabled={busy}>
-          {busy ? 'Signing you out…' : 'Sign out — I’m finished'}
+        {/* Keep them going: another pallet is the primary action, and
+            sign-out stays clearly visible as the outlined one. */}
+        <SignOutConfirm flow={flow} />
+        <Button onClick={() => navigate('/guest-home')} disabled={busy}>
+          {t('guest.done.another')}
         </Button>
-        <Button variant="secondary" onClick={() => navigate('/guest-home')} disabled={busy}>
-          Pack another pallet
+        <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
+          {flow.busy ? t('guest.nav.signingOut') : t('guest.nav.signOut')}
         </Button>
 
-        <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
+        <HelpNote>{t('guest.done.help')}</HelpNote>
       </GuestScreen>
     </GuestShell>
   );

@@ -2,12 +2,13 @@
 // Keep this limited to deployed backend contracts; frontend-only placeholder
 // tabs should not call future Section 18A endpoints before they exist.
 
+import { API_BASE } from './api';
+
 export { PRODUCT_CLASSIFICATION_CATEGORIES } from './donationClassificationAPI';
 
 export const PENDING_DONATION_STATUSES = ['awaiting_resolution', 'committing', 'commit_failed', 'commit_incomplete'];
 export const RECONCILIATION_STATUSES = ['commit_failed', 'commit_incomplete'];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : '');
 
 const parseResponse = async (response) => {
   let payload;
@@ -170,28 +171,6 @@ const donationManagementAPI = {
     return body.data;
   },
 
-  async getCertificateSettings() {
-    const response = await fetch(`${API_BASE}/api/donations/admin/section-18a/settings`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    const body = await parseResponse(response);
-    return body.data ?? null;
-  },
-
-  async updateCertificateSettings(payload) {
-    const response = await fetch(`${API_BASE}/api/donations/admin/section-18a/settings`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const body = await parseResponse(response);
-    return body.data;
-  },
 };
 
 export default donationManagementAPI;

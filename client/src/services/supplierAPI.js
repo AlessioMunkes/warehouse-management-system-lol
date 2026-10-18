@@ -36,6 +36,10 @@ export const toSupplier = (row) => ({
   isActive:             Boolean(row.is_active),
   createdAt:            row.created_at ?? null,
   deactivatedAt:        row.deactivated_at ?? null,
+  // What this supplier supplies: the products a purchase order to them
+  // may carry. Empty means nothing is listed, and ordering is not
+  // restricted.
+  suppliedProducts:     (row.supplied_products ?? []).map((p) => ({ id: p.id, name: p.name })),
 });
 
 const toStats = (row = {}) => ({

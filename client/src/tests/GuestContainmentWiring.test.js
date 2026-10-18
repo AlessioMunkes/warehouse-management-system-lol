@@ -51,7 +51,7 @@ describe('App.jsx route guards', () => {
       missingRoles,
       `These <ProtectedRoute> elements in App.jsx declare no roles, so they admit ` +
       `ANY logged-in user including guests:\n  ${missingRoles.join('\n  ')}\n\n` +
-      `Add an explicit roles={...} list (STAFF_ROLES for the warehouse floor).`,
+      `Add an explicit roles={...} list (ALL_STAFF from routes/permissions.js for the warehouse floor).`,
     ).toEqual([]);
   });
 });

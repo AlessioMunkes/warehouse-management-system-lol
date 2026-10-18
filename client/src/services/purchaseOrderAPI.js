@@ -19,15 +19,18 @@
 //
 // But null must survive the cast. Number(null) is 0, and a line whose
 // price nobody recorded would then render "R 0.00" as though the goods
-// were free. expectedQuantity is INTEGER, which pg already returns as
-// a number, so it needs no such care.
+// were free. expectedQuantity is NUMERIC too (12.5 kg is an order) and
+// is cast the same way; it is never null.
 //
-// There is no delete — nothing in the URS asks for a PO to be
-// destroyed. setPurchaseOrderStatus is the one update path, and it
-// only ever moves a PO through its states (BR-07B); it cannot edit
-// the lines, supplier, or anything else about it in place.
+// updatePurchaseOrder and deletePurchaseOrder both only ever reach a
+// 'pending' order server-side — see purchaseOrder.service.js. Nothing
+// has been sent to a supplier or received against a PO still in that
+// state, which is what makes an in-place edit or an outright delete
+// safe; setPurchaseOrderStatus (BR-07B's lifecycle) and
+// setQuickbooksReference are still the only paths once a PO has moved
+// past pending.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost, apiPatch } from "./api";
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from "./api";
 
 // ── BR-07B, for display ───────────────────────────────────────
 // Mirrors PO_STATUSES in server/src/services/purchaseOrder.service.js
@@ -54,6 +57,40 @@ export const OPEN_PO_STATUSES = [
   "pending", "approved", "in_transit", "partially_received",
 ];
 
+// Still expecting goods against this order itself. A part-received
+// order is not: the rest comes on its follow-up order.
+export const RECEIVABLE_PO_STATUSES = ["approved", "in_transit"];
+
+// Mirrors PO_MANUAL_TRANSITIONS on the server: from each status, the
+// statuses a manager's buttons lead to. The server refuses anything else.
+export const PO_MANUAL_TRANSITIONS = {
+  pending:            ["approved"],
+  approved:           ["in_transit", "follow_up_required", "returned"],
+  in_transit:         ["approved", "follow_up_required", "returned"],
+  follow_up_required: ["approved", "completed", "returned"],
+  partially_received: ["approved", "completed", "returned"],
+  completed:          [],
+  returned:           [],
+};
+export const canMovePurchaseOrder = (from, to) => (PO_MANUAL_TRANSITIONS[from] ?? []).includes(to);
+
+// THE FOLLOW-UP FLAG
+// "Partially received" is the status of an order that came in short.
+// "Follow-up required" is a flag on top of it, shown until a follow-up
+// order is raised for the rest (or the order is reopened or closed). It
+// is not stored: an order is flagged while it is part received and no
+// follow-up order is on its way. An order a manager marked for follow-up
+// before anything arrived is flagged too.
+export const needsFollowUp = (po) => {
+  if (!po) return false;
+  if (po.status === "follow_up_required") return true;
+  if (po.status !== "partially_received") return false;
+  const coming = po.followUpOrders?.length
+    ? po.followUpOrders.filter((o) => o.status !== "completed" && o.status !== "returned").length
+    : (po.openFollowUpCount ?? 0);
+  return coming === 0;
+};
+
 // ── Row mappers ───────────────────────────────────────────────
 const toLine = (row) => ({
   id:               row.id,
@@ -71,6 +108,21 @@ const toLine = (row) => ({
   receivedToDate: Number(row.received_to_date ?? 0),
 });
 
+// One real event: a delivery actually recorded against this PO. Not a
+// status-history entry — see purchaseOrder.repository.js's own note
+// on why there's no per-transition log to draw one from.
+const toDelivery = (row) => ({
+  id:               row.id,
+  deliveryDate:     row.delivery_date ?? null,
+  // When it was signed in on the floor. deliveryDate is a calendar day
+  // with no time of its own.
+  recordedAt:       row.recorded_at ?? null,
+  status:           row.status,
+  driverName:       row.driver_name ?? "",
+  receivedByName:   row.received_by_name ?? "",
+  hasDiscrepancies: Boolean(row.has_discrepancies),
+});
+
 export const toPurchaseOrder = (row) => ({
   id:                   row.id,
   poNumber:             row.po_number ?? "",
@@ -80,23 +132,46 @@ export const toPurchaseOrder = (row) => ({
   status:               row.status,
   statusLabel:          PO_STATUS_LABELS[row.status] ?? row.status,
   statusReason:         row.status_reason ?? "",
+  // The order this one is a follow-up to, and any raised to follow it.
+  followUpOf:           row.follow_up_of ? { id: row.follow_up_of, poNumber: row.follow_up_of_number ?? "" } : null,
+  followUpOrders:       (row.follow_up_orders ?? []).map((o) => ({
+    id: o.id, poNumber: o.po_number ?? "", status: o.status, statusLabel: PO_STATUS_LABELS[o.status] ?? o.status,
+  })),
   statusChangedAt:      row.status_changed_at ?? null,
   expectedDeliveryDate: row.expected_delivery_date ?? null,
   notes:                row.notes ?? "",
   quickbooksPoId:       row.quickbooks_po_id ?? "",
+  // Where the send to QuickBooks stands (list only): synced,
+  // needs_match, failed, sending, or null when never sent.
+  quickbooksState:      row.quickbooks_state ?? null,
+  // The status is on the list too (its "Finance email failed" tab);
+  // the error and time are detail only. financeEmailError is already a
+  // short safe message from the server (never raw provider text).
+  financeEmailStatus:      row.finance_email_status ?? null,
+  financeEmailError:       row.finance_email_error ?? "",
+  financeEmailAttemptedAt: row.finance_email_attempted_at ?? null,
   createdByName:        row.created_by_name ?? "",
   createdAt:            row.created_at ?? null,
   lineCount:            Number(row.line_count ?? 0),
+  // Lines whose full expected quantity has arrived (list only).
+  receivedLineCount:    Number(row.received_line_count ?? 0),
   estimatedValue:       Number(row.estimated_value ?? 0),
   receiptCount:         Number(row.receipt_count ?? 0),
+  // Follow-up orders still on their way (list only; the detail has them
+  // in followUpOrders).
+  openFollowUpCount:    Number(row.open_follow_up_count ?? 0),
   items:                (row.items ?? []).map(toLine),
+  deliveries:           (row.deliveries ?? []).map(toDelivery),
 });
 
 // ── GET /api/purchase-orders ──────────────────────────────────
-export const getPurchaseOrders = async ({ status = "", supplierId = null } = {}) => {
+// `limit` (1-500): the list page asks for 500 and counts its tabs from
+// what comes back; the server's default is 50.
+export const getPurchaseOrders = async ({ status = "", supplierId = null, limit = null } = {}) => {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   if (supplierId) params.set("supplierId", String(supplierId));
+  if (limit) params.set("limit", String(limit));
   const qs = params.toString();
   const body = await apiGet(`/api/purchase-orders${qs ? `?${qs}` : ""}`);
   return (body.data ?? []).map(toPurchaseOrder);
@@ -135,7 +210,65 @@ export const setPurchaseOrderStatus = async (id, status, reason = null) => {
 
 export const approvePurchaseOrder = async (id) => setPurchaseOrderStatus(id, "approved");
 
+// ── POST /api/purchase-orders/:id/follow-up-order ───────────────
+// A second order for what came short. Answers with the new order; the
+// first moves to Partially received.
+export const createFollowUpOrder = async (id, expectedDeliveryDate = null) => {
+  const body = await apiPost(`/api/purchase-orders/${id}/follow-up-order`, expectedDeliveryDate ? { expectedDeliveryDate } : {});
+  return toPurchaseOrder(body.data ?? {});
+};
+
+// ── PATCH /api/purchase-orders/:id/quickbooks-ref ───────────────
+// quickbooksPoId "" clears the reference — see purchaseOrder.service.js.
+export const setQuickbooksReference = async (id, quickbooksPoId) => {
+  const body = await apiPatch(`/api/purchase-orders/${id}/quickbooks-ref`, { quickbooksPoId });
+  return toPurchaseOrder(body.data ?? {});
+};
+
+// ── POST /api/purchase-orders/quickbooks-import/{preview,apply} ─
+// pairs: [{ poNumber, quickbooksNumber, overwrite? }], up to 500.
+// Both answer { rows, counts } with one row per pair, in order.
+export const previewQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/preview", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
+export const applyQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/apply", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
+// ── POST /api/purchase-orders/:id/finance-email/resend ──────────
+// Re-sends the new-PO email to Finance; resolves to the PO with the
+// status the attempt left behind.
+export const resendFinanceEmail = async (id) => {
+  const body = await apiPost(`/api/purchase-orders/${id}/finance-email/resend`, {});
+  return toPurchaseOrder(body.data ?? {});
+};
+
+// ── PUT /api/purchase-orders/:id ────────────────────────────────
+// Same 400 carrying missingProductIds as createPurchaseOrder — the
+// server validates an edit exactly as hard as a fresh order.
+export const updatePurchaseOrder = async (id, payload) => {
+  try {
+    const body = await apiPut(`/api/purchase-orders/${id}`, payload);
+    return toPurchaseOrder(body.data ?? {});
+  } catch (err) {
+    if (err.status === 400 && err.missingProductIds) {
+      err.missingProductIds = err.missingProductIds.map(Number);
+    }
+    throw err;
+  }
+};
+
+// ── DELETE /api/purchase-orders/:id ─────────────────────────────
+export const deletePurchaseOrder = async (id) => {
+  await apiDelete(`/api/purchase-orders/${id}`);
+};
+
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
-  setPurchaseOrderStatus, approvePurchaseOrder,
+  setPurchaseOrderStatus, approvePurchaseOrder, createFollowUpOrder, setQuickbooksReference,
+  updatePurchaseOrder, deletePurchaseOrder, resendFinanceEmail,
+  previewQuickbooksImport, applyQuickbooksImport,
 };

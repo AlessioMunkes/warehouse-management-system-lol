@@ -7,7 +7,7 @@
 // All three routes are manager/admin only on the server. The client
 // gate in App.jsx is a UX courtesy; the route guard is the control.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from './api';
 
 // GET /api/reporting/catalog
 // Returns { aiEnabled, metrics }. aiEnabled is false when no API key
@@ -17,8 +17,73 @@ export const getCatalog = () => apiGet('/api/reporting/catalog');
 // POST /api/reporting/report
 export const runReport = (spec) => apiPost('/api/reporting/report', spec);
 
+// Saved and scheduled reports — the signed-in manager's own.
+export const getSaved = () => apiGet('/api/reporting/saved');
+export const saveReport = (body) => apiPost('/api/reporting/saved', body);
+export const updateSaved = (id, patch) => apiPatch(`/api/reporting/saved/${id}`, patch);
+export const deleteSaved = (id) => apiDelete(`/api/reporting/saved/${id}`);
+export const sendSavedNow = (id) => apiPost(`/api/reporting/saved/${id}/send`, {});
+
+// POST /api/reporting/drill — the report behind one clicked bar.
+// `target` is one of the report's meta.drillOptions ids: which way to open the bar.
+export const drillDown = (spec, label, target) => apiPost('/api/reporting/drill', { spec, label, target });
+
+// POST /api/reporting/records — the rows behind a report, or behind one
+// bar of it when `label` is given: the last level of a drill.
+export const listRecords = (spec, label) => apiPost('/api/reporting/records', { spec, label: label ?? undefined });
+
+// GET /api/reporting/filter-options — choices for filters with no fixed
+// list: suppliers, products, centres, and statuses as recorded.
+export const getFilterOptions = () => apiGet('/api/reporting/filter-options');
+
+// POST /api/reporting/process — the process map: purchase order to
+// dispatch note, as steps and the typical time between them.
+export const getProcessMap = (dateRange, filters = {}) => apiPost('/api/reporting/process', { dateRange, filters });
+
+// GET /api/reporting/reorder — when each product runs out, and what to
+// order by when, for a planning horizon of 4, 8 or 12 weeks.
+export const getReorderPlan = (weeks = 8) => apiGet(`/api/reporting/reorder?weeks=${encodeURIComponent(weeks)}`);
+
+// GET /api/reporting/alerts — weekly measures against their control
+// limits, over a baseline of 8, 12 or 26 weeks.
+export const getExceptionAlerts = (weeks = 12) => apiGet(`/api/reporting/alerts?weeks=${encodeURIComponent(weeks)}`);
+
 // POST /api/reporting/ask
 // Returns either a report payload or { type: 'clarify', question, options }.
 export const askQuestion = (question) => apiPost('/api/reporting/ask', { question });
 
-export default { getCatalog, runReport, askQuestion };
+// PUT /api/reporting/factors/:factorKey
+// Inserts a new effective-dated row rather than editing one in place
+// — see reportingFactor.repository.js. Returns the new row.
+export const setFactor = (factorKey, { value, unit, sourceNote }) =>
+  apiPut(`/api/reporting/factors/${encodeURIComponent(factorKey)}`, { value, unit, sourceNote });
+
+// GET /api/reporting/factors/:factorKey/history
+export const getFactorHistory = (factorKey) =>
+  apiGet(`/api/reporting/factors/${encodeURIComponent(factorKey)}/history`);
+
+// POST /api/reporting/insight
+// Operational reports only. Returns the report with key figures, a
+// previous-period comparison, related charts and Actions
+// lists; narrate: true adds the written reading (AI, or a template
+// from the figures when the AI is unavailable).
+export const getInsight = (spec, { narrate = false } = {}) =>
+  apiPost('/api/reporting/insight', { spec, narrate });
+
+// GET /api/reporting/comparisons — the declared scatter comparisons.
+export const getComparisons = () => apiGet('/api/reporting/comparisons');
+
+// POST /api/reporting/comparison — one scatter plot's points.
+// narrate: true adds the written report (explanation, business view,
+// next steps) — the Generate report button under a scatter chart.
+export const runComparison = (id, dateRange, { narrate = false } = {}) =>
+  apiPost('/api/reporting/comparison', { id, dateRange, narrate });
+
+// GET /api/reporting/targets — this manager's target per metric.
+export const getTargets = () => apiGet('/api/reporting/targets');
+
+// PUT /api/reporting/targets/:metricId — value null resets to default.
+export const saveTarget = (metricId, value) =>
+  apiPut(`/api/reporting/targets/${encodeURIComponent(metricId)}`, { value });
+
+export default { getSaved, saveReport, updateSaved, deleteSaved, sendSavedNow, drillDown, getTargets, saveTarget, getComparisons, runComparison, getCatalog, runReport, askQuestion, getInsight, setFactor, getFactorHistory };

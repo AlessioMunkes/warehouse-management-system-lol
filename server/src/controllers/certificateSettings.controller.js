@@ -8,10 +8,8 @@
 // All business logic and validation lives in certificateSettings.service.js.
 // ─────────────────────────────────────────────────────────────
 import certificateSettingsService from '../services/certificateSettings.service.js';
-//import { auth, requireRole, ROLES } from '../middleware/auth.middleware.js';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP, ADMIN_ONLY } from '../constants/permissions.js';
 // Admin and manager roles can modify certificate settings.
-const ADMIN_OR_MANAGER = [ROLES.ADMIN, ROLES.MANAGER];
 
 // ── getSettings ────────────────────────────────────────────────
 // GET /api/certificate-settings
@@ -47,10 +45,10 @@ const createSettings = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
-    if (!ADMIN_OR_MANAGER.includes(req.user.role)) {
+    if (!MANAGERS_UP.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `Access denied. Required role: ${ADMIN_OR_MANAGER.join(' or ')}.`,
+        message: `Access denied. Required role: ${MANAGERS_UP.join(' or ')}.`,
       });
     }
 
@@ -77,10 +75,10 @@ const updateSettings = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
-    if (!ADMIN_OR_MANAGER.includes(req.user.role)) {
+    if (!MANAGERS_UP.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `Access denied. Required role: ${ADMIN_OR_MANAGER.join(' or ')}.`,
+        message: `Access denied. Required role: ${MANAGERS_UP.join(' or ')}.`,
       });
     }
 
@@ -107,10 +105,10 @@ const deleteSettings = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
-    if (req.user.role !== ROLES.ADMIN) {
+    if (!ADMIN_ONLY.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: `Access denied. Required role: ${ROLES.ADMIN}.`,
+        message: `Access denied. Required role: ${ADMIN_ONLY.join(' or ')}.`,
       });
     }
 

@@ -10,19 +10,18 @@
 // endpoints under the same prefix.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP } from '../constants/permissions.js';
 import donationAdminController from '../controllers/donation.admin.js';
 import donationController from '../controllers/donation.controller.js';
 
 const router = express.Router();
 
-// Single source of truth for who's allowed on this router. Defined once
-// here instead of repeating [ROLES.ADMIN, ROLES.MANAGER] on every line —
-// that repetition is exactly how the earlier 'warehouse_manager' typo
-// bug happened (one line got hand-edited, the others didn't, and they
-// silently drifted out of sync). One array, reused everywhere below,
-// means there's only one place to get it wrong.
-const ADMIN_OR_MANAGER = [ROLES.ADMIN, ROLES.MANAGER];
+// Every route here is MANAGERS_UP, from constants/permissions.js rather
+// than a list typed out per line — that repetition is exactly how the
+// earlier 'warehouse_manager' typo bug happened (one line got
+// hand-edited, the others didn't, and they silently drifted out of
+// sync). One group for the whole app means one place to get it wrong.
 
 // ── Category-level routing rules (BR-10) ────────────────────
 // These affect every product in a category at once, so they're the
@@ -36,7 +35,7 @@ const ADMIN_OR_MANAGER = [ROLES.ADMIN, ROLES.MANAGER];
 router.get(
   '/category-routing',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.getCategoryRoutings
 );
 
@@ -48,7 +47,7 @@ router.get(
 router.patch(
   '/category-routing/:category',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.updateCategoryRouting
 );
 
@@ -62,21 +61,21 @@ router.patch(
 router.get(
   '/products-with-defaults',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.getProductsWithDefaults
 );
 
 router.get(
   '/pending-classifications',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.getPendingClassifications
 );
 
 router.put(
   '/pending-classifications/:id/finalize',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.finalizePendingClassification
 );
 
@@ -88,7 +87,7 @@ router.put(
 router.put(
   '/products/:id/classification',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.setProductClassification
 );
 
@@ -100,7 +99,7 @@ router.put(
 router.delete(
   '/products/:id/classification',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.removeProductClassification
 );
 
@@ -114,7 +113,7 @@ router.delete(
 router.post(
   '/evaluate-routing',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationAdminController.evaluateRouting
 );
 
@@ -125,14 +124,14 @@ router.post(
 router.get(
   '/section-18a/settings',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationController.getSection18ASettings
 );
 
 router.put(
   '/section-18a/settings',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationController.updateSection18ASettings
 );
 

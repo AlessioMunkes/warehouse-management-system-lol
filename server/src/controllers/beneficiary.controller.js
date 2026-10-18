@@ -78,6 +78,20 @@ const approve = async (req, res) => {
   }
 };
 
+// ── PATCH /api/beneficiaries/:id/rollback-cohort ──────────────────
+const rollbackCohort = async (req, res) => {
+  try {
+    const data = await beneficiaryService.rollbackCohort(req.params.id, req.user?.id);
+    if (!data) {
+      res.status(404).json({ success: false, message: 'Beneficiary not found.' });
+      return;
+    }
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'rollbackCohort', 'Failed to move this beneficiary to the other cohort.');
+  }
+};
+
 export default {
   list,
   getOne,
@@ -85,4 +99,5 @@ export default {
   update,
   setStatus,
   approve,
+  rollbackCohort,
 };

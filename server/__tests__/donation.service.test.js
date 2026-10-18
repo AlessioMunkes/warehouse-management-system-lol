@@ -13,7 +13,6 @@ const repoMock = {
   getSection18AThreshold: vi.fn(),
   getEligibleEcdCentres:  vi.fn(),
   findByIdempotencyKey:   vi.fn(),
-  getProgrammeByCode:     vi.fn(),
   getLocationIdForArea:   vi.fn(),
   createDonation:         vi.fn(),
   getDonationById:        vi.fn(),
@@ -42,9 +41,17 @@ const emailMock = {
   sendEmail: vi.fn(),
 };
 
+const gmailRepoMock = {
+  findLatestConnection: vi.fn(),
+};
+
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: repoMock }));
-vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailMock }));
+vi.mock('../src/repositories/gmail.repository.js', () => ({ default: gmailRepoMock }));
+vi.mock('../src/repositories/notification.repository.js', () => ({
+  createNotification: vi.fn(),
+}));
+vi.mock('../src/utils/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailMock }));
 vi.mock('../src/services/certificateSettings.service.js', () => ({
   default: { getSettings: vi.fn() },
 }));
@@ -110,6 +117,7 @@ beforeEach(() => {
   repoMock.saveSection18AFormToken.mockResolvedValue({ id: 1 });
   repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue(null);
   repoMock.saveSection18AFormSubmission.mockResolvedValue(null);
+  gmailRepoMock.findLatestConnection.mockResolvedValue({ gmail_email: 'tax-team@example.org' });
 
   // Mock email provider to return success by default
   emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'msg-123', threadId: 'thread-1' });
@@ -403,6 +411,11 @@ describe('createDonation — records rather than refuses', () => {
       recipient: 'donor@example.org',
       status: 'SENT',
     }));
+    const sentEmail = emailMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.subject).toBe('Thank you for your donation');
+    expect(sentEmail.text).toContain('Thank you for your generous donation');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Thank you for your donation');
   });
 
   it('skips all email for anonymous donors or invalid donor emails', async () => {
@@ -456,6 +469,53 @@ describe('createDonation — records rather than refuses', () => {
       recipient: 'tax@example.test',
       status: 'SENT',
     }));
+    const sentEmail = emailMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.text).toContain('Your donation qualifies for a Section 18A certificate');
+    expect(sentEmail.text).toContain('/section-18a/');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Complete Section 18A Form');
+  });
+
+  it('sends no thank-you without the Section 18A link when this server has no web address, and records the failure', async () => {
+    const donation = {
+      id: 42,
+      donation_category: 'recipe_food',
+      estimated_value_zar: 5000,
+      donor_name: 'Pick n Pay',
+      donor_contact: 'tax@example.test',
+      donor_tax_reference: '9012345678',
+      donor_consent_given: true,
+      section_18a_status: 'queued',
+      section_18a_qualifying: true,
+      received_at: '2026-09-10T10:00:00.000Z',
+      items: [{ line_no: 1, description: 'Rice', quantity: 25, unit: 'kg', estimated_value_zar: 5000 }],
+    };
+    repoMock.getDonationById.mockResolvedValue(donation);
+    vi.stubEnv('NODE_ENV', 'production');
+    ['APP_BASE_URL', 'SECTION18A_FORM_BASE_URL', 'CLIENT_URL', 'FRONTEND_URL', 'CLIENT_ORIGIN']
+      .forEach((name) => vi.stubEnv(name, ''));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await donationService.createDonation(validBody({
+        estimatedValueZar: 5000,
+        donorName: 'Pick n Pay',
+        donorContact: 'tax@example.test',
+        donorTaxReference: '9012345678',
+        donorConsentGiven: true,
+      }), USER_ID);
+
+      expect(repoMock.saveSection18AFormToken).not.toHaveBeenCalled();
+      expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+        donationId: 42,
+        emailType: 'THANK_YOU',
+        status: 'FAILED',
+        errorMessage: expect.stringContaining('web address'),
+      }));
+      expect(log.mock.calls.some(([m]) => String(m).includes('[links]'))).toBe(true);
+    } finally {
+      log.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 
   it('records add-on food even when there are no eligible ECDs to split across', async () => {
@@ -707,7 +767,7 @@ describe('Section 18A certificate engine', () => {
     expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
   });
 
-  it('submits the secure donor form, generates the PDF, emails it and returns GENERATED', async () => {
+  it('submits the secure donor form and sends a Finance/Tax handoff to the connected Gmail account', async () => {
     repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue({
       ...queuedDonation,
       section_18a_form_token_expires_at: '2099-01-01T00:00:00.000Z',
@@ -729,17 +789,7 @@ describe('Section 18A certificate engine', () => {
         declarationAccepted: true,
       },
     });
-    repoMock.getSection18ACertificateByDonationId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 10,
-        donation_id: 42,
-        certificate_number: 'LOL-S18A-000001',
-        issue_date: '2026-09-11',
-        pdf_content: Buffer.from('%PDF-1.4'),
-        pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
-        pdf_content_type: 'application/pdf',
-      });
+    gmailRepoMock.findLatestConnection.mockResolvedValue({ gmail_email: 'tax-gmail@example.org' });
 
     const result = await donationService.submitSection18AForm('secure-token', {
       donorType: 'company',
@@ -753,21 +803,35 @@ describe('Section 18A certificate engine', () => {
       declarationAccepted: true,
     });
 
-    expect(result.status).toBe('issued');
+    expect(result.status).toBe('submitted');
     expect(repoMock.saveSection18AFormSubmission).toHaveBeenCalled();
-    expect(repoMock.createSection18ACertificate).toHaveBeenCalledTimes(1);
-    expect(certificateSettingsServiceMock.getSettings).toHaveBeenCalled();
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+    expect(certificateSettingsServiceMock.getSettings).not.toHaveBeenCalled();
     expect(repoMock.getSection18ASettings).not.toHaveBeenCalled();
     expect(emailMock.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: 'tax@example.test',
-        attachments: [expect.objectContaining({ contentType: 'application/pdf' })],
+        to: 'tax-gmail@example.org',
+        subject: expect.stringContaining('Finance/Tax handoff'),
+        text: expect.stringContaining('Finance/Tax handoff: Section 18A donor details received.'),
       }),
       null
     );
+    const sentEmail = emailMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.to).not.toBe('tax@example.test');
+    expect(sentEmail.attachments).toBeUndefined();
+    expect(sentEmail.text).toContain('Donor name: Pick n Pay Pty Ltd');
+    expect(sentEmail.text).toContain('Donor email/contact: tax@example.test / 0210000000');
+    expect(sentEmail.text).toContain('Donation reference/id: DON-42');
+    expect(sentEmail.text).toContain('Estimated donation value: 5000');
+    expect(sentEmail.text).toContain('Tax reference: 9012345678');
+    expect(sentEmail.text).toContain('- Rice: 25 kg');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Finance/Tax handoff');
+    expect(sentEmail.html).toContain('DON-42');
+    expect(sentEmail.text).toContain('- registrationNumber: REG-1');
   });
 
-  it('logs one failed Section 18A email if email preparation fails after certificate creation', async () => {
+  it('logs one failed Section 18A handoff if the connected Gmail send fails', async () => {
     repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue({
       ...queuedDonation,
       section_18a_form_token_expires_at: '2099-01-01T00:00:00.000Z',
@@ -778,19 +842,8 @@ describe('Section 18A certificate engine', () => {
       donor_contact: 'tax@example.test',
       donor_tax_reference: '9012345678',
     });
-    repoMock.getSection18ACertificateByDonationId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 10,
-        donation_id: 42,
-        certificate_number: 'LOL-S18A-000001',
-        pdf_content: Buffer.from('%PDF-1.4'),
-        pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
-        pdf_content_type: 'application/pdf',
-      });
-    certificateSettingsServiceMock.getSettings
-      .mockResolvedValueOnce({ organisation_name: 'Ladles of Love' })
-      .mockRejectedValueOnce(new Error('settings unavailable'));
+    gmailRepoMock.findLatestConnection.mockResolvedValue({ gmail_email: 'tax-gmail@example.org' });
+    emailMock.sendEmail.mockRejectedValueOnce(new Error('gmail unavailable'));
 
     const result = await donationService.submitSection18AForm('secure-token', {
       donorType: 'company',
@@ -804,15 +857,25 @@ describe('Section 18A certificate engine', () => {
       declarationAccepted: true,
     });
 
-    expect(result.status).toBe('issued');
-    expect(emailMock.sendEmail).not.toHaveBeenCalled();
+    expect(result.status).toBe('submitted');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+    expect(certificateSettingsServiceMock.getSettings).not.toHaveBeenCalled();
+    expect(emailMock.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'tax-gmail@example.org',
+        attachments: undefined,
+      }),
+      null
+    );
     expect(repoMock.logDonationEmail).toHaveBeenCalledTimes(1);
     expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
       donationId: 42,
-      certificateId: 10,
+      certificateId: null,
       emailType: 'SECTION_18A',
       status: 'FAILED',
-      errorMessage: 'settings unavailable',
+      recipient: 'tax-gmail@example.org',
+      subject: expect.stringContaining('Finance/Tax handoff'),
+      errorMessage: 'gmail unavailable',
     }));
   });
 
@@ -949,6 +1012,33 @@ describe('Persistent Email History — donation emails', () => {
       emailType: 'THANK_YOU',
       status: 'SENT',
       sentByUserId: USER_ID,
+    }));
+  });
+});
+
+// A certificate email that cannot be prepared is logged as failed and a
+// manager is told. The alert used to throw instead (pool was never
+// imported where it was raised), so the resend failed and nobody heard.
+describe('Section 18A certificate email failure', () => {
+  it('logs the failure and alerts managers when the certificate cannot be prepared', async () => {
+    const { createNotification } = await import('../src/repositories/notification.repository.js');
+    const donation = {
+      id: 42, donor_name: 'Thandi', donor_contact: 'thandi@example.org',
+      section_18a_status: 'queued', donor_consent_given: true, donor_tax_reference: '123',
+    };
+    repoMock.getEmailLogById.mockResolvedValue({ id: 9, donation_id: 42, email_type: 'SECTION_18A' });
+    repoMock.getDonationById.mockResolvedValue(donation);
+    repoMock.getSection18ACertificateByDonationId.mockRejectedValue(new Error('PDF failed'));
+    repoMock.logDonationEmail.mockResolvedValue({ id: 10, status: 'FAILED' });
+
+    const result = await donationService.resendDonationEmail(9, USER_ID);
+
+    expect(result).toMatchObject({ status: 'FAILED', emailType: 'SECTION_18A' });
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      emailType: 'SECTION_18A', status: 'FAILED', errorMessage: 'PDF failed',
+    }));
+    expect(createNotification).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      type: 'section18a_email_failed', entityId: 42,
     }));
   });
 });

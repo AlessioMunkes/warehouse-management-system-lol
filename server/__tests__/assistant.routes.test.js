@@ -62,16 +62,16 @@ describe('who can reach the help assistant', () => {
     await request(app).get(`${BASE}/catalog`).set('Cookie', cookieFor(role)).expect(200);
   });
 
-  // A guest is a volunteer signed in with a first name for one
-  // event. One screen, nothing to guide, and the obvious way to
-  // spend the shared AI quota from a near-anonymous session.
-  it('turns away a guest', async () => {
+  // A guest is a volunteer on their first shift: the person who needs
+  // help most. They are let in; what they may be told is decided by the
+  // catalogue (guest topics only), not by this gate.
+  it('lets a guest ask', async () => {
     await request(app)
       .post(`${BASE}/ask`)
       .set('Cookie', cookieFor('guest'))
-      .send({ question: 'how do I receive a delivery' })
-      .expect(403);
-    await request(app).get(`${BASE}/catalog`).set('Cookie', cookieFor('guest')).expect(403);
+      .send({ question: 'how do I pack this' })
+      .expect(200);
+    await request(app).get(`${BASE}/catalog`).set('Cookie', cookieFor('guest')).expect(200);
   });
 });
 
