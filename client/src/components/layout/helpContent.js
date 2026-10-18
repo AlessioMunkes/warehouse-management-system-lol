@@ -118,6 +118,7 @@ const MANAGER = [
       'A product is marked low when available stock falls to its reorder threshold.',
       'Adjust stock from a product’s panel. A reason is required, and counted items take whole numbers only.',
       'The stock ledger lists every movement: received, dispatched, decanted, adjusted and wastage.',
+      'The Map tab shows the warehouse floor plan. Open an area and choose Count this area to record what is there. Counts never change stock: where a count differs from what is on hand, adjust stock from the area.',
     ] },
   { title: 'Picking slips',
     steps: [
@@ -188,6 +189,11 @@ const ADMIN = [
       'Add a supplier with its contact details and the products it supplies.',
       'A purchase order can only include products its supplier is listed as supplying.',
       'Deactivate a supplier to stop new orders. Existing orders keep their history.',
+    ] },
+  { title: 'Warehouse layout',
+    steps: [
+      'Add dry stores, cold rooms, floor areas and doors, then drag each into place. Drag the corner to size it.',
+      'Areas cannot overlap. Save layout sends the whole plan; managers then count stock into it on Inventory.',
     ] },
   { title: 'Settings',
     steps: [

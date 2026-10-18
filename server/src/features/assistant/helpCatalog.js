@@ -120,7 +120,7 @@ export const SCREENS = [
 
   // Manager and admin.
   { id: 'inventory', label: 'Inventory', roles: MANAGERS_UP,
-    about: 'Stock levels per item: on hand, committed, available, and what is low.',
+    about: 'Stock levels per item: on hand, committed, available, and what is low. The Map tab shows where stock is kept and is where a manager counts an area.',
     aka: ['stock', 'stock levels', 'what we have'] },
   { id: 'stockLedger', label: 'Stock ledger', roles: MANAGERS_UP,
     about: 'Every stock movement in and out, warehouse-wide, with who did it.',
@@ -185,6 +185,9 @@ export const SCREENS = [
   { id: 'messageHistory', label: 'Message history', roles: ADMIN_ONLY,
     about: 'Every email the system has sent, and whether it went out.',
     aka: ['message history', 'sent emails', 'email log', 'outbox'] },
+  { id: 'warehouseLayout', label: 'Warehouse layout', roles: ADMIN_ONLY,
+    about: 'The floor plan: dry stores, cold rooms, floor areas and doors. Managers count stock into it on the Inventory map.',
+    aka: ['floor plan', 'warehouse map', 'layout', 'where stock is kept'] },
   { id: 'settings', label: 'Settings', roles: ADMIN_ONLY,
     about: 'How the system is set up: email, reminders, stock rules, reporting, certificates, accounts.',
     aka: ['settings', 'configuration', 'set up', 'preferences'] },

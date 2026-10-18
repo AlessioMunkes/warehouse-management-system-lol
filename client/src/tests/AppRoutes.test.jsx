@@ -118,7 +118,7 @@ describe('sidebars built from the table', () => {
         'Section 18A /admin/section-18a',
       ]],
       // The Gmail screen is Settings' Email section now.
-      ['Setup', ['Settings /admin/settings']],
+      ['Setup', ['Warehouse layout /admin/warehouse-layout', 'Settings /admin/settings']],
     ]);
   });
 

@@ -67,6 +67,7 @@ export const SCREEN_PATHS = {
   archive:            ADMIN.archive,
   messageHistory:     ADMIN.messageHistory,
   settings:           ADMIN.settings,
+  warehouseLayout:    ADMIN.warehouseLayout,
 };
 
 // The two screens each side has its own page for. A worker is sent to

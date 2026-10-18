@@ -116,5 +116,7 @@ export const ADMIN = {
   // Every email the system has sent, whatever sent it.
   messageHistory: '/admin/messages',
   archive:  '/admin/archive',
+  // The floor plan managers count stock into on Inventory's Map tab.
+  warehouseLayout: '/admin/warehouse-layout',
 };
 
