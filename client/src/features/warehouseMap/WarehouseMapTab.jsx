@@ -9,8 +9,13 @@
 // A MANAGER'S STOCK TAKE. Nothing on the floor records where stock is
 // put, and nothing is asked of the floor. A manager walks the
 // warehouse, opens an area and records what is there; the map holds
-// that until the next count, scaled down as stock goes out. Whatever
-// no counted area holds is "Not placed", one click from the toolbar.
+// that until the next count, scaled down as stock goes out or onto a
+// packed pallet. Stock nobody counted shows in the area meant for it
+// (preferred stock, set in Warehouse layout); whatever has no area is
+// "Not placed", one click from the toolbar. Packed pallets stand in the
+// staging areas until they are dispatched.
+//
+// Under the map, Capacity: how full each area and the whole warehouse is.
 //
 // FRESH WITHOUT A PUSH CHANNEL. The map is read again every minute
 // while the tab is in front and no count is being typed: the same
@@ -33,16 +38,23 @@ import { matchesSearch } from '../inventory/inventoryViews';
 import WarehouseMap from './WarehouseMap';
 import AreaPanel from './AreaPanel';
 import CountAreaDialog from './CountAreaDialog';
-import { holdsStock } from './mapGeometry';
-import { OVERLAYS, TONES, areasMatching, legendFor, programmeTones, toneFor } from './mapOverlays';
+import CapacitySummary from './CapacitySummary';
+import { holdsStock, isOpenable, isStaging } from './mapGeometry';
+import { OVERLAYS, TONES, areasMatching, legendFor, percent, programmeTones, toneFor } from './mapOverlays';
 
 const REFRESH_MS = 60_000;
 const UNPLACED = 'unplaced';
 
-const productCount = (area) => {
-  const n = area.items.filter((i) => i.about > 0).length;
+// The second line on an area: what it holds, and how full it is.
+const areaNote = (area) => {
+  const full = percent(area.fill);
+  if (isStaging(area)) {
+    const n = area.pallets?.length ?? 0;
+    return [n === 0 ? 'No pallets' : `${n} pallet${n === 1 ? '' : 's'}`, full].filter(Boolean).join(' · ');
+  }
   if (!holdsStock(area)) return null;
-  return n === 0 ? 'Empty' : `${n} product${n === 1 ? '' : 's'}`;
+  const n = new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size;
+  return [n === 0 ? 'Empty' : `${n} product${n === 1 ? '' : 's'}`, full].filter(Boolean).join(' · ');
 };
 
 function Legend({ entries }) {
@@ -194,7 +206,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           areas={areas}
           view={view}
           toneOf={(a) => toneFor(a, overlay, ctx)}
-          noteOf={productCount}
+          noteOf={areaNote}
           selectedId={openArea?.id ?? null}
           highlighted={highlighted}
           onSelect={(a) => setOpenId(a.id)}
@@ -203,8 +215,16 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
 
       <Legend entries={legendFor(overlay, { products })} />
 
+      <CapacitySummary areas={areas} totals={map.totals} onOpen={(a) => isOpenable(a) && setOpenId(a.id)} />
+
       {openId === UNPLACED ? (
-        <AreaPanel unplaced={unplaced} productsById={productsById} today={map.today} onClose={() => setOpenId(null)} />
+        <AreaPanel
+          unplaced={unplaced}
+          unstagedPallets={map.unstagedPallets ?? []}
+          productsById={productsById}
+          today={map.today}
+          onClose={() => setOpenId(null)}
+        />
       ) : null}
 
       {openArea ? (

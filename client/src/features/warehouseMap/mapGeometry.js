@@ -5,10 +5,12 @@
 // the kinds of area, and the arithmetic for both views.
 //
 //   Top view  the grid as it is, one square CELL units wide.
-//   3D view   the same plan drawn isometric: each area a box, as tall
-//             as its levels. Plain SVG polygons, no 3D library, so the
-//             view costs nothing to download and nothing to install on
-//             a floor tablet.
+//   3D view   the same plan seen from a camera that turns round the
+//             middle of the floor (yaw) and looks down at an angle
+//             (tilt). Each area is a box as tall as its levels, and each
+//             packed pallet a small box in its staging area. Plain SVG
+//             polygons, no 3D library, so the view costs nothing to
+//             download and nothing to install on a floor tablet.
 //
 // The grid size and the kinds mirror server/src/constants/warehouseMap.js.
 // ─────────────────────────────────────────────────────────────
@@ -18,14 +20,19 @@ export const MAX_LEVELS = 4;
 export const CELL = 24;
 
 export const KINDS = [
-  { id: 'dry',   label: 'Dry store', size: { w: 6, h: 2 }, levels: 2, holdsStock: true },
-  { id: 'cold',  label: 'Cold room', size: { w: 6, h: 5 }, levels: 2, holdsStock: true },
-  { id: 'floor', label: 'Floor',     size: { w: 4, h: 4 }, levels: 1, holdsStock: true },
-  { id: 'door',  label: 'Door',      size: { w: 3, h: 1 }, levels: 1, holdsStock: false },
+  { id: 'dry',     label: 'Dry store',      size: { w: 6, h: 2 }, levels: 2, holdsStock: true },
+  { id: 'cold',    label: 'Cold room',      size: { w: 6, h: 5 }, levels: 2, holdsStock: true },
+  { id: 'floor',   label: 'Floor',          size: { w: 4, h: 4 }, levels: 1, holdsStock: true },
+  { id: 'staging', label: 'Pallet staging', size: { w: 5, h: 3 }, levels: 1, holdsStock: false },
+  { id: 'door',    label: 'Door',           size: { w: 3, h: 1 }, levels: 1, holdsStock: false },
 ];
 
 export const kindById = (id) => KINDS.find((k) => k.id === id) ?? KINDS[0];
+/** Stock is counted into it: a dry store, cold room or floor area. */
 export const holdsStock = (area) => kindById(area.kind).holdsStock;
+export const isStaging = (area) => area.kind === 'staging';
+/** Opens a panel when chosen: everything but a door. */
+export const isOpenable = (area) => area.kind !== 'door';
 
 // ── Plan arithmetic ───────────────────────────────────────────
 export const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -71,70 +78,154 @@ export const nextName = (areas, kind) => {
   }
 };
 
+// ── Pallets in a staging area ─────────────────────────────────
+// One pallet a square, filling the area row by row, then stacked a
+// second high. Beyond that they are not drawn (the panel lists them).
+const PALLET_HEIGHT = 0.55;
+const PALLET_INSET = 0.12;
+const MAX_STACK = 2;
+
+/** Boxes for the pallets standing in a staging area. */
+export const palletBoxes = (area, count) => {
+  const perLayer = area.w * area.h;
+  const shown = Math.min(count, perLayer * MAX_STACK);
+  return Array.from({ length: shown }, (_, i) => {
+    const layer = Math.floor(i / perLayer);
+    const spot = i % perLayer;
+    return {
+      id: `${area.id}-pallet-${i}`,
+      x: area.x + (spot % area.w) + PALLET_INSET,
+      y: area.y + Math.floor(spot / area.w) + PALLET_INSET,
+      w: 1 - 2 * PALLET_INSET,
+      h: 1 - 2 * PALLET_INSET,
+      z0: 0.06 + layer * PALLET_HEIGHT,
+      z1: 0.06 + (layer + 1) * PALLET_HEIGHT - 0.04,
+    };
+  });
+};
+
 // ── 3D view ───────────────────────────────────────────────────
-// Isometric: x runs down to the right, y down to the left, height
-// straight up. ISO is one grid square's length on screen.
-const ISO = 22;
-const COS = Math.cos(Math.PI / 6);
-const SIN = 0.5;
-const LEVEL = 0.9; // one level, in squares
+// The camera: yaw turns the floor round its middle (45 is the classic
+// isometric corner view), tilt is how far it looks down (90 would be
+// straight down). Angles in degrees.
+export const DEFAULT_CAMERA = Object.freeze({ yaw: 45, tilt: 35 });
+export const TILT_RANGE = Object.freeze({ min: 15, max: 75 });
+const SCALE = 22;
+const LEVEL = 0.9; // one shelf level, in squares
+const rad = (deg) => (deg * Math.PI) / 180;
 
-export const project = (x, y, z = 0) => ({
-  px: (x - y) * COS * ISO,
-  py: (x + y) * SIN * ISO - z * ISO,
-});
-
-/** How tall an area is drawn, in squares. A floor area is a low pallet. */
+/** How tall an area's box is, in squares. Floors, doors and staging lie flat. */
 export const heightOf = (area) => {
-  if (area.kind === 'door') return 0.06;
+  if (area.kind === 'door' || area.kind === 'staging') return 0.06;
   if (area.kind === 'floor') return 0.35;
   return clamp(Number(area.levels) || 1, 1, MAX_LEVELS) * LEVEL;
 };
 
-const points = (corners) => corners.map(([x, y, z]) => {
-  const { px, py } = project(x, y, z);
-  return `${px.toFixed(1)},${py.toFixed(1)}`;
-}).join(' ');
-
-/** The three faces of an area's box the viewer can see. */
-export const boxFaces = (area) => {
-  const { x, y, w, h } = area;
-  const z = heightOf(area);
+/** A projector for one camera and grid: plan + height to screen, and depth. */
+export const camera = (cam = DEFAULT_CAMERA, grid = DEFAULT_GRID) => {
+  const yaw = rad(cam.yaw);
+  const tilt = rad(clamp(cam.tilt, TILT_RANGE.min, TILT_RANGE.max));
+  const [cos, sin, down, up] = [Math.cos(yaw), Math.sin(yaw), Math.sin(tilt), Math.cos(tilt)];
+  const cx = grid.cols / 2;
+  const cy = grid.rows / 2;
+  const turn = (x, y) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    return { X: dx * cos - dy * sin, Y: dx * sin + dy * cos };
+  };
   return {
-    top:   points([[x, y, z], [x + w, y, z], [x + w, y + h, z], [x, y + h, z]]),
-    left:  points([[x, y + h, 0], [x + w, y + h, 0], [x + w, y + h, z], [x, y + h, z]]),
-    right: points([[x + w, y, 0], [x + w, y + h, 0], [x + w, y + h, z], [x + w, y, z]]),
-    label: project(x + w / 2, y + h / 2, z),
+    // Depth grows towards the viewer, along this direction in the plan.
+    toward: { x: sin, y: cos },
+    turnNormal: (nx, ny) => ({ X: nx * cos - ny * sin, Y: nx * sin + ny * cos }),
+    depth: (x, y) => turn(x, y).Y,
+    project: (x, y, z = 0) => {
+      const { X, Y } = turn(x, y);
+      return { px: X * SCALE, py: (Y * down - z * up) * SCALE };
+    },
+    viewBox: (pad = 12) => {
+      const r = Math.hypot(grid.cols, grid.rows) / 2;
+      const top = -r * down - MAX_LEVELS * LEVEL * up;
+      const left = -r;
+      return `${(left * SCALE - pad).toFixed(1)} ${(top * SCALE - pad).toFixed(1)} ${(2 * r * SCALE + 2 * pad).toFixed(1)} ${((r * down - top) * SCALE + 2 * pad).toFixed(1)}`;
+    },
   };
 };
 
-export const floorOutline = (grid = DEFAULT_GRID) =>
-  points([[0, 0, 0], [grid.cols, 0, 0], [grid.cols, grid.rows, 0], [0, grid.rows, 0]]);
+const pointsOf = (cam, corners) => corners.map(([x, y, z]) => {
+  const { px, py } = cam.project(x, y, z);
+  return `${px.toFixed(1)},${py.toFixed(1)}`;
+}).join(' ');
 
-/** The 3D view's viewBox: the floor and the tallest possible box. */
-export const isoViewBox = (grid = DEFAULT_GRID, pad = 12) => {
-  const left = project(0, grid.rows).px;
-  const right = project(grid.cols, 0).px;
-  const top = project(0, 0, MAX_LEVELS * LEVEL).py;
-  const bottom = project(grid.cols, grid.rows).py;
-  return `${(left - pad).toFixed(1)} ${(top - pad).toFixed(1)} ${(right - left + 2 * pad).toFixed(1)} ${(bottom - top + 2 * pad).toFixed(1)}`;
+// The four walls of a box, each with the way it faces in the plan.
+const WALLS = [
+  { normal: [0, -1], edge: (b) => [[b.x, b.y], [b.x + b.w, b.y]] },
+  { normal: [1, 0],  edge: (b) => [[b.x + b.w, b.y], [b.x + b.w, b.y + b.h]] },
+  { normal: [0, 1],  edge: (b) => [[b.x + b.w, b.y + b.h], [b.x, b.y + b.h]] },
+  { normal: [-1, 0], edge: (b) => [[b.x, b.y + b.h], [b.x, b.y]] },
+];
+
+/**
+ * The faces of a box the camera sees: its top, and the walls facing it,
+ * each with a shade (how much darker it is drawn, lit from the left).
+ * A box is { x, y, w, h, z0, z1 }.
+ */
+export const boxFaces = (box, cam) => {
+  const { x, y, w, h, z0 = 0, z1 } = box;
+  const walls = WALLS
+    .map((wall) => ({ wall, n: cam.turnNormal(...wall.normal) }))
+    .filter(({ n }) => n.Y > 0.001)
+    .map(({ wall, n }) => {
+      const [[ax, ay], [bx, by]] = wall.edge(box);
+      return {
+        points: pointsOf(cam, [[ax, ay, z0], [bx, by, z0], [bx, by, z1], [ax, ay, z1]]),
+        shade: 0.08 + 0.16 * ((1 + n.X) / 2),
+      };
+    });
+  return {
+    top: pointsOf(cam, [[x, y, z1], [x + w, y, z1], [x + w, y + h, z1], [x, y + h, z1]]),
+    walls,
+    label: cam.project(x + w / 2, y + h / 2, z1),
+  };
 };
 
-// A box hides the boxes behind it, so the far ones are drawn first. On a
-// grid with no overlaps, A is behind B when it ends before B starts
-// along x or along y (and B does not also end before A along the other).
-const behind = (a, b) =>
-  (a.x + a.w <= b.x && !(b.y + b.h <= a.y)) || (a.y + a.h <= b.y && !(b.x + b.w <= a.x));
+/** An area as a box. */
+export const areaBox = (area) => ({ x: area.x, y: area.y, w: area.w, h: area.h, z0: 0, z1: heightOf(area) });
 
-/** Areas in the order the 3D view draws them: far first. */
-export const drawOrder = (areas) => {
-  const remaining = [...areas].sort((a, b) => (a.x + a.w / 2 + a.y + a.h / 2) - (b.x + b.w / 2 + b.y + b.h / 2));
+export const floorOutline = (cam, grid = DEFAULT_GRID) =>
+  pointsOf(cam, [[0, 0, 0], [grid.cols, 0, 0], [grid.cols, grid.rows, 0], [0, grid.rows, 0]]);
+
+// A box hides the boxes behind it, so the far ones are drawn first. Two
+// boxes that do not overlap on the plan are apart along x or along y;
+// the one on the far side of that gap, as the camera looks, is behind.
+const side = (a, b, key, size) => {
+  if (a[key] + a[size] <= b[key]) return 1;  // a before b along the axis
+  if (b[key] + b[size] <= a[key]) return -1; // a after b
+  return 0;
+};
+
+export const isBehind = (a, b, toward) => {
+  const sx = side(a, b, 'x', 'w');
+  const sy = side(a, b, 'y', 'h');
+  const aBack = (sx * toward.x > 1e-9) || (sy * toward.y > 1e-9);
+  const bBack = (sx * toward.x < -1e-9) || (sy * toward.y < -1e-9);
+  return aBack && !bBack;
+};
+
+/**
+ * Boxes in the order the 3D view draws them: far first. A box that lies
+ * flat (a floor marking, a staging area) is drawn before anything that
+ * stands, so the pallets standing on it are never hidden under it.
+ */
+export const drawOrder = (boxes, cam) => {
+  const flat = (b) => (b.z1 ?? 0) - (b.z0 ?? 0) < 0.1 && (b.z0 ?? 0) === 0;
+  const byDepth = (a, b) => cam.depth(a.x + a.w / 2, a.y + a.h / 2) - cam.depth(b.x + b.w / 2, b.y + b.h / 2) || (a.z0 ?? 0) - (b.z0 ?? 0);
+  const lying = boxes.filter(flat).sort(byDepth);
+  const remaining = boxes.filter((b) => !flat(b)).sort(byDepth);
   const ordered = [];
   while (remaining.length > 0) {
-    // The first area nothing left is behind; on a tangle (which a grid
-    // without overlaps cannot make), the nearest-first guess.
-    const i = remaining.findIndex((a) => !remaining.some((b) => b !== a && behind(b, a)));
+    // The first box nothing left is behind; on a tangle, the farthest.
+    const i = remaining.findIndex((a) => !remaining.some((b) => b !== a && isBehind(b, a, cam.toward)));
     ordered.push(...remaining.splice(i === -1 ? 0 : i, 1));
   }
-  return ordered;
+  return [...lying, ...ordered];
 };

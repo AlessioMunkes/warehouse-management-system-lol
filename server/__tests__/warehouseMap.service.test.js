@@ -13,6 +13,8 @@ const repoMock = {
   getArea: vi.fn(),
   listLatestCounts: vi.fn(),
   listMapProducts: vi.fn(),
+  listPackedPallets: vi.fn(),
+  readUnitSizes: vi.fn(),
   productsForCount: vi.fn(),
   saveLayout: vi.fn(),
   latestCountsForArea: vi.fn(),
@@ -33,10 +35,13 @@ const AREA = { id: 3, name: 'Dry store A', kind: 'dry', x: 0, y: 0, w: 4, h: 3, 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mapService.clearMapCache();
+  repoMock.listPackedPallets.mockResolvedValue([]);
+  repoMock.readUnitSizes.mockResolvedValue({});
   repoMock.listAreas.mockResolvedValue([AREA]);
   repoMock.listLatestCounts.mockResolvedValue([]);
   repoMock.listMapProducts.mockResolvedValue([
-    { id: 1, name: 'Rice', sku: 'R1', unit: 'kg', on_hand: '40', programme_id: null, programme_name: null },
+    { id: 1, name: 'Rice', sku: 'R1', unit: 'kg', on_hand: '40', on_pallets: '0', programme_id: null, programme_name: null },
   ]);
   repoMock.getArea.mockResolvedValue(AREA);
   repoMock.latestCountsForArea.mockResolvedValue([]);
@@ -51,6 +56,23 @@ describe('getMap', () => {
     expect(map.grid).toEqual({ cols: 40, rows: 24 });
     expect(map.areas[0].items[0]).toMatchObject({ productId: 1, about: 15 });
     expect(map.products[0]).toMatchObject({ onHand: 40, placed: 15, unplaced: 25 });
+  });
+
+  it('keeps the answer for a few seconds, and drops it when a count is saved', async () => {
+    await mapService.getMap();
+    await mapService.getMap();
+    expect(repoMock.listMapProducts).toHaveBeenCalledTimes(1);
+    await mapService.recordCount(3, { lines: [{ productId: 1, quantity: 5 }] }, 9);
+    expect(repoMock.listMapProducts).toHaveBeenCalledTimes(2);
+  });
+
+  it('stands packed pallets in a staging area and takes their stock off the shelves', async () => {
+    repoMock.listAreas.mockResolvedValue([AREA, { id: 4, name: 'Bay', kind: 'staging', x: 10, y: 0, w: 3, h: 2, levels: 1, pallet_spaces: 6 }]);
+    repoMock.listMapProducts.mockResolvedValue([{ id: 1, name: 'Rice', unit: 'kg', on_hand: '40', on_pallets: '15' }]);
+    repoMock.listPackedPallets.mockResolvedValue([{ id: 70, pallet_ref: 'PAL-70', beneficiary: 'Sunflower ECD', dispatch_date: '2026-10-20' }]);
+    const map = await mapService.getMap();
+    expect(map.areas[1].pallets).toEqual([{ id: 70, ref: 'PAL-70', beneficiary: 'Sunflower ECD', dispatchDate: '2026-10-20' }]);
+    expect(map.products[0]).toMatchObject({ shelf: 25, onPallets: 15, unplaced: 25 });
   });
 
   it('says there is no map yet on a database without the tables', async () => {
@@ -72,7 +94,8 @@ describe('saveLayout', () => {
   it('writes a good plan as the signed-in admin', async () => {
     await mapService.saveLayout({ areas: [{ id: 3, name: ' Dry store A ', kind: 'dry', x: 1, y: 1, w: 3, h: 2, levels: 2 }] }, 7);
     expect(repoMock.saveLayout).toHaveBeenCalledWith(client, [
-      { id: 3, name: 'Dry store A', kind: 'dry', x: 1, y: 1, w: 3, h: 2, levels: 2 },
+      { id: 3, name: 'Dry store A', kind: 'dry', x: 1, y: 1, w: 3, h: 2, levels: 2,
+        capacityKg: null, palletSpaces: null, preferredProductIds: [], preferredCategories: [] },
     ], 7);
   });
 

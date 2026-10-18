@@ -2,8 +2,10 @@
 // client/src/features/warehouseMap/LayoutBuilder.jsx
 //
 // The admin's drawing board for the floor plan. Add a dry store, cold
-// room, floor area or door; drag it into place; drag its corner to size
-// it; name it in the form beside the plan. The 3D preview shows the
+// room, floor area, pallet staging area or door; drag it into place;
+// drag its corner to size it. The form beside the plan names it and sets
+// its capacity (kilograms for a store, pallet spaces for staging) and
+// the stock it is meant for. The 3D preview shows the
 // plan the way managers can view it.
 //
 // Controlled: the page holds the plan (so its header can save it) and
@@ -24,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import NativeSelect from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import WarehouseMap from './WarehouseMap';
+import PreferredStockPicker from './PreferredStockPicker';
 import {
   CELL, DEFAULT_GRID, KINDS, MAX_LEVELS, clamp, freeSpot, keepOnGrid, kindById, nextName, overlapping,
 } from './mapGeometry';
@@ -47,7 +50,10 @@ const cellAt = (svg, e) => {
   return { x: p.x / CELL, y: p.y / CELL };
 };
 
-function AreaForm({ area, grid, countedProducts, onChange, onRemove }) {
+// An empty box is no capacity, not 0.
+const positiveOrNull = (v) => (v === '' || !(Number(v) > 0) ? null : Number(v));
+
+function AreaForm({ area, grid, products, countedProducts, onChange, onRemove }) {
   const kind = kindById(area.kind);
   const set = (patch) => onChange(keepOnGrid({ ...area, ...patch }, grid));
   const whole = (v, min, max) => clamp(Math.round(Number(v) || min), min, max);
@@ -79,6 +85,33 @@ function AreaForm({ area, grid, countedProducts, onChange, onRemove }) {
           <Input id="area-levels" type="number" min="1" max={MAX_LEVELS} value={area.levels} onChange={(e) => set({ levels: whole(e.target.value, 1, MAX_LEVELS) })} />
         </div>
       ) : null}
+      {kind.holdsStock ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="area-capacity">Capacity (kg)</Label>
+          <Input
+            id="area-capacity" type="number" min="1" step="any" inputMode="decimal" placeholder="Not set"
+            value={area.capacityKg ?? ''} onChange={(e) => onChange({ ...area, capacityKg: positiveOrNull(e.target.value) })}
+          />
+        </div>
+      ) : null}
+      {kind.id === 'staging' ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="area-pallets">Pallet spaces</Label>
+          <Input
+            id="area-pallets" type="number" min="1" step="1" placeholder="Not set"
+            value={area.palletSpaces ?? ''}
+            onChange={(e) => onChange({ ...area, palletSpaces: positiveOrNull(e.target.value) && Math.round(Number(e.target.value)) })}
+          />
+        </div>
+      ) : null}
+      {kind.holdsStock ? (
+        <PreferredStockPicker
+          products={products}
+          productIds={area.preferredProductIds ?? []}
+          categories={area.preferredCategories ?? []}
+          onChange={({ productIds, categories }) => onChange({ ...area, preferredProductIds: productIds, preferredCategories: categories })}
+        />
+      ) : null}
       <Button type="button" variant="destructive" size="sm" onClick={onRemove}>
         <Trash2 /> Remove area
       </Button>
@@ -91,7 +124,7 @@ function AreaForm({ area, grid, countedProducts, onChange, onRemove }) {
   );
 }
 
-export default function LayoutBuilder({ areas, onChange, grid = DEFAULT_GRID, countedOf = () => 0 }) {
+export default function LayoutBuilder({ areas, onChange, grid = DEFAULT_GRID, products = [], countedOf = () => 0 }) {
   const svgRef = useRef(null);
   const [selectedId, setSelectedId] = useState(null);
   const [view, setView] = useState('plan');
@@ -106,7 +139,10 @@ export default function LayoutBuilder({ areas, onChange, grid = DEFAULT_GRID, co
   const add = (kindId) => {
     const kind = kindById(kindId);
     const spot = freeSpot(areas, kind.size, grid);
-    const area = { id: newId(), name: nextName(areas, kindId), kind: kindId, ...spot, ...kind.size, levels: kind.levels };
+    const area = {
+      id: newId(), name: nextName(areas, kindId), kind: kindId, ...spot, ...kind.size, levels: kind.levels,
+      capacityKg: null, palletSpaces: null, preferredProductIds: [], preferredCategories: [],
+    };
     onChange([...areas, area]);
     setSelectedId(area.id);
     setView('plan');
@@ -246,6 +282,7 @@ export default function LayoutBuilder({ areas, onChange, grid = DEFAULT_GRID, co
             key={selected.id}
             area={selected}
             grid={grid}
+            products={products}
             countedProducts={countedOf(selected.id)}
             onChange={update}
             onRemove={() => remove(selected.id)}

@@ -8,13 +8,16 @@
 // A tone is a pair of design-token classes (fill and outline) the map
 // puts on an area's shape, so both themes come for free.
 //
+// Fill level compares what an area holds with the capacity set in
+// Warehouse layout: kilograms for a store, pallets for a staging area.
+//
 // Expiry reads the same rules as the Inventory list (inventoryViews.js):
 // an area takes the soonest expiry among the products it holds. Which
 // deliveries are still on the shelf is an estimate there, and so it is
 // here.
 // ─────────────────────────────────────────────────────────────
 import { expiryState } from '../inventory/inventoryViews';
-import { holdsStock, kindById } from './mapGeometry';
+import { isStaging, kindById } from './mapGeometry';
 
 export const TONES = {
   bad:     { fill: 'fill-danger-soft', stroke: 'stroke-danger' },
@@ -33,12 +36,14 @@ export const OVERLAYS = [
   { id: 'expiry',    label: 'Expiry' },
   { id: 'programme', label: 'Programme' },
   { id: 'counted',   label: 'Last counted' },
+  { id: 'fill',      label: 'Fill level' },
   { id: 'kind',      label: 'Area type' },
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const COUNT_FRESH_DAYS = 7;
 export const COUNT_STALE_DAYS = 30;
+export const FILL_WARN = 0.8;
 
 const hasStock = (area) => area.items?.some((i) => i.about > 0);
 
@@ -69,12 +74,25 @@ export const countedWhen = (iso, now = new Date()) => {
   return `Counted ${days} days ago`;
 };
 
-const KIND_TONE = { dry: 'tan', cold: 'info', floor: 'sage', door: 'door' };
+const KIND_TONE = { dry: 'tan', cold: 'info', floor: 'sage', staging: 'violet', door: 'door' };
+
+/** The tone for how full something is: 0.5 is half. */
+export const fillTone = (fill) => {
+  if (fill === null || fill === undefined) return 'neutral';
+  if (fill >= 1) return 'bad';
+  return fill >= FILL_WARN ? 'warn' : 'good';
+};
+
+/** '45%', or '' with no capacity set. */
+export const percent = (fill) => (fill === null || fill === undefined ? '' : `${Math.round(fill * 100)}%`);
 
 /** The tone name for an area under an overlay. */
 export const toneFor = (area, overlay, ctx = {}) => {
-  if (!holdsStock(area)) return 'door';
+  if (area.kind === 'door') return 'door';
   if (overlay === 'kind') return KIND_TONE[area.kind];
+  if (overlay === 'fill') return fillTone(area.fill);
+  // A staging area holds pallets, not counted stock.
+  if (isStaging(area)) return area.pallets?.length ? 'neutral' : 'empty';
   if (overlay === 'counted') {
     const days = daysSince(area.lastCountedAt, ctx.now);
     if (days === null) return 'empty';
@@ -96,7 +114,15 @@ export const toneFor = (area, overlay, ctx = {}) => {
 /** The legend for an overlay: [{ tone, label }]. */
 export const legendFor = (overlay, { products = [] } = {}) => {
   if (overlay === 'kind') {
-    return ['dry', 'cold', 'floor', 'door'].map((k) => ({ tone: KIND_TONE[k], label: kindById(k).label }));
+    return ['dry', 'cold', 'floor', 'staging', 'door'].map((k) => ({ tone: KIND_TONE[k], label: kindById(k).label }));
+  }
+  if (overlay === 'fill') {
+    return [
+      { tone: 'good', label: `Under ${FILL_WARN * 100}% full` },
+      { tone: 'warn', label: `${FILL_WARN * 100}% full or more` },
+      { tone: 'bad', label: 'Full or over' },
+      { tone: 'neutral', label: 'No capacity set' },
+    ];
   }
   if (overlay === 'counted') {
     return [
@@ -113,7 +139,7 @@ export const legendFor = (overlay, { products = [] } = {}) => {
     return [
       ...Object.entries(tones).map(([id, tone]) => ({ tone, label: names.get(Number(id)) || 'Programme' })),
       { tone: 'neutral', label: 'No programme' },
-      { tone: 'empty', label: 'Nothing counted' },
+      { tone: 'empty', label: 'Empty' },
     ];
   }
   return [
@@ -121,7 +147,7 @@ export const legendFor = (overlay, { products = [] } = {}) => {
     { tone: 'warn', label: 'Within 30 days' },
     { tone: 'good', label: 'Later' },
     { tone: 'neutral', label: 'No expiry on record' },
-    { tone: 'empty', label: 'Nothing counted' },
+    { tone: 'empty', label: 'Empty' },
   ];
 };
 

@@ -22,7 +22,9 @@ import LayoutBuilder from '../features/warehouseMap/LayoutBuilder';
 import { overlapping } from '../features/warehouseMap/mapGeometry';
 import { getWarehouseMap, saveWarehouseLayout } from '../services/warehouseMapAPI';
 
-const toPlan = (areas) => areas.map(({ id, name, kind, x, y, w, h, levels }) => ({ id, name, kind, x, y, w, h, levels }));
+const toPlan = (areas) => areas.map(({
+  id, name, kind, x, y, w, h, levels, capacityKg = null, palletSpaces = null, preferredProductIds = [], preferredCategories = [],
+}) => ({ id, name, kind, x, y, w, h, levels, capacityKg, palletSpaces, preferredProductIds, preferredCategories }));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // What stops the plan saving, in words; null when it can be saved.
@@ -93,7 +95,7 @@ export default function WarehouseLayoutPage() {
     <PageShell>
       <PageHeader
         title="Warehouse layout"
-        description="Draw the dry stores, cold rooms, floor areas and doors where they are in the warehouse."
+        description="Draw where stock is kept, set how much each area holds and what it is for."
         actions={map?.ready ? (
           <>
             {dirty ? (
@@ -118,7 +120,7 @@ export default function WarehouseLayoutPage() {
             description="Run npm run migrate on the server, then reload this page."
           />
         ) : (
-          <LayoutBuilder areas={plan} onChange={setPlan} grid={map.grid} countedOf={(id) => counted.get(id) ?? 0} />
+          <LayoutBuilder areas={plan} onChange={setPlan} grid={map.grid} products={map.products} countedOf={(id) => counted.get(id) ?? 0} />
         )}
       </div>
     </PageShell>

@@ -2,18 +2,19 @@
 // client/src/features/warehouseMap/CountAreaDialog.jsx
 //
 // "What is in this area?" A manager stands at an area and records what
-// they see: the products already recorded there come filled in with
-// about how much the map thinks is left, to be corrected, and anything
-// else is added from a search. Saving records the area's count; taking
+// they see: the products the map shows there (counted before, or
+// expected because the area is meant for them) come filled in with about
+// how much the map thinks is there, to be corrected, and anything else is
+// added from a search. Saving records the area's count; taking
 // a product off the list records that the area no longer holds it.
 //
 // It never changes stock. The panel shows the count beside what is on
 // hand afterwards, and a difference is corrected with Adjust stock.
 //
-// With nothing typed in the search, the products with the most stock
-// not yet placed are suggested, cold products for a cold room and dry
-// ones elsewhere: they are what a first walk round the warehouse is
-// placing.
+// With nothing typed in the search, suggestions come first from the
+// stock the area is meant for, then the products with the most stock
+// not yet placed (cold products for a cold room, dry ones elsewhere):
+// they are what a walk round the warehouse is placing.
 // ─────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
@@ -31,9 +32,16 @@ const SUGGESTED = 5;
 const fitsArea = (product, area) => (area.kind === 'cold' ? product.storageType === 'cold' : product.storageType !== 'cold');
 
 export default function CountAreaDialog({ area, products, onSave, onClose, isSaving = false }) {
-  const [lines, setLines] = useState(() => area.items
-    .filter((i) => i.about > 0)
-    .map((i) => ({ productId: i.productId, name: i.name, unit: i.unit, quantity: qtyInput(i.about) })));
+  const [lines, setLines] = useState(() => {
+    // A product can be both counted here and expected here: one line, both added.
+    const byProduct = new Map();
+    for (const i of area.items.filter((x) => x.about > 0)) {
+      const line = byProduct.get(i.productId) ?? { productId: i.productId, name: i.name, unit: i.unit, total: 0 };
+      line.total += i.about;
+      byProduct.set(i.productId, line);
+    }
+    return [...byProduct.values()].map(({ total, ...l }) => ({ ...l, quantity: qtyInput(Math.round(total * 1000) / 1000) }));
+  });
   const [query, setQuery] = useState('');
   const [error, setError] = useState(null);
 
@@ -41,10 +49,13 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
   const choices = useMemo(() => {
     const open = products.filter((p) => !listed.has(p.id));
     if (query.trim()) return open.filter((p) => matchesSearch(p, query)).slice(0, 8);
-    return open
-      .filter((p) => p.unplaced > 0 && fitsArea(p, area))
-      .sort((a, b) => b.unplaced - a.unplaced)
-      .slice(0, SUGGESTED);
+    const ids = new Set(area.preferredProductIds ?? []);
+    const categories = new Set((area.preferredCategories ?? []).map((c) => c.toLowerCase()));
+    const meant = open.filter((p) => ids.has(p.id) || categories.has(String(p.category ?? '').toLowerCase()));
+    const spare = open
+      .filter((p) => !meant.includes(p) && p.unplaced > 0 && fitsArea(p, area))
+      .sort((a, b) => b.unplaced - a.unplaced);
+    return [...meant, ...spare].slice(0, SUGGESTED);
   }, [products, listed, query, area]);
 
   const add = (p) => {
@@ -109,9 +120,9 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
               />
             </div>
             {choices.length > 0 ? (
-              <ul className="divide-y rounded-lg border" aria-label={query.trim() ? 'Matching products' : 'Not placed yet'}>
+              <ul className="divide-y rounded-lg border" aria-label={query.trim() ? 'Matching products' : 'Suggested products'}>
                 {!query.trim() ? (
-                  <li className="px-3 py-1.5 text-xs text-muted-foreground">Not placed yet</li>
+                  <li className="px-3 py-1.5 text-xs text-muted-foreground">Suggested</li>
                 ) : null}
                 {choices.map((p) => (
                   <li key={p.id}>
@@ -124,7 +135,7 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
                         <span className="block text-xs text-muted-foreground">{p.sku}</span>
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {p.unplaced > 0 ? `${fmtQtyUnit(p.unplaced, p.unit)} not placed` : `${fmtQtyUnit(p.onHand, p.unit)} on hand`}
+                        {p.unplaced > 0 ? `${fmtQtyUnit(p.unplaced, p.unit)} not placed` : `${fmtQtyUnit(p.shelf ?? p.onHand, p.unit)} on the shelves`}
                       </span>
                     </button>
                   </li>

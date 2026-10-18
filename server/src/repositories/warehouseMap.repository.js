@@ -6,18 +6,25 @@
 // migration 048. What an area holds NOW is worked out from these in
 // features/warehouseMap/placement.js, not here.
 //
-// A warehouse database that has not had migration 048 yet has neither
-// table. Reads then answer null ("no plan yet") rather than failing, so
-// the Inventory screen keeps working while the migration is waiting.
+// A warehouse database that has not had migrations 048 and 049 yet has
+// no tables, or not their columns. Reads then answer null ("no plan
+// yet") rather than failing, so the Inventory screen keeps working while
+// the migration is waiting.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { committedStockSql } from './committedStock.sql.js';
+import { UNIT_SIZE_SETTINGS } from '../features/units/unitConversion.js';
+import settingsRepository from './settings.repository.js';
 
-const NOT_MIGRATED = '42P01';
+// No table (42P01) or no column (42703): the migration has not run.
+const NOT_MIGRATED = ['42P01', '42703'];
+const notMigrated = (err) => NOT_MIGRATED.includes(err.code);
 
 const AREA_COLUMNS = `
   a.id, a.name, a.kind,
   a.grid_x AS x, a.grid_y AS y, a.grid_w AS w, a.grid_h AS h,
-  a.levels, a.updated_at`;
+  a.levels, a.capacity_kg, a.pallet_spaces, a.preferred_product_ids, a.preferred_categories,
+  a.updated_at`;
 
 /** Every area on the plan, or null when the tables do not exist yet. */
 const listAreas = async (db = pool) => {
@@ -27,7 +34,7 @@ const listAreas = async (db = pool) => {
     );
     return rows;
   } catch (err) {
-    if (err.code === NOT_MIGRATED) return null;
+    if (notMigrated(err)) return null;
     throw err;
   }
 };
@@ -57,29 +64,70 @@ const listLatestCounts = async (db = pool) => {
     );
     return rows;
   } catch (err) {
-    if (err.code === NOT_MIGRATED) return [];
+    if (notMigrated(err)) return [];
     throw err;
   }
 };
 
 /**
  * Every active product with what is on hand, in its stock unit (the
- * catalogue unit for a product with no stock row yet), and its
- * programme.
+ * catalogue unit for a product with no stock row yet), how much of that
+ * is packed onto pallets not yet dispatched, and its programme.
+ * Benevolent requests are left out of on_pallets: what they set aside
+ * is still on the shelf until it goes out.
  */
 const listMapProducts = async (db = pool) => {
   const { rows } = await db.query(
     `SELECT p.id, p.name, p.stock_keeping_unit AS sku, p.storage_type,
             COALESCE(sl.quantity_on_hand, 0)::numeric AS on_hand,
             COALESCE(NULLIF(sl.unit, ''), p.default_unit, '') AS unit,
+            COALESCE(c.committed, 0)::numeric AS on_pallets,
+            p.category, p.weight_kg,
             pr.id AS programme_id, pr.name AS programme_name
        FROM products p
        LEFT JOIN stock_levels sl ON sl.product_id = p.id
+       LEFT JOIN (${committedStockSql({ includeBenevolent: false })}) c ON c.product_id = p.id
        LEFT JOIN programmes pr ON pr.id = p.programme_id
       WHERE p.is_active = true
       ORDER BY p.name ASC`
   );
   return rows;
+};
+
+/**
+ * Packed pallets not yet dispatched: closed slips with no dispatch, or one
+ * still awaiting collection. The same rule as committed stock.
+ */
+const listPackedPallets = async (db = pool) => {
+  const { rows } = await db.query(
+    `SELECT ps.id, ps.pallet_ref, ps.dispatch_date::text AS dispatch_date,
+            COALESCE(NULLIF(ps.beneficiary_name, ''), e.name) AS beneficiary
+       FROM picking_slips ps
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+      WHERE ps.status = 'complete' AND (de.id IS NULL OR de.status = 'awaiting')
+      ORDER BY ps.dispatch_date ASC, ps.id ASC`
+  );
+  return rows;
+};
+
+/**
+ * What a crate, bag, box and punnet weigh, as saved (a punnet in grams),
+ * the shape convertQuantity takes; {} when unreadable.
+ */
+const readUnitSizes = async (db = pool) => {
+  try {
+    const rows = await settingsRepository.readKeys(db, Object.values(UNIT_SIZE_SETTINGS).map((s) => s.key));
+    const sizes = {};
+    for (const [unit, { key }] of Object.entries(UNIT_SIZE_SETTINGS)) {
+      const saved = Number(rows.find((r) => r.key === key)?.value);
+      if (Number.isFinite(saved) && saved > 0) sizes[unit] = saved;
+    }
+    return sizes;
+  } catch (err) {
+    console.error('[warehouseMap] unit sizes not read:', err.message);
+    return {};
+  }
 };
 
 /** What a count needs about each product: its name, balance and unit. */
@@ -130,17 +178,23 @@ const saveLayout = async (client, areas, userId) => {
     await client.query(
       `UPDATE warehouse_areas
           SET name = $2, kind = $3, grid_x = $4, grid_y = $5, grid_w = $6, grid_h = $7,
-              levels = $8, updated_by = $9, updated_at = NOW()
+              levels = $8, capacity_kg = $10, pallet_spaces = $11,
+              preferred_product_ids = $12, preferred_categories = $13,
+              updated_by = $9, updated_at = NOW()
         WHERE id = $1`,
-      [a.id, a.name, a.kind, a.x, a.y, a.w, a.h, a.levels, userId]
+      [a.id, a.name, a.kind, a.x, a.y, a.w, a.h, a.levels, userId,
+        a.capacityKg, a.palletSpaces, a.preferredProductIds, a.preferredCategories]
     );
   }
 
   for (const a of areas.filter((x) => !keptIds.includes(x.id))) {
     await client.query(
-      `INSERT INTO warehouse_areas (name, kind, grid_x, grid_y, grid_w, grid_h, levels, created_by, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
-      [a.name, a.kind, a.x, a.y, a.w, a.h, a.levels, userId]
+      `INSERT INTO warehouse_areas
+         (name, kind, grid_x, grid_y, grid_w, grid_h, levels, created_by, updated_by,
+          capacity_kg, pallet_spaces, preferred_product_ids, preferred_categories)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12)`,
+      [a.name, a.kind, a.x, a.y, a.w, a.h, a.levels, userId,
+        a.capacityKg, a.palletSpaces, a.preferredProductIds, a.preferredCategories]
     );
   }
 };
@@ -169,6 +223,6 @@ const insertCounts = async (client, { areaId, lines, countedBy }) => {
 };
 
 export default {
-  listAreas, getArea, listLatestCounts, listMapProducts, productsForCount, saveLayout,
+  listAreas, getArea, listLatestCounts, listMapProducts, listPackedPallets, readUnitSizes, productsForCount, saveLayout,
   latestCountsForArea, insertCounts,
 };
