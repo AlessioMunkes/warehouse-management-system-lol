@@ -28,6 +28,11 @@
 //   - shadows and a floor grid for depth, a compass that turns with the
 //     view, and a card on hover with everything about the area.
 //
+// ZOOMING (useMapZoom.js, both views). It opens fitted to the drawn
+// plan. The + and - buttons, scrolling once the map has been clicked,
+// pinching, or the + - 0 keys zoom in and out; Fit puts the whole plan
+// back. In the top view a drag moves the plan; in 3D Shift-drag does.
+//
 // TURNING IT. Drag across it to turn the floor round, up or down to look
 // from higher or lower. The buttons turn it a quarter at a time, put it
 // back, or set it turning slowly by itself; the arrow keys turn it once
@@ -35,14 +40,15 @@
 // Reduce movement every turn is instant and there is no slow turning.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pause, Play, RotateCcw, RotateCw, Tags, Undo2 } from 'lucide-react';
+import { Maximize2, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Tags, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fmtQty } from '@/lib/quantity';
 import {
   CELL, DEFAULT_CAMERA, DEFAULT_GRID, LEVEL_HEIGHT, TILT_RANGE, anchorAbove, areaBox, boxFaces, camera, clamp,
   drawOrder, floorGrid, floorOutline, holdsStock, isOpenable, isStaging, kindById, northBearing, palletBoxes,
-  shadowPoints, shelfLines,
+  planFocus, shadowPoints, shelfLines,
 } from './mapGeometry';
+import useMapZoom from './useMapZoom';
 import { TONES, fillTone } from './mapOverlays';
 import { BADGE_CLASS, alertsFor, badgeFor, figureOf, palletDue, palletLook } from './mapIndicators';
 import { cn } from '@/lib/utils';
@@ -281,6 +287,29 @@ function Compass({ bearing }) {
   );
 }
 
+// + / - / Fit, bottom right, and the scroll hint while it is needed.
+function ZoomControls({ z }) {
+  return (
+    <>
+      <div className="absolute bottom-2 right-2 flex flex-col gap-1 rounded-2xl border bg-card/90 p-0.5 shadow-sm backdrop-blur" role="group" aria-label="Zoom">
+        <Button type="button" size="icon-sm" variant="ghost" aria-label="Zoom in" title="Zoom in" onClick={z.zoomIn}><Plus /></Button>
+        <Button type="button" size="icon-sm" variant="ghost" aria-label="Zoom out" title="Zoom out" onClick={z.zoomOut}><Minus /></Button>
+        <Button type="button" size="icon-sm" variant="ghost" aria-label="Fit the plan" title="Fit the plan" onClick={z.fitPlan}><Maximize2 /></Button>
+      </div>
+      {z.zoom.k !== 1 ? (
+        <span className="pointer-events-none absolute bottom-3 right-14 rounded-full bg-card/90 px-2 py-0.5 text-xs tabular-nums text-muted-foreground shadow-sm">
+          {Math.round(z.zoom.k * 100)}%
+        </span>
+      ) : null}
+      {z.hint ? (
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto w-fit -translate-y-1/2 rounded-full bg-ink/80 px-3 py-1.5 text-xs text-on-ink shadow">
+          Click the map, then scroll to zoom
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function ThreeD({ grid, areas, shared, title, className, today }) {
   const [cam, setCam] = useState(DEFAULT_CAMERA);
   const [showLabels, setShowLabels] = useState(true);
@@ -288,11 +317,15 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
   const [hover, setHover] = useState(null); // { id, x, y }
   const [calm] = useState(lessMotion);
   const wrapRef = useRef(null);
+  const svgRef = useRef(null);
   const drag = useRef(null);
   const moved = useRef(false);
   const frame = useRef(0);
   const camRef = useRef(cam);
-  const view = useMemo(() => camera(cam, grid), [cam, grid]);
+  const focus = useMemo(() => planFocus(areas, grid), [areas, grid]);
+  const view = useMemo(() => camera(cam, grid, focus), [cam, grid, focus]);
+  const fit = useMemo(() => view.fit(), [view]);
+  const z = useMapZoom({ fit, svgRef });
 
   useEffect(() => { camRef.current = cam; }, [cam]);
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
@@ -345,10 +378,13 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
   const down = (e) => {
     cancelAnimationFrame(frame.current);
     setSpinning(false);
-    drag.current = { x: e.clientX, y: e.clientY, from: camRef.current, active: false };
     moved.current = false;
+    // A pinch or a Shift-drag is the zoom's; anything else turns the floor.
+    if (z.onPointerDown(e)) { drag.current = null; setHover(null); return; }
+    drag.current = { x: e.clientX, y: e.clientY, from: camRef.current, active: false };
   };
   const move = (e) => {
+    if (z.onPointerMove(e)) return;
     const d = drag.current;
     if (!d) return;
     const dx = e.clientX - d.x;
@@ -361,7 +397,10 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
       tilt: clamp(d.from.tilt + dy * TILT_PER_PX, TILT_RANGE.min, TILT_RANGE.max),
     });
   };
-  const up = () => { drag.current = null; };
+  const up = (e) => {
+    if (z.onPointerUp(e)) moved.current = true;
+    drag.current = null;
+  };
   // The click that ends a drag is not a choice: stopped before it
   // reaches the area under the pointer.
   const swallowDragClick = (e) => {
@@ -371,6 +410,7 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
   };
 
   const keyDown = (e) => {
+    if (e.target === e.currentTarget && z.onKeyDown(e)) { e.preventDefault(); return; }
     const step = {
       ArrowLeft: () => turn(15), ArrowRight: () => turn(-15),
       ArrowUp: () => animateTo({ ...camRef.current, tilt: clamp(camRef.current.tilt + 5, TILT_RANGE.min, TILT_RANGE.max) }),
@@ -396,10 +436,11 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
   return (
     <div ref={wrapRef} className="relative overflow-hidden rounded-lg bg-linear-to-b from-surface to-surface-2">
       <svg
-        viewBox={view.viewBox()}
+        ref={svgRef}
+        viewBox={z.viewBox}
         role="group"
         tabIndex={0}
-        aria-label={`${title}, 3D view. Drag or use the arrow keys to turn it.`}
+        aria-label={`${title}, 3D view. Drag or use the arrow keys to turn it; plus and minus zoom.`}
         className={cn('h-auto w-full cursor-grab touch-none select-none outline-none active:cursor-grabbing', className)}
         onPointerDown={down}
         onPointerMove={move}
@@ -434,11 +475,12 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
       {hovered ? <HoverCard area={hovered} at={hover} today={today} /> : null}
 
       <div className="absolute bottom-2 left-2"><Compass bearing={northBearing(view)} /></div>
+      <ZoomControls z={z} />
 
       <div className="absolute right-2 top-2 flex gap-1 rounded-4xl border bg-card/90 p-0.5 shadow-sm backdrop-blur" role="group" aria-label="Turn the view">
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Turn left" title="Turn left" onClick={() => turn(90)}><RotateCcw /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Turn right" title="Turn right" onClick={() => turn(-90)}><RotateCw /></Button>
-        <Button type="button" size="icon-sm" variant="ghost" aria-label="Reset the view" title="Reset the view" onClick={() => animateTo(DEFAULT_CAMERA)}><Undo2 /></Button>
+        <Button type="button" size="icon-sm" variant="ghost" aria-label="Reset the view" title="Reset the view" onClick={() => { animateTo(DEFAULT_CAMERA); z.fitPlan(); }}><Undo2 /></Button>
         {calm ? null : (
           <Button
             type="button" size="icon-sm" variant={spinning ? 'secondary' : 'ghost'} aria-pressed={spinning}
@@ -491,10 +533,45 @@ export default function WarehouseMap({
     return <ThreeD grid={grid} areas={areas} shared={shared} title={title} className={className} today={today} />;
   }
 
+  return <TopView grid={grid} areas={areas} shared={shared} noteOf={noteOf} title={title} className={className} today={today} />;
+}
+
+// The plan from above, fitted to what is drawn with a square of room round it.
+function TopView({ grid, areas, shared, noteOf, title, className, today }) {
+  const svgRef = useRef(null);
   const width = grid.cols * CELL;
   const height = grid.rows * CELL;
+  const fit = useMemo(() => {
+    if (!areas.length) return { x: 0, y: 0, w: width, h: height };
+    const x0 = Math.max(Math.min(...areas.map((a) => a.x)) - 1, 0) * CELL;
+    const y0 = Math.max(Math.min(...areas.map((a) => a.y)) - 1, 0) * CELL;
+    const x1 = Math.min(Math.max(...areas.map((a) => a.x + a.w)) + 1, grid.cols) * CELL;
+    const y1 = Math.min(Math.max(...areas.map((a) => a.y + a.h)) + 1, grid.rows) * CELL;
+    // Kept to the map's own shape, so a thin plan is not stretched.
+    const w = Math.max(x1 - x0, (y1 - y0) * (width / height));
+    const h = Math.max(y1 - y0, w * (height / width));
+    return { x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h };
+  }, [areas, grid, width, height]);
+  const z = useMapZoom({ fit, svgRef, dragPans: true });
+  const panned = useRef(false);
+
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label={`${title}, top view`} className={cn('h-auto w-full', className)}>
+    <div className="relative">
+      <svg
+        ref={svgRef}
+        viewBox={z.viewBox}
+        role="group"
+        tabIndex={0}
+        aria-label={`${title}, top view. Drag to move round it; plus and minus zoom.`}
+        className={cn('h-auto w-full touch-none outline-none', className)}
+        style={{ aspectRatio: `${width} / ${height}` }}
+        onPointerDown={(e) => { panned.current = false; z.onPointerDown(e); }}
+        onPointerMove={z.onPointerMove}
+        onPointerUp={(e) => { if (z.onPointerUp(e)) panned.current = true; }}
+        onPointerCancel={z.onPointerUp}
+        onKeyDown={(e) => { if (e.target === e.currentTarget && z.onKeyDown(e)) e.preventDefault(); }}
+        onClickCapture={(e) => { if (panned.current) { panned.current = false; e.stopPropagation(); } }}
+      >
       <defs>
         <pattern id="wm-grid" width={CELL} height={CELL} patternUnits="userSpaceOnUse">
           <path d={`M ${CELL} 0 L 0 0 0 ${CELL}`} fill="none" className="stroke-line" strokeWidth={0.75} />
@@ -503,6 +580,8 @@ export default function WarehouseMap({
       <rect width={width} height={height} className="fill-surface-2" />
       <rect width={width} height={height} fill="url(#wm-grid)" />
       {areas.map((area) => <TopArea key={area.id} {...shared(area)} note={noteOf?.(area)} today={today} />)}
-    </svg>
+      </svg>
+      <ZoomControls z={z} />
+    </div>
   );
 }

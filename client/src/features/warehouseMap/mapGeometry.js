@@ -121,13 +121,30 @@ export const heightOf = (area) => {
   return clamp(Number(area.levels) || 1, 1, MAX_LEVELS) * LEVEL;
 };
 
+/**
+ * Where the 3D view looks: the middle of the drawn areas and how far out
+ * they reach, so the plan fills the view and turns round its own middle
+ * rather than the middle of the whole grid. The whole grid when nothing
+ * is drawn. { cx, cy, r } in squares.
+ */
+export const planFocus = (areas, grid = DEFAULT_GRID) => {
+  if (!areas?.length) return { cx: grid.cols / 2, cy: grid.rows / 2, r: Math.hypot(grid.cols, grid.rows) / 2 };
+  const x0 = Math.min(...areas.map((a) => a.x));
+  const y0 = Math.min(...areas.map((a) => a.y));
+  const x1 = Math.max(...areas.map((a) => a.x + a.w));
+  const y1 = Math.max(...areas.map((a) => a.y + a.h));
+  // A little room round the edge, and never so tight one box fills it.
+  return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, r: Math.max(Math.hypot(x1 - x0, y1 - y0) / 2 + 1.5, 5) };
+};
+
 /** A projector for one camera and grid: plan + height to screen, and depth. */
-export const camera = (cam = DEFAULT_CAMERA, grid = DEFAULT_GRID) => {
+export const camera = (cam = DEFAULT_CAMERA, grid = DEFAULT_GRID, focus = null) => {
   const yaw = rad(cam.yaw);
   const tilt = rad(clamp(cam.tilt, TILT_RANGE.min, TILT_RANGE.max));
   const [cos, sin, down, up] = [Math.cos(yaw), Math.sin(yaw), Math.sin(tilt), Math.cos(tilt)];
-  const cx = grid.cols / 2;
-  const cy = grid.rows / 2;
+  const cx = focus?.cx ?? grid.cols / 2;
+  const cy = focus?.cy ?? grid.rows / 2;
+  const reach = focus?.r ?? Math.hypot(grid.cols, grid.rows) / 2;
   const turn = (x, y) => {
     const dx = x - cx;
     const dy = y - cy;
@@ -142,11 +159,20 @@ export const camera = (cam = DEFAULT_CAMERA, grid = DEFAULT_GRID) => {
       const { X, Y } = turn(x, y);
       return { px: X * SCALE, py: (Y * down - z * up) * SCALE };
     },
-    viewBox: (pad = 12) => {
-      const r = Math.hypot(grid.cols, grid.rows) / 2;
-      const top = -r * down - MAX_LEVELS * LEVEL * up;
-      const left = -r;
-      return `${(left * SCALE - pad).toFixed(1)} ${(top * SCALE - pad).toFixed(1)} ${(2 * r * SCALE + 2 * pad).toFixed(1)} ${((r * down - top) * SCALE + 2 * pad).toFixed(1)}`;
+    // The view that fits the focus whichever way it is turned, with room
+    // above the tallest box for its label. { x, y, w, h } in screen units.
+    fit: (pad = 12) => {
+      const top = -reach * down - (MAX_LEVELS * LEVEL + 2.5) * up;
+      return {
+        x: -reach * SCALE - pad,
+        y: top * SCALE - pad,
+        w: 2 * reach * SCALE + 2 * pad,
+        h: (reach * down - top) * SCALE + 2 * pad,
+      };
+    },
+    viewBox(pad = 12) {
+      const b = this.fit(pad);
+      return `${b.x.toFixed(1)} ${b.y.toFixed(1)} ${b.w.toFixed(1)} ${b.h.toFixed(1)}`;
     },
   };
 };

@@ -18,11 +18,14 @@
 // the stock take: when they differ, Adjust stock corrects the ledger,
 // with a reason, the same as from the Inventory list.
 //
-// A staging area lists the packed pallets waiting in it; they leave the
-// map when they are dispatched. The same panel, with `area` null, lists
+// A staging area lists the packed pallets waiting in it, the ones past
+// their collection day first, each marked as the map marks it; they
+// leave the map when they are dispatched. Under the title, every alert
+// the map's badge stands for (mapIndicators.js), so the panel and the
+// map never disagree. The same panel, with `area` null, lists
 // what is not placed anywhere.
 // ─────────────────────────────────────────────────────────────
-import { ClipboardList, SlidersHorizontal } from 'lucide-react';
+import { AlertCircle, CalendarClock, ClipboardList, HelpCircle, SlidersHorizontal, Truck } from 'lucide-react';
 import DetailPanel from '@/components/ui/detail-panel';
 import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +35,29 @@ import { formatCalendarDay, formatShortDate } from '@/lib/dates';
 import { EXPIRY_ESTIMATE_HINT, expiryLabel, expiryState, isExpiringSoon } from '../inventory/inventoryViews';
 import { countedWhen, fillTone, percent } from './mapOverlays';
 import { holdsStock, isStaging, kindById } from './mapGeometry';
+import { alertsFor, palletDue } from './mapIndicators';
+
+const ALERT_LOOK = {
+  bad:   { tone: 'bad', icon: AlertCircle },
+  warn:  { tone: 'warn', icon: AlertCircle },
+  info:  { tone: 'info', icon: Truck },
+  muted: { tone: 'neutral', icon: HelpCircle },
+};
+
+const DUE_ORDER = { overdue: 0, today: 1, tomorrow: 2, later: 3 };
+const DAY_MS = 86_400_000;
+const daysLate = (day, today) => Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${String(day).slice(0, 10)}T00:00:00Z`)) / DAY_MS);
+
+function DueBadge({ pallet, today }) {
+  const due = palletDue(pallet, today);
+  if (due === 'overdue') {
+    const n = daysLate(pallet.dispatchDate, today);
+    return <StatusBadge tone="bad" icon={AlertCircle}>{n === 1 ? '1 day overdue' : `${n} days overdue`}</StatusBadge>;
+  }
+  if (due === 'today') return <StatusBadge tone="warn" icon={Truck}>Collected today</StatusBadge>;
+  if (due === 'tomorrow') return <StatusBadge tone="info" icon={CalendarClock}>Tomorrow</StatusBadge>;
+  return null;
+}
 
 const near = (a, b) => Math.abs(a - b) < 0.001;
 const kg = (n) => `${fmtQty(Math.round(Number(n) || 0))} kg`;
@@ -65,20 +91,41 @@ function ExpiryBadge({ product, today }) {
   );
 }
 
-function PalletList({ pallets, label }) {
+function PalletList({ pallets, label, today }) {
   if (pallets.length === 0) return null;
+  const sorted = [...pallets].sort((a, b) => (DUE_ORDER[palletDue(a, today)] - DUE_ORDER[palletDue(b, today)])
+    || String(a.dispatchDate ?? '').localeCompare(String(b.dispatchDate ?? '')));
   return (
     <ul className="divide-y rounded-lg border" aria-label={label}>
-      {pallets.map((p) => (
-        <li key={p.id} className="flex items-baseline justify-between gap-3 px-3 py-2">
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-medium">{p.beneficiary || 'Pallet'}</span>
-            <span className="block text-xs text-muted-foreground">{p.ref || `Slip ${p.id}`}</span>
-          </span>
-          <span className="shrink-0 text-xs text-muted-foreground">Collection {formatCalendarDay(p.dispatchDate)}</span>
-        </li>
-      ))}
+      {sorted.map((p) => {
+        const overdue = palletDue(p, today) === 'overdue';
+        return (
+          <li key={p.id} className={`flex items-center justify-between gap-3 px-3 py-2 ${overdue ? 'bg-danger-soft/60' : ''}`}>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium">{p.beneficiary || 'Pallet'}</span>
+              <span className="block text-xs text-muted-foreground">
+                {p.ref || `Slip ${p.id}`} · Collection {formatCalendarDay(p.dispatchDate)}
+              </span>
+            </span>
+            <DueBadge pallet={p} today={today} />
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+// Every alert on the area, as the map's badge sums them up.
+function AlertBadges({ area, today }) {
+  const alerts = alertsFor(area, { today, now: new Date() });
+  if (alerts.length === 0) return null;
+  return (
+    <span className="flex flex-wrap gap-1.5" title={EXPIRY_ESTIMATE_HINT}>
+      {alerts.map((a) => {
+        const look = ALERT_LOOK[a.level];
+        return <StatusBadge key={a.text} tone={look.tone} icon={look.icon}>{a.text}</StatusBadge>;
+      })}
+    </span>
   );
 }
 
@@ -138,7 +185,7 @@ export default function AreaPanel({
         {unstagedPallets.length > 0 ? (
           <>
             <p className="text-sm font-medium">Packed pallets with no staging area</p>
-            <PalletList pallets={unstagedPallets} label="Packed pallets with no staging area" />
+            <PalletList pallets={unstagedPallets} label="Packed pallets with no staging area" today={today} />
           </>
         ) : null}
       </DetailPanel>
@@ -146,7 +193,6 @@ export default function AreaPanel({
   }
 
   const items = area.items.filter((i) => i.about > 0);
-  const areaExpiry = expiryState(area.earliestExpiry, today ?? undefined);
   const by = items.find((i) => i.countedByName)?.countedByName;
   const eyebrow = holdsStock(area)
     ? `${kindById(area.kind).label} · ${countedWhen(area.lastCountedAt)}${by && area.lastCountedAt ? ` by ${by}` : ''}`
@@ -158,11 +204,7 @@ export default function AreaPanel({
       onClose={onClose}
       eyebrow={eyebrow}
       title={area.name}
-      badges={areaExpiry && isExpiringSoon(areaExpiry) ? (
-        <span title={EXPIRY_ESTIMATE_HINT}>
-          <StatusBadge kind="expiry" status={areaExpiry.status}>Soonest {expiryLabel(areaExpiry).toLowerCase()}</StatusBadge>
-        </span>
-      ) : null}
+      badges={<AlertBadges area={area} today={today} />}
       actions={canCount ? (
         <Button type="button" size="sm" onClick={onCount}>
           <ClipboardList /> Count this area
@@ -174,7 +216,7 @@ export default function AreaPanel({
       {isStaging(area) ? (
         area.pallets.length === 0
           ? <p className="text-sm text-muted-foreground">No packed pallets waiting here.</p>
-          : <PalletList pallets={area.pallets} label={`Pallets in ${area.name}`} />
+          : <PalletList pallets={area.pallets} label={`Pallets in ${area.name}`} today={today} />
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {area.lastCountedAt ? 'Empty at the last count.' : 'Nothing counted here yet. Count this area to record what it holds.'}

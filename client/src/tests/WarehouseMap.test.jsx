@@ -14,6 +14,7 @@ import {
 } from '../features/warehouseMap/mapGeometry';
 import { areasMatching, countedWhen, fillTone, legendFor, toneFor } from '../features/warehouseMap/mapOverlays';
 import { alertsFor, badgeFor, figureOf, palletDue } from '../features/warehouseMap/mapIndicators';
+import { zoomAbout, zoomedBox } from '../features/warehouseMap/useMapZoom';
 
 vi.mock('../services/warehouseMapAPI', () => ({
   getWarehouseMap: vi.fn(),
@@ -361,5 +362,66 @@ describe('the 3D marks', () => {
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /^Dry store 1, Dry store/ })).toHaveAttribute('opacity', '1');
     expect(screen.getByRole('button', { name: /^Cold room 1, Cold room/ })).toHaveAttribute('opacity', '0.3');
+  });
+});
+
+// ── Zooming, and the panel's marks ────────────────────────────
+describe('zoom', () => {
+  const fit = { x: 0, y: 0, w: 200, h: 100 };
+
+  it('closes in on the middle, keeps a point under the pointer, and stays in range', () => {
+    expect(zoomedBox(fit, { k: 2, dx: 0, dy: 0 })).toEqual({ x: 50, y: 25, w: 100, h: 50 });
+    const z = zoomAbout({ k: 1, dx: 0, dy: 0 }, fit, { x: 200, y: 100 }, 2);
+    const box = zoomedBox(fit, z);
+    // The bottom-right corner is where it was, on screen.
+    expect((200 - box.x) / box.w).toBeCloseTo(1, 6);
+    expect(zoomAbout({ k: 5.5, dx: 0, dy: 0 }, fit, null, 4).k).toBe(6);
+    expect(zoomAbout({ k: 1, dx: 0, dy: 0 }, fit, null, 0.1).k).toBe(0.8);
+  });
+
+  it('zooms the 3D view with its buttons and fits the plan again', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const svg = () => screen.getByRole('group', { name: /3D view/ });
+    const fitted = svg().getAttribute('viewBox');
+    await user.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(svg().getAttribute('viewBox')).not.toBe(fitted);
+    expect(screen.getByText('140%')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Fit the plan' }));
+    expect(svg().getAttribute('viewBox')).toBe(fitted);
+  });
+
+  it('opens the top view fitted to what is drawn, not the whole grid', async () => {
+    render(<WarehouseMapTab />);
+    const svg = await screen.findByRole('group', { name: /top view/ });
+    const [, , w] = svg.getAttribute('viewBox').split(' ').map(Number);
+    expect(w).toBeLessThan(40 * 24);
+  });
+});
+
+describe('the area panel marks', () => {
+  it('lists overdue pallets first, marked, and the area\'s alerts under the title', async () => {
+    const user = userEvent.setup();
+    const bay = {
+      ...MAP.areas[3],
+      pallets: [
+        { id: 80, ref: 'PAL-80', beneficiary: 'Later ECD', dispatchDate: '2026-10-25' },
+        { id: 81, ref: 'PAL-81', beneficiary: 'Late ECD', dispatchDate: '2026-10-13' },
+        { id: 82, ref: 'PAL-82', beneficiary: 'Today ECD', dispatchDate: '2026-10-18' },
+      ],
+    };
+    getWarehouseMap.mockResolvedValue({ ...MAP, areas: [...MAP.areas.slice(0, 3), bay] });
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /^Bay 1, Pallet staging/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    const rows = within(panel.getByRole('list', { name: 'Pallets in Bay 1' })).getAllByRole('listitem');
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining('Late ECD'), expect.stringContaining('Today ECD'), expect.stringContaining('Later ECD'),
+    ]);
+    expect(within(rows[0]).getByText('5 days overdue')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('Collected today')).toBeInTheDocument();
+    expect(panel.getByText('1 pallet past the collection day')).toBeInTheDocument();
+    expect(panel.getByText('1 pallet to be collected today')).toBeInTheDocument();
   });
 });
