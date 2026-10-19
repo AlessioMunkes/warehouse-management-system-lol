@@ -32,11 +32,11 @@
 //     breathe.
 //   - shadows and a floor grid for depth, a compass that turns with the
 //     view, and a card on hover with everything about the area.
-//   - the day (mapActivity.js): a truck backed up to the dispatch gate
-//     while pallets wait to be collected (red if overdue), and to the
-//     receiving gate while a delivery is expected (amber if late); a
-//     moving line along the floor where goods are on their way. A truck
-//     opens its gate.
+//   - the day (mapActivity.js): on a collection day, each centre whose
+//     pallet is packed waits at the dispatch gate in its own bakkie,
+//     named, until it collects; a supplier's truck at the receiving gate
+//     while a delivery is expected (amber if late); a moving line along
+//     the floor where goods are on their way. A vehicle opens its gate.
 //
 // ZOOMING (useMapZoom.js, both views). It opens fitted to the drawn
 // plan. The + and - buttons, scrolling once the map has been clicked,
@@ -268,13 +268,17 @@ function Area3D({ box, view, s }) {
 // down to the top of its box.
 function Label3D({ box, view, s, showText }) {
   const { area } = box;
-  const lift = isStaging(area) && area.pallets?.length ? 3.2 : 1.1;
+  // Above what stands on or by it: pallets, or the centres' name tags.
+  const lift = (isStaging(area) && area.pallets?.length) ? 3.2 : (area.gate?.trucks ? 3.4 : 1.1);
   const { top, float } = anchorAbove(box, view, showText ? lift : 0.7);
   const name = clip(area.name, 18);
   const figure = area.kind === 'door' ? null : figureOf(area);
   const text = figure ? `${name} · ${figure}` : name;
   const width = text.length * 5.9 + (s.badge ? 26 : 14);
   if (!showText && !s.badge) return null;
+  // A dispatch gate with centres queued has its label at the head of
+  // their names instead (drawn with the name tags).
+  if (showText && area.gate?.kind === 'dispatch' && area.gate.trucks) return null;
   return (
     <g className="pointer-events-none" opacity={s.dimmed ? 0.25 : 1} transform={s.hovered ? 'translate(0 -4)' : undefined}>
       <line x1={top.px} y1={top.py} x2={float.px} y2={float.py} className="stroke-ink-soft" strokeWidth={0.75} strokeDasharray="2 2" />
@@ -301,8 +305,13 @@ function HoverCard({ area, at, today, stack }) {
   const lines = [];
   if (area.gate?.kind === 'dispatch') {
     const g = area.gate;
-    lines.push(g.ready.length ? `${g.ready.length} pallet${g.ready.length === 1 ? '' : 's'} ready to collect` : 'No pallets waiting');
-    lines.push(`${g.collectedToday} collected today`);
+    if (g.total) {
+      lines.push(`${g.collected.length} of ${g.total} centres collected`);
+      if (g.waiting.length) lines.push(`At the gate: ${g.waiting.slice(0, 3).map((c) => c.name).join(', ')}${g.waiting.length > 3 ? ` and ${g.waiting.length - 3} more` : ''}`);
+      if (g.packing.length + g.toPack.length) lines.push(`${g.packing.length + g.toPack.length} still packing`);
+    } else {
+      lines.push('No collections today');
+    }
   } else if (area.gate?.kind === 'receiving') {
     const g = area.gate;
     [...g.late, ...g.expected].slice(0, 3).forEach((po) => lines.push(`${po.supplier} · ${po.po_number}${po.expected_on < today ? ' (late)' : ''}`));
@@ -370,17 +379,29 @@ function Compass({ bearing }) {
   );
 }
 
-// A truck's parts: the trailer in its gate's colour, a white cab, black wheels.
-const TRUCK_LOOK = {
-  trailer: (tone) => cn(TONES[tone]?.solid ?? 'fill-info', TONES[tone]?.stroke ?? 'stroke-info'),
-  cab: () => 'fill-surface stroke-ink-soft',
-  wheel: () => 'fill-ink stroke-ink',
+// A centre's bakkie: each in its own colour so the queue reads as
+// different centres. A supplier's truck: the trailer in its gate's tone
+// (amber when late) and a white cab. Wheels black.
+const BAKKIE_COLOURS = ['info', 'violet', 'good', 'tan'];
+const vehicleLook = (box) => {
+  if (box.part === 'wheel') return 'fill-ink stroke-ink';
+  const gate = box.truckOf.gate;
+  if (gate.kind === 'dispatch') {
+    const t = TONES[BAKKIE_COLOURS[box.truck % BAKKIE_COLOURS.length]];
+    return box.part === 'cab' ? cn(t.solid, t.stroke) : cn(t.fill, t.stroke);
+  }
+  if (box.part === 'cab') return 'fill-surface stroke-ink-soft';
+  return cn(TONES[gate.tone]?.solid ?? 'fill-info', TONES[gate.tone]?.stroke ?? 'stroke-info');
 };
 
-/** Every truck standing at a gate today, as boxes, each knowing its gate. */
+/**
+ * Every vehicle at a gate today, as boxes, each knowing its gate and, at
+ * the dispatch gate, the centre it is: { ...box, truckOf, centre }.
+ */
 const trucksOf = (areas) => areas
   .filter((a) => a.gate?.trucks)
-  .flatMap((gate) => truckBoxes(gate, areas, gate.gate.trucks).map((b) => ({ ...b, truckOf: gate })));
+  .flatMap((gate) => truckBoxes(gate, areas, gate.gate.trucks, gate.gate.kind === 'dispatch' ? 'bakkie' : 'truck')
+    .map((b) => ({ ...b, truckOf: gate, centre: gate.gate.vehicles?.[b.truck]?.name ?? null })));
 
 // + / - / Fit, bottom right, and the scroll hint while it is needed.
 function ZoomControls({ z }) {
@@ -555,7 +576,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
           {floorGrid(view, grid, 2).map((l) => (
             <line key={`${l.x1.toFixed(1)},${l.y1.toFixed(1)}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className="stroke-line" strokeWidth={0.5} />
           ))}
-          {ordered.filter((b) => (b.area && b.z1 >= 0.3) || b.part === 'trailer').map((b) => (
+          {ordered.filter((b) => (b.area && b.z1 >= 0.3) || b.part === 'trailer' || b.part === 'bed').map((b) => (
             <polygon key={`shadow-${b.id ?? b.area.id}`} points={shadowPoints(b, view)} className="fill-black" fillOpacity={b.area && shared(b.area).dimmed ? 0.03 : 0.09} />
           ))}
           {routes.map((r) => {
@@ -582,7 +603,8 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
                 onPointerEnter={(e) => s3(gate).onHover(e)}
                 onPointerLeave={s3(gate).onLeave}
               >
-                <Box faces={boxFaces(box, view)} className={TRUCK_LOOK[box.part](gate.gate.tone)} strokeWidth={box.part === 'wheel' ? 0.5 : 0.9} />
+                {box.centre && box.part === 'cab' ? <title>{`${box.centre}, here to collect`}</title> : null}
+                <Box faces={boxFaces(box, view)} className={vehicleLook(box)} strokeWidth={box.part === 'wheel' ? 0.5 : 0.9} />
               </g>
             );
           }
@@ -597,6 +619,42 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
           return <Area3D key={box.area.id} box={box} view={view} s={s3(box.area)} />;
         })}
         {labelled.map((box) => <Label3D key={`label-${box.area.id}`} box={box} view={view} s={s3(box.area)} showText={showLabels} />)}
+        {showLabels ? (() => {
+          // The centres' names as a tidy column over the queue: one above
+          // the other, 17 apart, each on a line down to its own bakkie,
+          // so neighbouring names never sit on one another.
+          const tags = trucks
+            .filter((b) => b.centre && b.part === 'cab')
+            .map((b) => ({ b, top: anchorAbove(b, view, 0).top }))
+            .sort((p, q) => q.top.py - p.top.py);
+          if (!tags.length) return null;
+          const base = Math.min(...tags.map((t) => t.top.py)) - 22;
+          const gate = tags[0].b.truckOf;
+          const sg = { ...shared(gate), hovered: hover?.id === gate.id };
+          const headY = base - tags.length * 17 - 6;
+          const headX = tags[tags.length - 1].top.px;
+          const head = `${clip(gate.name, 18)} · ${figureOf(gate)}`;
+          const headW = head.length * 5.9 + (sg.badge ? 26 : 14);
+          const heading = (
+            <g key="tag-head" className="pointer-events-none" opacity={sg.dimmed ? 0.3 : 1}>
+              <rect x={headX - headW / 2} y={headY - 9} width={headW} height={18} rx={9} className={cn('fill-surface', sg.selected || sg.hovered ? 'stroke-ink' : 'stroke-line-strong')} strokeWidth={1} />
+              <text x={headX + (sg.badge ? 6 : 0)} y={headY + 3.5} textAnchor="middle" fontSize={FONT - 1} className="select-none fill-ink font-medium">{head}</text>
+              {sg.badge ? <Badge x={headX - headW / 2 + 9} y={headY} badge={sg.badge} r={6.5} /> : null}
+            </g>
+          );
+          return [heading, ...tags.map(({ b, top }, k) => {
+            const y = base - k * 17;
+            const name = clip(b.centre, 16);
+            const width = name.length * 5.4 + 12;
+            return (
+              <g key={`tag-${b.id}`} className="pointer-events-none" opacity={shared(b.truckOf).dimmed ? 0.3 : 1}>
+                <line x1={top.px} y1={top.py} x2={top.px} y2={y} className="stroke-ink-soft" strokeWidth={0.6} />
+                <rect x={top.px - width / 2} y={y - 8} width={width} height={15} rx={7.5} className="fill-ink" fillOpacity={0.88} />
+                <text x={top.px} y={y + 3} textAnchor="middle" fontSize={FONT - 2} className="select-none fill-on-ink font-medium">{name}</text>
+              </g>
+            );
+          })];
+        })() : null}
       </svg>
 
       {hovered ? <HoverCard area={hovered} at={hover} today={today} stack={hover.stack} /> : null}
@@ -670,6 +728,8 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
   const width = grid.cols * CELL;
   const height = grid.rows * CELL;
   const trucks = useMemo(() => trucksOf(areas).filter((b) => b.part !== 'wheel'), [areas]);
+  // A centre's name by its bakkie, from above.
+  const tags = trucks.filter((b) => b.centre && b.part === 'cab');
   const routes = useMemo(() => routesFor(areas), [areas]);
   const fit = useMemo(() => {
     if (!areas.length) return { x: 0, y: 0, w: width, h: height };
@@ -718,16 +778,24 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
         />
       ))}
       {areas.map((area) => <TopArea key={area.id} {...shared(area)} note={noteOf?.(area)} today={today} matchProduct={matchProduct} />)}
+      {tags.map((b) => (
+        <text
+          key={`tag-${b.id}`} x={(b.x + b.w / 2) * CELL} y={(b.y + b.h) * CELL + 10} textAnchor="middle" fontSize={8}
+          className="pointer-events-none select-none fill-ink stroke-surface font-medium" strokeWidth={2.5} paintOrder="stroke"
+        >
+          {clip(b.centre, 14)}
+        </text>
+      ))}
       {trucks.map((b) => {
         const gate = b.truckOf;
         const sg = shared(gate);
         return (
           <rect
             key={b.id} x={b.x * CELL} y={b.y * CELL} width={b.w * CELL} height={b.h * CELL} rx={b.part === 'cab' ? 5 : 3}
-            className={cn(TRUCK_LOOK[b.part](gate.gate.tone), sg.onSelect && 'cursor-pointer')} strokeWidth={1}
+            className={cn(vehicleLook(b), sg.onSelect && 'cursor-pointer')} strokeWidth={1}
             onClick={sg.onSelect ? () => sg.onSelect(gate) : undefined}
           >
-            <title>{`${gate.name}: ${figureOf(gate)}`}</title>
+            <title>{b.centre ? `${b.centre}, here to collect` : `${gate.name}: ${figureOf(gate)}`}</title>
           </rect>
         );
       })}

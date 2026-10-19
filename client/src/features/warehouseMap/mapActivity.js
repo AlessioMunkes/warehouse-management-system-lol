@@ -6,8 +6,13 @@
 // `day`, the day's figures), with no React in it. The Today strip, the
 // gates, their trucks and the route lines all read from here.
 //
-//   dispatch gate    a truck waits while packed pallets are due to be
-//                    collected today or are past their day (red then)
+//   dispatch gate    on a collection day, each centre collecting today
+//                    (a slip due today): its vehicle waits at the gate,
+//                    named, once its pallet is packed and until it is
+//                    collected. As centres collect, their vehicle and
+//                    pallet leave and the gate's count goes down. A
+//                    pallet missed on an earlier day is an alert, not a
+//                    vehicle.
 //   receiving gate   a truck waits while a purchase order is expected
 //                    today or is late (amber then); a delivery note
 //                    recorded today for it means it has arrived
@@ -20,6 +25,26 @@ import { palletDue } from './mapIndicators';
 export const GATE_KINDS = ['dispatch_gate', 'receiving_gate'];
 export const isGate = (area) => GATE_KINDS.includes(area?.kind);
 export const MAX_TRUCKS = 2;
+// Centres' vehicles queued at the dispatch gate; the rest are counted.
+export const MAX_VEHICLES = 4;
+
+const COLLECTED = ['collected', 'late_collected'];
+
+/**
+ * Where a centre collecting today is in the day:
+ *   collected   collected (its pallet has left)
+ *   missed      marked not collected
+ *   waiting     packed, at the gate to collect
+ *   packing     being packed
+ *   to_pack     not started
+ */
+export const collectionState = (c) => {
+  if (COLLECTED.includes(c.dispatchStatus) || c.slipStatus === 'dispatched') return 'collected';
+  if (c.dispatchStatus === 'not_collected') return 'missed';
+  if (c.slipStatus === 'complete') return 'waiting';
+  if (c.slipStatus === 'in_progress') return 'packing';
+  return 'to_pack';
+};
 
 const allPallets = (map) => [
   ...(map?.areas ?? []).flatMap((a) => a.pallets ?? []),
@@ -42,17 +67,34 @@ export const gateActivity = (map) => {
   const late = waiting.filter((po) => po.expected_on < today);
 
   const ready = [...overdue, ...dueToday];
+  const collections = (day.collections ?? []).map((c) => ({ ...c, state: collectionState(c) }));
+  const by = (state) => collections.filter((c) => c.state === state);
+  const waitingNow = by('waiting');
+  const collected = by('collected');
+  const missed = by('missed');
+  const remaining = collections.length - collected.length - missed.length;
   return {
     dispatch: {
       ready,
       overdue,
       dueToday,
       later,
-      collectedToday: day.collectedToday ?? 0,
-      notCollectedToday: day.notCollectedToday ?? 0,
-      trucks: Math.min(ready.length > 0 ? Math.ceil(ready.length / 12) : 0, MAX_TRUCKS),
-      truckCount: ready.length,
-      tone: overdue.length ? 'bad' : 'violet',
+      collections,
+      waiting: waitingNow,
+      packing: by('packing'),
+      toPack: by('to_pack'),
+      collected,
+      missed,
+      remaining,
+      total: collections.length,
+      nextCollection: day.nextCollection ?? null,
+      collectedToday: day.collectedToday ?? collected.length,
+      notCollectedToday: day.notCollectedToday ?? missed.length,
+      // A vehicle for each centre waiting at the gate, named.
+      vehicles: waitingNow.slice(0, MAX_VEHICLES).map((c) => ({ id: c.id, name: c.name })),
+      trucks: Math.min(waitingNow.length, MAX_VEHICLES),
+      truckCount: waitingNow.length,
+      tone: overdue.length || missed.length ? 'bad' : 'violet',
     },
     receiving: {
       expected,
@@ -84,6 +126,10 @@ export const withGates = (areas, activity, packing = 0) => {
 };
 
 const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+// "Tuesday 21 Oct", for the next collection day.
+export const dayLabel = (day) => (day
+  ? new Date(`${day}T00:00:00Z`).toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' })
+  : '');
 
 /**
  * The Today strip, card by card: { id, label, value, detail, tone }.
@@ -94,16 +140,26 @@ export const todayCards = (map, activity, { needing = 0 } = {}) => {
   const { dispatch, receiving } = activity;
   const cards = [];
 
-  cards.push({
+  cards.push(dispatch.total ? {
     id: 'dispatch',
     label: 'Collections',
-    value: `${dispatch.collectedToday} collected`,
+    value: `${dispatch.collected.length} of ${dispatch.total} collected`,
     detail: [
-      dispatch.ready.length ? `${plural(dispatch.ready.length, 'pallet')} ready` : 'No pallets waiting',
-      dispatch.overdue.length ? `${dispatch.overdue.length} overdue` : null,
-      day.toPackToday ? `${day.toPackToday} still to pack` : null,
-    ].filter(Boolean).join(' · '),
-    tone: dispatch.overdue.length ? 'bad' : dispatch.ready.length ? 'violet' : 'neutral',
+      dispatch.waiting.length ? `${plural(dispatch.waiting.length, 'centre')} at the gate` : null,
+      dispatch.packing.length + dispatch.toPack.length ? `${dispatch.packing.length + dispatch.toPack.length} still packing` : null,
+      dispatch.missed.length ? `${dispatch.missed.length} not collected` : null,
+      dispatch.overdue.length ? `${plural(dispatch.overdue.length, 'pallet')} missed earlier` : null,
+    ].filter(Boolean).join(' · ') || 'All collected',
+    tone: dispatch.missed.length || dispatch.overdue.length ? 'bad' : dispatch.remaining ? 'violet' : 'good',
+  } : {
+    id: 'dispatch',
+    label: 'Collections',
+    value: 'None today',
+    detail: [
+      dispatch.nextCollection ? `Next: ${dayLabel(dispatch.nextCollection.day)}, ${plural(dispatch.nextCollection.centres, 'centre')}` : null,
+      dispatch.overdue.length ? `${plural(dispatch.overdue.length, 'pallet')} missed earlier` : null,
+    ].filter(Boolean).join(' · ') || 'Not a collection day',
+    tone: dispatch.overdue.length ? 'bad' : 'neutral',
   });
 
   cards.push({
@@ -142,7 +198,7 @@ export const routesFor = (areas) => {
   const routes = [];
   const dispatch = areas.find((a) => a.gate?.kind === 'dispatch');
   const staging = areas.find((a) => a.kind === 'staging' && a.pallets?.length);
-  if (dispatch && staging && dispatch.gate.ready.length) {
+  if (dispatch && staging && (dispatch.gate.waiting?.length || dispatch.gate.ready.length)) {
     routes.push({ id: 'out', from: centre(staging), to: centre(dispatch), tone: dispatch.gate.tone });
   }
   const receiving = areas.find((a) => a.gate?.kind === 'receiving');

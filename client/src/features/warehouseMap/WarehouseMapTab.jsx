@@ -98,7 +98,7 @@ function MarksLegend({ view, hasPallets }) {
       )) : null}
       <li className="inline-flex items-center gap-1.5">
         <svg width="22" height="12" aria-hidden="true"><rect x="1" y="2" width="13" height="8" rx="1.5" className="fill-violet stroke-violet" /><rect x="15" y="3" width="6" height="7" rx="1.5" className="fill-surface stroke-ink-soft" /></svg>
-        Truck at a gate: pallets to collect, or a delivery expected (red: overdue, amber: late)
+        At the dispatch gate, a bakkie for each centre here to collect, named; at the receiving gate, a truck for each delivery expected (amber: late)
       </li>
       <li className="inline-flex items-center gap-1.5">
         <svg width="22" height="10" aria-hidden="true"><line x1="1" y1="5" x2="21" y2="5" className="stroke-info" strokeWidth="2.5" strokeDasharray="4 3" /></svg>

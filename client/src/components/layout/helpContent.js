@@ -119,7 +119,7 @@ const MANAGER = [
       'Adjust stock from a product’s panel. A reason is required, and counted items take whole numbers only.',
       'The stock ledger lists every movement: received, dispatched, decanted, adjusted and wastage.',
       'The Map tab shows the warehouse floor plan. Open an area and choose Count this area to record what is there. Counts never change stock: where a count differs from what is on the shelves, adjust stock from the area. Packed pallets stand in the staging areas until they are dispatched, and Capacity under the map shows how full each area is. Drag the 3D view to turn it.',
-      'Today, above the map, sums up the day: collections, deliveries, packing, people on site and donations. A truck stands at the dispatch gate while pallets wait to be collected, and at the receiving gate while a delivery is expected; red or amber means overdue or late. Choose a card or a gate to see the list.',
+      'Today, above the map, sums up the day: collections, deliveries, packing, people on site and donations. On a collection day each centre whose pallet is packed waits at the dispatch gate in its own bakkie, named, and leaves when it collects, so the count goes down through the day. A truck stands at the receiving gate while a delivery is expected; amber means late. Choose a card or a gate to see the list.',
     ] },
   { title: 'Picking slips',
     steps: [

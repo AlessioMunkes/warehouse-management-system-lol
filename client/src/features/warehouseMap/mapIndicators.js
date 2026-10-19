@@ -50,8 +50,9 @@ export const alertsFor = (area, { today, now } = {}) => {
   // A gate: the day's trucks (mapActivity.js puts them on area.gate).
   if (area.gate?.kind === 'dispatch') {
     const g = area.gate;
-    if (g.overdue.length) out.push({ level: 'bad', glyph: String(g.overdue.length), text: `${plural(g.overdue.length, 'pallet')} past the collection day` });
-    if (g.dueToday.length) out.push({ level: 'info', glyph: String(g.dueToday.length), text: `${plural(g.dueToday.length, 'pallet')} to be collected today` });
+    if (g.missed?.length) out.push({ level: 'bad', glyph: String(g.missed.length), text: `${plural(g.missed.length, 'centre')} did not collect today` });
+    if (g.overdue.length) out.push({ level: 'bad', glyph: String(g.overdue.length), text: `${plural(g.overdue.length, 'pallet')} missed on an earlier day` });
+    if (g.waiting?.length) out.push({ level: 'info', glyph: String(g.waiting.length), text: `${plural(g.waiting.length, 'centre')} at the gate to collect` });
     return out;
   }
   if (area.gate?.kind === 'receiving') {
@@ -97,7 +98,11 @@ export const badgeFor = (area, ctx) => {
 
 /** The figure on an area's label: how full, how many pallets, or how many products. */
 export const figureOf = (area) => {
-  if (area.gate?.kind === 'dispatch') return area.gate.ready.length ? `${area.gate.ready.length} ready` : (area.gate.collectedToday ? `${area.gate.collectedToday} collected` : 'Quiet');
+  if (area.gate?.kind === 'dispatch') {
+    const g = area.gate;
+    if (!g.total) return 'No collections today';
+    return g.remaining ? `${g.remaining} of ${g.total} to collect` : 'All collected';
+  }
   if (area.gate?.kind === 'receiving') return area.gate.truckCount ? `${area.gate.truckCount} expected` : (area.gate.receivedToday.length ? `${area.gate.receivedToday.length} received` : 'Quiet');
   if (isStaging(area)) {
     const n = area.pallets?.length ?? 0;

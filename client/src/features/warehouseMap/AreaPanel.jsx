@@ -28,7 +28,9 @@
 // arrived today. The same panel, with `area` null, lists
 // what is not placed anywhere.
 // ─────────────────────────────────────────────────────────────
-import { AlertCircle, CalendarClock, ClipboardList, HelpCircle, SlidersHorizontal, Truck } from 'lucide-react';
+import {
+  AlertCircle, CalendarClock, CheckCircle2, ClipboardList, HelpCircle, PackageOpen, SlidersHorizontal, Truck,
+} from 'lucide-react';
 import DetailPanel from '@/components/ui/detail-panel';
 import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
@@ -39,6 +41,7 @@ import { EXPIRY_ESTIMATE_HINT, expiryLabel, expiryState, isExpiringSoon } from '
 import { countedWhen, fillTone, percent } from './mapOverlays';
 import { holdsStock, isStaging, kindById } from './mapGeometry';
 import { alertsFor, palletDue } from './mapIndicators';
+import { dayLabel } from './mapActivity';
 
 const ALERT_LOOK = {
   bad:   { tone: 'bad', icon: AlertCircle },
@@ -157,19 +160,72 @@ function DeliveryList({ orders, today, label }) {
   );
 }
 
+// Today's collections at the dispatch gate, by where each centre is.
+const COLLECTION_GROUPS = [
+  { state: 'waiting',  title: 'At the gate',    badge: { tone: 'info', icon: Truck, text: 'Here to collect' } },
+  { state: 'missed',   title: 'Not collected',  badge: { tone: 'bad', icon: AlertCircle, text: 'Not collected' } },
+  { state: 'packing',  title: 'Still packing',  badge: { tone: 'warn', icon: PackageOpen, text: 'Packing' } },
+  { state: 'to_pack',  title: 'Not packed yet', badge: { tone: 'neutral', icon: PackageOpen, text: 'To pack' } },
+  { state: 'collected', title: 'Collected',     badge: { tone: 'good', icon: CheckCircle2, text: 'Collected' } },
+];
+const timeOf = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : '');
+
+function CollectionsToday({ g }) {
+  const pct = g.total ? Math.round((g.collected.length / g.total) * 100) : 0;
+  return (
+    <>
+      <div>
+        <p className="flex items-baseline justify-between text-sm">
+          <span className="font-medium">{g.collected.length} of {g.total} centres collected</span>
+          <span className="tabular-nums text-muted-foreground">{pct}%</span>
+        </p>
+        <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2" role="meter" aria-label="Collected today" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+          <div className="h-full rounded-full bg-good" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      {COLLECTION_GROUPS.map((group) => {
+        const list = g.collections.filter((c) => c.state === group.state);
+        if (!list.length) return null;
+        return (
+          <section key={group.state} aria-label={group.title}>
+            <p className="mb-1.5 text-sm font-medium">{group.title} <span className="font-normal text-muted-foreground">{list.length}</span></p>
+            <ul className="max-h-64 divide-y overflow-y-auto rounded-lg border">
+              {list.map((c) => (
+                <li key={c.id} className={`flex items-center justify-between gap-3 px-3 py-2 ${group.state === 'missed' ? 'bg-danger-soft/60' : ''}`}>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{c.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {[c.palletRef, c.state === 'collected' && c.collectedAt ? `at ${timeOf(c.collectedAt)}` : null].filter(Boolean).join(' · ') || 'No pallet yet'}
+                    </span>
+                  </span>
+                  <StatusBadge tone={group.badge.tone} icon={group.badge.icon}>{group.badge.text}</StatusBadge>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
 function GateDay({ area, today }) {
   const g = area.gate;
   if (g.kind === 'dispatch') {
     return (
       <>
-        <p className="text-sm">
-          {g.collectedToday} collected today
-          {g.notCollectedToday ? <span className="text-danger"> · {g.notCollectedToday} not collected</span> : null}
-          {g.later ? <span className="text-muted-foreground"> · {g.later} packed for later days</span> : null}
-        </p>
-        {g.ready.length === 0
-          ? <p className="text-sm text-muted-foreground">No pallets waiting to be collected today.</p>
-          : <PalletList pallets={g.ready} label={`Ready at ${area.name}`} today={today} />}
+        {g.total ? <CollectionsToday g={g} /> : (
+          <p className="text-sm text-muted-foreground">
+            No collections today.
+            {g.nextCollection ? ` Next: ${dayLabel(g.nextCollection.day)}, ${g.nextCollection.centres} centre${g.nextCollection.centres === 1 ? '' : 's'}.` : ''}
+          </p>
+        )}
+        {g.overdue.length ? (
+          <>
+            <p className="text-sm font-medium text-danger">Missed on an earlier day</p>
+            <PalletList pallets={g.overdue} label="Missed on an earlier day" today={today} />
+          </>
+        ) : null}
       </>
     );
   }

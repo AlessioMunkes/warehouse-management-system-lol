@@ -402,16 +402,24 @@ export const gateOutward = (gate, areas) => {
   return { axis: 'x', sign: gx <= middle.x ? -1 : 1 };
 };
 
+// A centre collects in a bakkie: a cab and an open load bed, smaller
+// than a supplier's delivery truck.
+const BAKKIE = { bed: 2.1, bedHigh: 0.5, lift: 0.3, wide: 1.25, cab: 1.4, cabHigh: 1.05 };
+const VEHICLE_GAP = 1.75;
+
 /**
- * Boxes for `count` trucks (up to 2, side by side) at a gate, each part
- * tagged: { id, part: 'trailer' | 'cab' | 'wheel', truck, x, y, w, h, z0, z1 }.
+ * Boxes for `count` vehicles at a gate, side by side, each part tagged:
+ * { id, part, truck, x, y, w, h, z0, z1 }.
+ *   style 'truck'   a delivery truck: trailer, cab, six wheels (receiving)
+ *   style 'bakkie'  a centre's bakkie: load bed, cab, four wheels (dispatch)
  */
-export const truckBoxes = (gate, areas, count) => {
+export const truckBoxes = (gate, areas, count, style = 'truck') => {
   if (!count) return [];
   const { axis, sign } = gateOutward(gate, areas);
   const boxes = [];
-  for (let t = 0; t < Math.min(count, 2); t += 1) {
-    const across = (count > 1 ? (t === 0 ? -0.8 : 0.8) : 0);
+  const n = Math.min(count, style === 'bakkie' ? 4 : 2);
+  for (let t = 0; t < n; t += 1) {
+    const across = (t - (n - 1) / 2) * VEHICLE_GAP;
     // Along: distance out from the gate's outer edge.
     const edge = axis === 'y' ? (sign < 0 ? gate.y : gate.y + gate.h) : (sign < 0 ? gate.x : gate.x + gate.w);
     const mid = axis === 'y' ? gate.x + gate.w / 2 + across : gate.y + gate.h / 2 + across;
@@ -420,25 +428,32 @@ export const truckBoxes = (gate, areas, count) => {
       const b = edge + sign * (from + len);
       return [Math.min(a, b), Math.abs(b - a)];
     };
-    const place = (part, from, len, wide, z0, z1, idx = '') => {
+    const place = (part, from, len, wide, z0, z1) => {
       const [start, length] = seg(from, len);
       const box = axis === 'y'
         ? { x: mid - wide / 2, y: start, w: wide, h: length }
         : { x: start, y: mid - wide / 2, w: length, h: wide };
-      boxes.push({ id: `${gate.id}-truck-${t}-${part}${idx}`, part, truck: t, ...box, z0, z1 });
+      boxes.push({ id: `${gate.id}-truck-${t}-${part}`, part, truck: t, ...box, z0, z1 });
     };
-    place('trailer', 0.25, TRAILER.len, TRAILER.wide, TRAILER.lift, TRAILER.lift + TRAILER.high);
-    place('cab', 0.25 + TRAILER.len + 0.12, CAB.len, TRAILER.wide * 0.92, TRAILER.lift - 0.05, TRAILER.lift + CAB.high);
-    [0.5, TRAILER.len - 0.3, TRAILER.len + 0.12 + CAB.len - 0.2].forEach((at, i) => {
+    const wheels = (ats, wide) => ats.forEach((at, i) => {
       [-1, 1].forEach((sideSign, j) => {
         const [start, length] = seg(at, 0.42);
-        const off = mid + sideSign * (TRAILER.wide / 2 - 0.12);
+        const off = mid + sideSign * (wide / 2 - 0.12);
         const wheel = axis === 'y'
           ? { x: off - 0.12, y: start, w: 0.24, h: length }
           : { x: start, y: off - 0.12, w: length, h: 0.24 };
         boxes.push({ id: `${gate.id}-truck-${t}-wheel${i}${j}`, part: 'wheel', truck: t, ...wheel, z0: 0, z1: 0.36 });
       });
     });
+    if (style === 'bakkie') {
+      place('bed', 0.25, BAKKIE.bed, BAKKIE.wide, BAKKIE.lift, BAKKIE.lift + BAKKIE.bedHigh);
+      place('cab', 0.25 + BAKKIE.bed + 0.08, BAKKIE.cab, BAKKIE.wide, BAKKIE.lift - 0.05, BAKKIE.lift + BAKKIE.cabHigh);
+      wheels([0.45, 0.25 + BAKKIE.bed + 0.08 + BAKKIE.cab - 0.6], BAKKIE.wide);
+    } else {
+      place('trailer', 0.25, TRAILER.len, TRAILER.wide, TRAILER.lift, TRAILER.lift + TRAILER.high);
+      place('cab', 0.25 + TRAILER.len + 0.12, CAB.len, TRAILER.wide * 0.92, TRAILER.lift - 0.05, TRAILER.lift + CAB.high);
+      wheels([0.5, TRAILER.len - 0.3, TRAILER.len + 0.12 + CAB.len - 0.2], TRAILER.wide);
+    }
   }
   return boxes;
 };

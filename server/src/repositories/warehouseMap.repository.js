@@ -147,7 +147,7 @@ const soft = (promise) => promise.then((r) => r.rows).catch((err) => {
 });
 
 const listDayActivity = async (today, db = pool) => {
-  const [slips, collected, inbound, received, onSite, donations, closure, benevolent] = await Promise.all([
+  const [slips, collected, inbound, received, onSite, donations, closure, benevolent, collections, next] = await Promise.all([
     soft(db.query(
       `SELECT COUNT(*) FILTER (WHERE status = 'in_progress')::int AS packing,
               COUNT(*) FILTER (WHERE status = 'pending' AND dispatch_date = $1::date)::int AS to_pack_today,
@@ -194,6 +194,27 @@ const listDayActivity = async (today, db = pool) => {
     )),
     soft(db.query(`SELECT label, kind FROM operating_closures WHERE closed_on = $1::date`, [today])),
     soft(db.query(`SELECT COUNT(*)::int AS n FROM community_requests WHERE outcome = 'approved'`)),
+    // Today's collections: each slip due today is a centre coming to the
+    // dispatch gate. Its pallet's state and its collection's say where
+    // it is in the day.
+    soft(db.query(
+      `SELECT ps.id, COALESCE(NULLIF(ps.beneficiary_name, ''), e.name, 'Centre') AS name,
+              ps.cohort::text AS cohort, ps.status AS slip_status, ps.pallet_ref,
+              de.status AS dispatch_status, de.collected_at
+         FROM picking_slips ps
+         LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+         LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+        WHERE ps.dispatch_date = $1::date AND ps.status <> 'cancelled'
+        ORDER BY de.collected_at ASC NULLS LAST, name ASC`,
+      [today]
+    )),
+    soft(db.query(
+      `SELECT dispatch_date::text AS day, COUNT(*)::int AS centres, MIN(cohort::text) AS cohort
+         FROM picking_slips
+        WHERE dispatch_date > $1::date AND status <> 'cancelled'
+        GROUP BY dispatch_date ORDER BY dispatch_date ASC LIMIT 1`,
+      [today]
+    )),
   ]);
 
   return {
@@ -208,6 +229,11 @@ const listDayActivity = async (today, db = pool) => {
     donationsToday: donations?.[0]?.n ?? null,
     closure: closure?.[0] ?? null,
     benevolentWaiting: benevolent?.[0]?.n ?? null,
+    collections: (collections ?? []).map((c) => ({
+      id: c.id, name: c.name, cohort: c.cohort, palletRef: c.pallet_ref ?? null,
+      slipStatus: c.slip_status, dispatchStatus: c.dispatch_status ?? null, collectedAt: c.collected_at ?? null,
+    })),
+    nextCollection: next?.[0] ?? null,
   };
 };
 
