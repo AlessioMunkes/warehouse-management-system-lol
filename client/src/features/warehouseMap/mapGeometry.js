@@ -25,12 +25,15 @@ export const KINDS = [
   { id: 'floor',   label: 'Floor',          size: { w: 4, h: 4 }, levels: 1, holdsStock: true },
   { id: 'staging', label: 'Pallet staging', size: { w: 5, h: 3 }, levels: 1, holdsStock: false },
   { id: 'door',    label: 'Door',           size: { w: 3, h: 1 }, levels: 1, holdsStock: false },
+  { id: 'dispatch_gate',  label: 'Dispatch gate',  size: { w: 4, h: 1 }, levels: 1, holdsStock: false },
+  { id: 'receiving_gate', label: 'Receiving gate', size: { w: 4, h: 1 }, levels: 1, holdsStock: false },
 ];
 
 export const kindById = (id) => KINDS.find((k) => k.id === id) ?? KINDS[0];
 /** Stock is counted into it: a dry store, cold room or floor area. */
 export const holdsStock = (area) => kindById(area.kind).holdsStock;
 export const isStaging = (area) => area.kind === 'staging';
+export const isGateKind = (area) => area.kind === 'dispatch_gate' || area.kind === 'receiving_gate';
 /** Opens a panel when chosen: everything but a door. */
 export const isOpenable = (area) => area.kind !== 'door';
 
@@ -116,7 +119,7 @@ const rad = (deg) => (deg * Math.PI) / 180;
 
 /** How tall an area's box is, in squares. Floors, doors and staging lie flat. */
 export const heightOf = (area) => {
-  if (area.kind === 'door' || area.kind === 'staging') return 0.06;
+  if (area.kind === 'door' || area.kind === 'staging' || isGateKind(area)) return 0.06;
   if (area.kind === 'floor') return 0.35;
   return clamp(Number(area.levels) || 1, 1, MAX_LEVELS) * LEVEL;
 };
@@ -378,3 +381,67 @@ export const productStacks = (area, items) => {
     z1: floor + stackHeight(item.about, roof),
   }));
 };
+
+// ── Trucks at the gates ───────────────────────────────────────
+// A truck stands outside its gate, backed up to it: the trailer against
+// the gate, the cab beyond. "Outside" is the side of the gate away from
+// the middle of the rest of the plan. A gate drawn wider than deep faces
+// north or south, one deeper than wide faces east or west.
+const TRAILER = { len: 3, wide: 1.3, high: 1.35, lift: 0.3 };
+const CAB = { len: 1.1, high: 1.15 };
+
+/** Which way is out of a gate: { axis: 'x' | 'y', sign: -1 | 1 }. */
+export const gateOutward = (gate, areas) => {
+  const rest = areas.filter((a) => a.id !== gate.id && !isGateKind(a) && a.kind !== 'door');
+  const middle = rest.length
+    ? { x: rest.reduce((s, a) => s + a.x + a.w / 2, 0) / rest.length, y: rest.reduce((s, a) => s + a.y + a.h / 2, 0) / rest.length }
+    : { x: gate.x + gate.w / 2, y: gate.y + gate.h + 1 };
+  const gx = gate.x + gate.w / 2;
+  const gy = gate.y + gate.h / 2;
+  if (gate.w >= gate.h) return { axis: 'y', sign: gy <= middle.y ? -1 : 1 };
+  return { axis: 'x', sign: gx <= middle.x ? -1 : 1 };
+};
+
+/**
+ * Boxes for `count` trucks (up to 2, side by side) at a gate, each part
+ * tagged: { id, part: 'trailer' | 'cab' | 'wheel', truck, x, y, w, h, z0, z1 }.
+ */
+export const truckBoxes = (gate, areas, count) => {
+  if (!count) return [];
+  const { axis, sign } = gateOutward(gate, areas);
+  const boxes = [];
+  for (let t = 0; t < Math.min(count, 2); t += 1) {
+    const across = (count > 1 ? (t === 0 ? -0.8 : 0.8) : 0);
+    // Along: distance out from the gate's outer edge.
+    const edge = axis === 'y' ? (sign < 0 ? gate.y : gate.y + gate.h) : (sign < 0 ? gate.x : gate.x + gate.w);
+    const mid = axis === 'y' ? gate.x + gate.w / 2 + across : gate.y + gate.h / 2 + across;
+    const seg = (from, len) => {
+      const a = edge + sign * from;
+      const b = edge + sign * (from + len);
+      return [Math.min(a, b), Math.abs(b - a)];
+    };
+    const place = (part, from, len, wide, z0, z1, idx = '') => {
+      const [start, length] = seg(from, len);
+      const box = axis === 'y'
+        ? { x: mid - wide / 2, y: start, w: wide, h: length }
+        : { x: start, y: mid - wide / 2, w: length, h: wide };
+      boxes.push({ id: `${gate.id}-truck-${t}-${part}${idx}`, part, truck: t, ...box, z0, z1 });
+    };
+    place('trailer', 0.25, TRAILER.len, TRAILER.wide, TRAILER.lift, TRAILER.lift + TRAILER.high);
+    place('cab', 0.25 + TRAILER.len + 0.12, CAB.len, TRAILER.wide * 0.92, TRAILER.lift - 0.05, TRAILER.lift + CAB.high);
+    [0.5, TRAILER.len - 0.3, TRAILER.len + 0.12 + CAB.len - 0.2].forEach((at, i) => {
+      [-1, 1].forEach((sideSign, j) => {
+        const [start, length] = seg(at, 0.42);
+        const off = mid + sideSign * (TRAILER.wide / 2 - 0.12);
+        const wheel = axis === 'y'
+          ? { x: off - 0.12, y: start, w: 0.24, h: length }
+          : { x: start, y: off - 0.12, w: length, h: 0.24 };
+        boxes.push({ id: `${gate.id}-truck-${t}-wheel${i}${j}`, part: 'wheel', truck: t, ...wheel, z0: 0, z1: 0.36 });
+      });
+    });
+  }
+  return boxes;
+};
+
+/** The plan's extent including what stands outside it (trucks), for fitting the view. */
+export const withOutside = (areas, extra) => [...areas, ...extra.map((b) => ({ id: b.id, x: b.x, y: b.y, w: b.w, h: b.h }))];

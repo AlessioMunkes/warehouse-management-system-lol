@@ -5,11 +5,16 @@
 // admin can draw, what each kind holds, and the size of the grid.
 //
 // The kinds are the warehouse_areas.kind CHECK constraint (migrations
-// 048 and 049). The grid size is mirrored once on the client
+// 048, 049 and 051). The grid size is mirrored once on the client
 // (features/warehouseMap/mapGeometry.js), which draws the same grid.
 // ─────────────────────────────────────────────────────────────
 
-export const AREA_KINDS = ['dry', 'cold', 'floor', 'staging', 'door'];
+export const AREA_KINDS = ['dry', 'cold', 'floor', 'staging', 'door', 'dispatch_gate', 'receiving_gate'];
+
+// Where pallets leave and deliveries arrive. Like a door they hold
+// nothing; the map stands a truck at them for the day's collections and
+// expected deliveries.
+export const GATE_KINDS = ['dispatch_gate', 'receiving_gate'];
 
 // Stock is counted into these, and they can have a capacity by weight
 // and preferred stock.
@@ -34,6 +39,6 @@ export const isAreaKind = (value) => AREA_KINDS.includes(value);
 export const isStorageKind = (value) => STORAGE_KINDS.includes(value);
 
 export default {
-  AREA_KINDS, STORAGE_KINDS, STAGING_KIND, GRID, MAX_LEVELS, MAX_NAME_LENGTH, MAX_AREAS,
+  AREA_KINDS, GATE_KINDS, STORAGE_KINDS, STAGING_KIND, GRID, MAX_LEVELS, MAX_NAME_LENGTH, MAX_AREAS,
   MAX_CAPACITY_KG, MAX_PALLET_SPACES, MAX_PREFERENCES, MAX_CATEGORY_LENGTH, isAreaKind, isStorageKind,
 };

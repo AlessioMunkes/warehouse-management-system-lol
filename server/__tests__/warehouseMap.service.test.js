@@ -15,6 +15,7 @@ const repoMock = {
   listMapProducts: vi.fn(),
   listPackedPallets: vi.fn(),
   readUnitSizes: vi.fn(),
+  listDayActivity: vi.fn(),
   productsForCount: vi.fn(),
   saveLayout: vi.fn(),
   latestCountsForArea: vi.fn(),
@@ -38,6 +39,7 @@ beforeEach(() => {
   mapService.clearMapCache();
   repoMock.listPackedPallets.mockResolvedValue([]);
   repoMock.readUnitSizes.mockResolvedValue({});
+  repoMock.listDayActivity.mockResolvedValue({ packing: 2, inbound: [], receivedToday: [] });
   repoMock.listAreas.mockResolvedValue([AREA]);
   repoMock.listLatestCounts.mockResolvedValue([]);
   repoMock.listMapProducts.mockResolvedValue([
@@ -53,6 +55,8 @@ describe('getMap', () => {
     repoMock.listLatestCounts.mockResolvedValue([{ area_id: 3, product_id: 1, quantity: '15', counted_at: '2026-10-17T09:00:00Z', counted_by_name: 'Grizel' }]);
     const map = await mapService.getMap();
     expect(map.ready).toBe(true);
+    expect(map.day).toMatchObject({ packing: 2 });
+    expect(repoMock.listDayActivity).toHaveBeenCalledWith('2026-10-18');
     expect(map.grid).toEqual({ cols: 40, rows: 24 });
     expect(map.areas[0].items[0]).toMatchObject({ productId: 1, about: 15 });
     expect(map.products[0]).toMatchObject({ onHand: 40, placed: 15, unplaced: 25 });

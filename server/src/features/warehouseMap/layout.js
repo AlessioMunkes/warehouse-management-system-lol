@@ -48,7 +48,7 @@ export const checkLayout = (input) => {
     if (names.has(key)) return { error: `Two areas are called "${name}". Give each its own name.` };
     names.set(key, name);
 
-    if (!isAreaKind(raw?.kind)) return { error: `Choose dry store, cold room, floor, pallet staging or door for "${name}".` };
+    if (!isAreaKind(raw?.kind)) return { error: `Choose dry store, cold room, floor, pallet staging, door, dispatch gate or receiving gate for "${name}".` };
     const storage = isStorageKind(raw.kind);
     const staging = raw.kind === STAGING_KIND;
 

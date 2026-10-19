@@ -119,6 +119,7 @@ const MANAGER = [
       'Adjust stock from a product’s panel. A reason is required, and counted items take whole numbers only.',
       'The stock ledger lists every movement: received, dispatched, decanted, adjusted and wastage.',
       'The Map tab shows the warehouse floor plan. Open an area and choose Count this area to record what is there. Counts never change stock: where a count differs from what is on the shelves, adjust stock from the area. Packed pallets stand in the staging areas until they are dispatched, and Capacity under the map shows how full each area is. Drag the 3D view to turn it.',
+      'Today, above the map, sums up the day: collections, deliveries, packing, people on site and donations. A truck stands at the dispatch gate while pallets wait to be collected, and at the receiving gate while a delivery is expected; red or amber means overdue or late. Choose a card or a gate to see the list.',
     ] },
   { title: 'Picking slips',
     steps: [
@@ -193,7 +194,7 @@ const ADMIN = [
     ] },
   { title: 'Warehouse layout',
     steps: [
-      'Add dry stores, cold rooms, floor areas, pallet staging areas and doors, then drag each into place. Drag the corner to size it.',
+      'Add dry stores, cold rooms, floor areas, pallet staging areas, doors and the dispatch and receiving gates, then drag each into place. Drag the corner to size it.',
       'Set a capacity in kilograms for a store, or pallet spaces for a staging area. Choose the categories or products each store is meant for: stock nobody has counted shows there as expected.',
       'Areas cannot overlap. Save layout sends the whole plan; managers then count stock into it on Inventory.',
     ] },

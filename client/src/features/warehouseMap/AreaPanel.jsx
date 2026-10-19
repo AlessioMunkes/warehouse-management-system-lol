@@ -22,7 +22,10 @@
 // their collection day first, each marked as the map marks it; they
 // leave the map when they are dispatched. Under the title, every alert
 // the map's badge stands for (mapIndicators.js), so the panel and the
-// map never disagree. The same panel, with `area` null, lists
+// map never disagree. A product's name lights up everywhere it is on
+// the map (onFind). A gate shows its day: the dispatch gate the pallets
+// ready to collect, the receiving gate the deliveries late, expected and
+// arrived today. The same panel, with `area` null, lists
 // what is not placed anywhere.
 // ─────────────────────────────────────────────────────────────
 import { AlertCircle, CalendarClock, ClipboardList, HelpCircle, SlidersHorizontal, Truck } from 'lucide-react';
@@ -129,6 +132,70 @@ function AlertBadges({ area, today }) {
   );
 }
 
+// The receiving gate's purchase orders: late ones marked by how late.
+function DeliveryList({ orders, today, label }) {
+  if (!orders.length) return null;
+  return (
+    <ul className="divide-y rounded-lg border" aria-label={label}>
+      {orders.map((po) => {
+        const late = po.expected_on && po.expected_on < today ? daysLate(po.expected_on, today) : 0;
+        return (
+          <li key={po.id} className={`flex items-center justify-between gap-3 px-3 py-2 ${late ? 'bg-warn-soft/60' : ''}`}>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium">{po.supplier}</span>
+              <span className="block text-xs text-muted-foreground">
+                {po.po_number}{po.lines ? ` · ${po.lines} line${po.lines === 1 ? '' : 's'}` : ''}{po.expected_on ? ` · Expected ${formatCalendarDay(po.expected_on)}` : ''}
+              </span>
+            </span>
+            {late
+              ? <StatusBadge tone="warn" icon={AlertCircle}>{late === 1 ? '1 day late' : `${late} days late`}</StatusBadge>
+              : (po.expected_on === today ? <StatusBadge tone="info" icon={Truck}>Today</StatusBadge> : null)}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function GateDay({ area, today }) {
+  const g = area.gate;
+  if (g.kind === 'dispatch') {
+    return (
+      <>
+        <p className="text-sm">
+          {g.collectedToday} collected today
+          {g.notCollectedToday ? <span className="text-danger"> · {g.notCollectedToday} not collected</span> : null}
+          {g.later ? <span className="text-muted-foreground"> · {g.later} packed for later days</span> : null}
+        </p>
+        {g.ready.length === 0
+          ? <p className="text-sm text-muted-foreground">No pallets waiting to be collected today.</p>
+          : <PalletList pallets={g.ready} label={`Ready at ${area.name}`} today={today} />}
+      </>
+    );
+  }
+  return (
+    <>
+      {g.truckCount === 0 && g.receivedToday.length === 0
+        ? <p className="text-sm text-muted-foreground">No deliveries expected today.</p>
+        : null}
+      <DeliveryList orders={[...g.late, ...g.expected]} today={today} label={`Expected at ${area.name}`} />
+      {g.receivedToday.length ? (
+        <>
+          <p className="text-sm font-medium">Received today</p>
+          <ul className="divide-y rounded-lg border" aria-label="Received today">
+            {g.receivedToday.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="min-w-0 truncate text-sm">{d.supplier}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{d.po_number}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 // "About 240 kg of 500 kg · 48%", in the fill colour.
 function CapacityLine({ area }) {
   if (isStaging(area)) {
@@ -195,7 +262,7 @@ export default function AreaPanel({
     );
   }
 
-  const items = area.items.filter((i) => i.about > 0);
+  const items = (area.items ?? []).filter((i) => i.about > 0);
   const by = items.find((i) => i.countedByName)?.countedByName;
   const eyebrow = holdsStock(area)
     ? `${kindById(area.kind).label} · ${countedWhen(area.lastCountedAt)}${by && area.lastCountedAt ? ` by ${by}` : ''}`
@@ -214,9 +281,9 @@ export default function AreaPanel({
         </Button>
       ) : null}
     >
-      <CapacityLine area={area} />
+      {area.gate ? null : <CapacityLine area={area} />}
 
-      {isStaging(area) ? (
+      {area.gate ? <GateDay area={area} today={today} /> : isStaging(area) ? (
         area.pallets.length === 0
           ? <p className="text-sm text-muted-foreground">No packed pallets waiting here.</p>
           : <PalletList pallets={area.pallets} label={`Pallets in ${area.name}`} today={today} />

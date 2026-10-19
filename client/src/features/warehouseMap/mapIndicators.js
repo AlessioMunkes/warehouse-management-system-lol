@@ -25,7 +25,7 @@ import { holdsStock, isStaging } from './mapGeometry';
 const RANK = { bad: 0, warn: 1, info: 2, muted: 3 };
 const DAY_MS = 86_400_000;
 const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
 /** When a pallet is collected, against today: overdue, today, tomorrow or later. */
 export const palletDue = (pallet, today) => {
@@ -47,6 +47,19 @@ export const palletLook = (due) => PALLET_DUE.find((p) => p.id === due) ?? PALLE
 /** Every alert on an area, most urgent first: [{ level, glyph, text }]. */
 export const alertsFor = (area, { today, now } = {}) => {
   const out = [];
+  // A gate: the day's trucks (mapActivity.js puts them on area.gate).
+  if (area.gate?.kind === 'dispatch') {
+    const g = area.gate;
+    if (g.overdue.length) out.push({ level: 'bad', glyph: String(g.overdue.length), text: `${plural(g.overdue.length, 'pallet')} past the collection day` });
+    if (g.dueToday.length) out.push({ level: 'info', glyph: String(g.dueToday.length), text: `${plural(g.dueToday.length, 'pallet')} to be collected today` });
+    return out;
+  }
+  if (area.gate?.kind === 'receiving') {
+    const g = area.gate;
+    if (g.late.length) out.push({ level: 'warn', glyph: String(g.late.length), text: `${plural(g.late.length, 'delivery', 'deliveries')} late` });
+    if (g.expected.length) out.push({ level: 'info', glyph: String(g.expected.length), text: `${plural(g.expected.length, 'delivery', 'deliveries')} expected today` });
+    return out;
+  }
   if (isStaging(area)) {
     const pallets = area.pallets ?? [];
     const overdue = pallets.filter((p) => palletDue(p, today) === 'overdue').length;
@@ -84,9 +97,12 @@ export const badgeFor = (area, ctx) => {
 
 /** The figure on an area's label: how full, how many pallets, or how many products. */
 export const figureOf = (area) => {
+  if (area.gate?.kind === 'dispatch') return area.gate.ready.length ? `${area.gate.ready.length} ready` : (area.gate.collectedToday ? `${area.gate.collectedToday} collected` : 'Quiet');
+  if (area.gate?.kind === 'receiving') return area.gate.truckCount ? `${area.gate.truckCount} expected` : (area.gate.receivedToday.length ? `${area.gate.receivedToday.length} received` : 'Quiet');
   if (isStaging(area)) {
     const n = area.pallets?.length ?? 0;
-    return area.palletSpaces ? `${n}/${area.palletSpaces}` : plural(n, 'pallet');
+    const packed = area.palletSpaces ? `${n}/${area.palletSpaces}` : plural(n, 'pallet');
+    return area.packingNow ? `${packed} · ${area.packingNow} packing` : packed;
   }
   if (!holdsStock(area) || !Array.isArray(area.items)) return null;
   if (area.fill !== null && area.fill !== undefined && !(area.unweighed > 0)) return percent(area.fill);

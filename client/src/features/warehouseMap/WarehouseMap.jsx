@@ -32,6 +32,11 @@
 //     breathe.
 //   - shadows and a floor grid for depth, a compass that turns with the
 //     view, and a card on hover with everything about the area.
+//   - the day (mapActivity.js): a truck backed up to the dispatch gate
+//     while pallets wait to be collected (red if overdue), and to the
+//     receiving gate while a delivery is expected (amber if late); a
+//     moving line along the floor where goods are on their way. A truck
+//     opens its gate.
 //
 // ZOOMING (useMapZoom.js, both views). It opens fitted to the drawn
 // plan. The + and - buttons, scrolling once the map has been clicked,
@@ -51,8 +56,9 @@ import { fmtQty } from '@/lib/quantity';
 import {
   CELL, DEFAULT_CAMERA, DEFAULT_GRID, LEVEL_HEIGHT, TILT_RANGE, anchorAbove, areaBox, boxFaces, camera, clamp,
   drawOrder, floorGrid, floorOutline, holdsStock, isOpenable, isStaging, kindById, northBearing, palletBoxes,
-  planFocus, productStacks, shadowPoints, shelfLines,
+  planFocus, productStacks, shadowPoints, shelfLines, truckBoxes, withOutside,
 } from './mapGeometry';
+import { routesFor } from './mapActivity';
 import useMapZoom from './useMapZoom';
 import { TONES, fillTone } from './mapOverlays';
 import {
@@ -293,7 +299,16 @@ function HoverCard({ area, at, today, stack }) {
   const alerts = alertsFor(area, { today, now: new Date() });
   const products = stockLines(area);
   const lines = [];
-  if (isStaging(area)) {
+  if (area.gate?.kind === 'dispatch') {
+    const g = area.gate;
+    lines.push(g.ready.length ? `${g.ready.length} pallet${g.ready.length === 1 ? '' : 's'} ready to collect` : 'No pallets waiting');
+    lines.push(`${g.collectedToday} collected today`);
+  } else if (area.gate?.kind === 'receiving') {
+    const g = area.gate;
+    [...g.late, ...g.expected].slice(0, 3).forEach((po) => lines.push(`${po.supplier} · ${po.po_number}${po.expected_on < today ? ' (late)' : ''}`));
+    if (!g.truckCount) lines.push('No deliveries expected');
+    lines.push(`${g.receivedToday.length} received today`);
+  } else if (isStaging(area)) {
     lines.push(`${area.pallets?.length ?? 0} packed pallet${area.pallets?.length === 1 ? '' : 's'}${area.palletSpaces ? ` of ${area.palletSpaces} spaces` : ''}`);
   } else if (holdsStock(area) && Array.isArray(area.items)) {
     const held = heldText(area);
@@ -355,6 +370,18 @@ function Compass({ bearing }) {
   );
 }
 
+// A truck's parts: the trailer in its gate's colour, a white cab, black wheels.
+const TRUCK_LOOK = {
+  trailer: (tone) => cn(TONES[tone]?.solid ?? 'fill-info', TONES[tone]?.stroke ?? 'stroke-info'),
+  cab: () => 'fill-surface stroke-ink-soft',
+  wheel: () => 'fill-ink stroke-ink',
+};
+
+/** Every truck standing at a gate today, as boxes, each knowing its gate. */
+const trucksOf = (areas) => areas
+  .filter((a) => a.gate?.trucks)
+  .flatMap((gate) => truckBoxes(gate, areas, gate.gate.trucks).map((b) => ({ ...b, truckOf: gate })));
+
 // + / - / Fit, bottom right, and the scroll hint while it is needed.
 function ZoomControls({ z }) {
   return (
@@ -390,7 +417,9 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
   const moved = useRef(false);
   const frame = useRef(0);
   const camRef = useRef(cam);
-  const focus = useMemo(() => planFocus(areas, grid), [areas, grid]);
+  const trucks = useMemo(() => trucksOf(areas), [areas]);
+  const routes = useMemo(() => routesFor(areas), [areas]);
+  const focus = useMemo(() => planFocus(withOutside(areas, trucks), grid), [areas, trucks, grid]);
   const view = useMemo(() => camera(cam, grid, focus), [cam, grid, focus]);
   const fit = useMemo(() => view.fit(), [view]);
   const z = useMapZoom({ fit, svgRef });
@@ -432,11 +461,12 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
   const turn = (deg) => animateTo({ ...camRef.current, yaw: (camRef.current.yaw + deg + 360) % 360 });
 
   const items = useMemo(() => [
+    ...trucks,
     ...areas.map((area) => ({ ...areaBox(area), area })),
     ...areas.flatMap((area) => palletBoxes(area, area.pallets?.length ?? 0).map((p, i) => ({
       ...p, palletOf: area, due: palletDue(area.pallets[i % area.pallets.length], today),
     }))),
-  ], [areas, today]);
+  ], [areas, trucks, today]);
   const ordered = useMemo(() => drawOrder(items, view), [items, view]);
   const labelled = useMemo(
     () => ordered.filter((b) => b.area && (isOpenable(b.area) || b.area.kind === 'door')),
@@ -525,11 +555,37 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
           {floorGrid(view, grid, 2).map((l) => (
             <line key={`${l.x1.toFixed(1)},${l.y1.toFixed(1)}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className="stroke-line" strokeWidth={0.5} />
           ))}
-          {ordered.filter((b) => b.area && b.z1 >= 0.3).map((b) => (
-            <polygon key={`shadow-${b.area.id}`} points={shadowPoints(b, view)} className="fill-black" fillOpacity={shared(b.area).dimmed ? 0.03 : 0.09} />
+          {ordered.filter((b) => (b.area && b.z1 >= 0.3) || b.part === 'trailer').map((b) => (
+            <polygon key={`shadow-${b.id ?? b.area.id}`} points={shadowPoints(b, view)} className="fill-black" fillOpacity={b.area && shared(b.area).dimmed ? 0.03 : 0.09} />
           ))}
+          {routes.map((r) => {
+            const a = view.project(r.from.x, r.from.y, 0.03);
+            const b = view.project(r.to.x, r.to.y, 0.03);
+            return (
+              <g key={r.id}>
+                <line x1={a.px} y1={a.py} x2={b.px} y2={b.py} className={cn('wm-flow', TONES[r.tone]?.stroke ?? 'stroke-info')} strokeWidth={2.5} strokeLinecap="round" />
+                <circle cx={b.px} cy={b.py} r={4} className={TONES[r.tone]?.solid ?? 'fill-info'} />
+              </g>
+            );
+          })}
         </g>
         {ordered.map((box) => {
+          if (box.truckOf) {
+            const gate = box.truckOf;
+            const sg = shared(gate);
+            return (
+              <g
+                key={box.id}
+                className={cn(sg.onSelect && 'cursor-pointer')}
+                opacity={sg.dimmed ? 0.3 : 1}
+                onClick={sg.onSelect ? () => sg.onSelect(gate) : undefined}
+                onPointerEnter={(e) => s3(gate).onHover(e)}
+                onPointerLeave={s3(gate).onLeave}
+              >
+                <Box faces={boxFaces(box, view)} className={TRUCK_LOOK[box.part](gate.gate.tone)} strokeWidth={box.part === 'wheel' ? 0.5 : 0.9} />
+              </g>
+            );
+          }
           if (box.palletOf) {
             const look = palletLook(box.due);
             return (
@@ -613,17 +669,21 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
   const svgRef = useRef(null);
   const width = grid.cols * CELL;
   const height = grid.rows * CELL;
+  const trucks = useMemo(() => trucksOf(areas).filter((b) => b.part !== 'wheel'), [areas]);
+  const routes = useMemo(() => routesFor(areas), [areas]);
   const fit = useMemo(() => {
     if (!areas.length) return { x: 0, y: 0, w: width, h: height };
-    const x0 = Math.max(Math.min(...areas.map((a) => a.x)) - 1, 0) * CELL;
-    const y0 = Math.max(Math.min(...areas.map((a) => a.y)) - 1, 0) * CELL;
-    const x1 = Math.min(Math.max(...areas.map((a) => a.x + a.w)) + 1, grid.cols) * CELL;
-    const y1 = Math.min(Math.max(...areas.map((a) => a.y + a.h)) + 1, grid.rows) * CELL;
+    // Trucks stand outside the plan, so the view reaches a little past it.
+    const all = withOutside(areas, trucks);
+    const x0 = Math.max(Math.min(...all.map((a) => a.x)) - 1, -6) * CELL;
+    const y0 = Math.max(Math.min(...all.map((a) => a.y)) - 1, -6) * CELL;
+    const x1 = Math.min(Math.max(...all.map((a) => a.x + a.w)) + 1, grid.cols + 6) * CELL;
+    const y1 = Math.min(Math.max(...all.map((a) => a.y + a.h)) + 1, grid.rows + 6) * CELL;
     // Kept to the map's own shape, so a thin plan is not stretched.
     const w = Math.max(x1 - x0, (y1 - y0) * (width / height));
     const h = Math.max(y1 - y0, w * (height / width));
     return { x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h };
-  }, [areas, grid, width, height]);
+  }, [areas, trucks, grid, width, height]);
   const z = useMapZoom({ fit, svgRef, dragPans: true });
   const panned = useRef(false);
 
@@ -651,7 +711,26 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
       </defs>
       <rect width={width} height={height} className="fill-surface-2" />
       <rect width={width} height={height} fill="url(#wm-grid)" />
+      {routes.map((r) => (
+        <line
+          key={r.id} x1={r.from.x * CELL} y1={r.from.y * CELL} x2={r.to.x * CELL} y2={r.to.y * CELL}
+          className={cn('wm-flow pointer-events-none', TONES[r.tone]?.stroke ?? 'stroke-info')} strokeWidth={3} strokeLinecap="round"
+        />
+      ))}
       {areas.map((area) => <TopArea key={area.id} {...shared(area)} note={noteOf?.(area)} today={today} matchProduct={matchProduct} />)}
+      {trucks.map((b) => {
+        const gate = b.truckOf;
+        const sg = shared(gate);
+        return (
+          <rect
+            key={b.id} x={b.x * CELL} y={b.y * CELL} width={b.w * CELL} height={b.h * CELL} rx={b.part === 'cab' ? 5 : 3}
+            className={cn(TRUCK_LOOK[b.part](gate.gate.tone), sg.onSelect && 'cursor-pointer')} strokeWidth={1}
+            onClick={sg.onSelect ? () => sg.onSelect(gate) : undefined}
+          >
+            <title>{`${gate.name}: ${figureOf(gate)}`}</title>
+          </rect>
+        );
+      })}
       </svg>
       <ZoomControls z={z} />
     </div>

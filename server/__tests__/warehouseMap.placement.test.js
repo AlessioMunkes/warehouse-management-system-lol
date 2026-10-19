@@ -189,7 +189,7 @@ describe('checkLayout', () => {
   it.each([
     ['not a list', 'nope', /list of areas/],
     ['no name', [good({ name: '  ' })], /Give area 1 a name/],
-    ['an unknown kind', [good({ kind: 'roof' })], /dry store, cold room, floor, pallet staging or door/],
+    ['an unknown kind', [good({ kind: 'roof' })], /pallet staging, door, dispatch gate or receiving gate/],
     ['a fraction of a square', [good({ w: 2.5 })], /whole-number position/],
     ['off the grid', [good({ x: 38 })], /runs off the edge/],
     ['too tall', [good({ levels: 9 })], /1 to 4 levels/],

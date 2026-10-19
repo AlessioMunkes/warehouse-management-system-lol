@@ -11,11 +11,12 @@ import { render, screen, within, waitFor, fireEvent } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import {
   DEFAULT_CAMERA, boxFaces, camera, drawOrder, freeSpot, keepOnGrid, nextName, overlapping, palletBoxes,
-  productStacks,
+  gateOutward, productStacks, truckBoxes,
 } from '../features/warehouseMap/mapGeometry';
 import { areasMatching, countedWhen, fillTone, legendFor, toneFor } from '../features/warehouseMap/mapOverlays';
 import { alertsFor, badgeFor, figureOf, heldText, palletDue, stockMode } from '../features/warehouseMap/mapIndicators';
 import { zoomAbout, zoomedBox } from '../features/warehouseMap/useMapZoom';
+import { gateActivity, todayCards, withGates } from '../features/warehouseMap/mapActivity';
 
 vi.mock('../services/warehouseMapAPI', () => ({
   getWarehouseMap: vi.fn(),
@@ -491,5 +492,81 @@ describe('finding a product from its area', () => {
     // Behind the panel, which is modal on a narrow screen.
     expect(screen.getByRole('searchbox', { name: /Find a product/, hidden: true })).toHaveValue('Rice');
     expect(screen.getByRole('button', { name: /^Cold room 1, Cold room/, hidden: true })).toHaveAttribute('opacity', '0.3');
+  });
+});
+
+// ── The day: gates, trucks and the Today strip ────────────────
+describe('the day at the gates', () => {
+  const dispatchGate = { id: 20, name: 'Dispatch gate', kind: 'dispatch_gate', x: 30, y: 23, w: 4, h: 1, levels: 1 };
+  const receivingGate = { id: 21, name: 'Receiving gate', kind: 'receiving_gate', x: 0, y: 10, w: 1, h: 4, levels: 1 };
+  const day = {
+    packing: 3, toPackToday: 2, collectedToday: 5, notCollectedToday: 1,
+    inbound: [
+      { id: 176, po_number: 'PO-2026-0176', status: 'approved', expected_on: '2026-10-11', supplier: "Mambo's", lines: 2 },
+      { id: 180, po_number: 'PO-2026-0180', status: 'approved', expected_on: '2026-10-18', supplier: 'Fampak', lines: 1 },
+      { id: 181, po_number: 'PO-2026-0181', status: 'in_transit', expected_on: '2026-10-18', supplier: 'Pelican', lines: 3 },
+    ],
+    receivedToday: [{ id: 9, supplier: 'Pelican', po_number: 'PO-2026-0181', status: 'recorded' }],
+    volunteersOnSite: 4, donationsToday: 2, closure: null, benevolentWaiting: 1,
+  };
+  const DAY_MAP = { ...MAP, day, areas: [...MAP.areas, dispatchGate, receivingGate] };
+
+  it('sends a truck to each gate for what is due, and counts late ones', () => {
+    const activity = gateActivity(DAY_MAP);
+    expect(activity.dispatch).toMatchObject({ truckCount: 0, collectedToday: 5 });
+    expect(activity.receiving.expected.map((po) => po.id)).toEqual([180]);
+    expect(activity.receiving.late.map((po) => po.id)).toEqual([176]);
+    expect(activity.receiving).toMatchObject({ trucks: 2, tone: 'warn' });
+    const withPallets = gateActivity({ ...DAY_MAP, areas: DAY_MAP.areas.map((a) => (a.id === 4 ? { ...a, pallets: [{ id: 1, dispatchDate: '2026-10-17' }, { id: 2, dispatchDate: '2026-10-18' }, { id: 3, dispatchDate: '2026-10-30' }] } : a)) });
+    expect(withPallets.dispatch).toMatchObject({ truckCount: 2, trucks: 1, tone: 'bad', later: 1 });
+  });
+
+  it('puts the day on the first gate of each kind, and the packing on the staging area', () => {
+    const areas = withGates(DAY_MAP.areas, gateActivity(DAY_MAP), 3);
+    expect(areas.find((a) => a.id === 21).gate).toMatchObject({ kind: 'receiving', truckCount: 2 });
+    expect(areas.find((a) => a.id === 4).packingNow).toBe(3);
+    expect(figureOf(areas.find((a) => a.id === 21))).toBe('2 expected');
+  });
+
+  it('backs a truck up to the outside of its gate', () => {
+    const plan = [{ id: 1, kind: 'dry', x: 5, y: 5, w: 10, h: 10 }, dispatchGate];
+    const boxes = truckBoxes(dispatchGate, plan, 1);
+    const trailer = boxes.find((b) => b.part === 'trailer');
+    // The gate is below the plan, so the truck stands further below it.
+    expect(trailer.y).toBeGreaterThanOrEqual(dispatchGate.y + dispatchGate.h);
+    expect(boxes.filter((b) => b.part === 'wheel')).toHaveLength(6);
+    expect(gateOutward(receivingGate, [{ id: 1, kind: 'dry', x: 5, y: 5, w: 10, h: 10 }])).toEqual({ axis: 'x', sign: -1 });
+  });
+
+  it('writes the Today strip, leaving out what could not be read', () => {
+    const cards = todayCards(DAY_MAP, gateActivity(DAY_MAP), { needing: 2 });
+    expect(cards.map((c) => [c.label, c.value])).toEqual([
+      ['Collections', '5 collected'], ['Deliveries', '1 received'], ['Packing now', '3 pallets'],
+      ['On site', '4 volunteers'], ['Donations', '2 today'], ['Needs attention', '2 areas'],
+    ]);
+    expect(cards[1].detail).toBe('1 delivery expected · 1 late');
+    expect(todayCards({ ...DAY_MAP, day: { ...day, volunteersOnSite: null } }, gateActivity(DAY_MAP)).map((c) => c.id)).not.toContain('people');
+  });
+
+  it('shows the day above the map, a truck at the receiving gate, and opens it', async () => {
+    const user = userEvent.setup();
+    getWarehouseMap.mockResolvedValue(DAY_MAP);
+    render(<WarehouseMapTab />);
+    const strip = within(await screen.findByRole('list', { name: 'Today in the warehouse' }));
+    expect(strip.getByText('5 collected')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /3D/ }));
+    const svg = screen.getByRole('group', { name: /3D view/ });
+    expect(svg.querySelectorAll('polygon.fill-warn').length).toBeGreaterThan(0);
+    await user.click(strip.getByRole('button', { name: /Deliveries/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.getByText("Mambo's")).toBeInTheDocument();
+    expect(panel.getByText('7 days late')).toBeInTheDocument();
+    expect(panel.getByText('Received today')).toBeInTheDocument();
+  });
+
+  it('says when the warehouse is closed today', async () => {
+    getWarehouseMap.mockResolvedValue({ ...DAY_MAP, day: { ...day, closure: { label: 'Heritage Day', kind: 'public_holiday' } } });
+    render(<WarehouseMapTab />);
+    expect(await screen.findByText('The warehouse is closed today: Heritage Day.')).toBeInTheDocument();
   });
 });

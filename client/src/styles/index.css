@@ -1916,6 +1916,11 @@ color:white;
 .wm-ping { transform-box: fill-box; transform-origin: center; animation: wm-ping 1.6s ease-out infinite; }
 .wm-breathe { animation: wm-breathe 1.8s ease-in-out infinite; }
 .wm-lift { transition: transform 160ms ease-out; }
+/* A route goods are on along the floor: the dashes run towards where they go. */
+@keyframes wm-flow { to { stroke-dashoffset: -16; } }
+.wm-flow { stroke-dasharray: 8 8; animation: wm-flow 0.9s linear infinite; }
+[data-stf-motion="reduced"] .wm-flow { animation: none; }
+@media (prefers-reduced-motion: reduce) { .wm-flow { animation: none; } }
 [data-stf-motion="reduced"] :is(.wm-ping, .wm-breathe) { animation: none; }
 [data-stf-motion="reduced"] .wm-ping { opacity: 0; }
 [data-stf-motion="reduced"] .wm-lift { transition: none; }
