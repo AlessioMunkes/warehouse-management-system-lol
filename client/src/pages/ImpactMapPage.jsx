@@ -12,7 +12,7 @@
 // gate, meals from the kg_to_meals factor. The period defaults to the
 // last 90 days, counted in South African days by the server.
 //
-// Where a centre is, an admin sets on Centre locations; a centre with no
+// Where a centre is, a manager sets in Beneficiaries (Edit details); one with no
 // pin is in the totals and the list, but not on the map, and the strip
 // says how many. Behind sign-in only: these are children's centres.
 // ─────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export default function ImpactMapPage() {
                   title="No centre to show on the map"
                   description={shown.length === 0
                     ? 'Nothing matches these filters.'
-                    : 'None of these centres has a location yet. An admin sets them on Centre locations.'}
+                    : 'None of these centres has a location yet. Add one in Beneficiaries, under Edit details.'}
                 />
               ) : null}
               <ImpactLeafletMap
@@ -203,7 +203,7 @@ export default function ImpactMapPage() {
               </ul>
               {summary.unplaced > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {summary.unplaced} of {shown.length} centres have no location yet, so they are counted but not drawn. An admin sets them on Centre locations.
+                  {summary.unplaced} of {shown.length} centres have no location yet, so they are counted but not drawn. Add them in Beneficiaries, under Edit details.
                 </p>
               ) : null}
             </div>

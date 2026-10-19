@@ -84,7 +84,6 @@ export const PAGE_LOADERS = {
   settings:         () => import('../pages/SettingsPage'),
   warehouseLayout:  () => import('../pages/WarehouseLayoutPage'),
   impactMap:        () => import('../pages/ImpactMapPage'),
-  centreLocations:  () => import('../pages/CentreLocationsPage'),
   financeReport:    () => import('../pages/FinanceWarehouseReportPage'),
 
   guestHome:        () => import('../pages/GuestHomePage'),
@@ -166,7 +165,6 @@ export const PAGES = {
   settings:         <L.settings />,
   warehouseLayout:  <L.warehouseLayout />,
   impactMap:        <L.impactMap />,
-  centreLocations:  <L.centreLocations />,
   financeReport:    <L.financeReport />,
 
   guestHome:        <L.guestHome />,

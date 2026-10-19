@@ -8,6 +8,11 @@
 // beneficiary.service.js's buildBeneficiaryPayload exactly.
 // contactName/contactEmail/mobileNumber/childCount are optional.
 //
+// LOCATION (address, suburb, pin) is part of the same form, but saved
+// apart from the centre by the page, through the location endpoint
+// (LocationFields.jsx, beneficiaryLocation.js), so the beneficiary
+// endpoint and its rules are untouched.
+//
 // approved_at is NOT a field here — see beneficiary.service.js's
 // comment: approval is a deliberate separate action
 // (BeneficiaryDirectoryPage's "Approve" button), not something this
@@ -25,8 +30,13 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { COHORT_OPTIONS } from '@/lib/cohorts';
+import LocationFields from './LocationFields';
+import { locationOf } from './beneficiaryLocation';
 
-const BLANK = { name: '', cohort: '', contactName: '', contactEmail: '', mobileNumber: '', childCount: '' };
+const BLANK = {
+  name: '', cohort: '', contactName: '', contactEmail: '', mobileNumber: '', childCount: '',
+  address: '', suburb: '', lat: null, lng: null,
+};
 
 export default function BeneficiaryForm({
   initial = null,
@@ -52,6 +62,7 @@ export default function BeneficiaryForm({
     if (nameMissing || cohortMissing) return;
     onSubmit({
       ...form,
+      ...locationOf(form),
       childCount: form.childCount === '' || form.childCount === null ? null : Number(form.childCount),
     });
   };
@@ -132,6 +143,12 @@ export default function BeneficiaryForm({
         />
         <FieldDescription>Leave blank if not yet known. Used for impact reporting.</FieldDescription>
       </Field>
+
+      <LocationFields
+        name={form.name}
+        value={{ address: form.address, suburb: form.suburb, lat: form.lat, lng: form.lng }}
+        onChange={(loc) => setForm((f) => ({ ...f, ...loc }))}
+      />
 
       <Field orientation="horizontal">
         <Button type="button" onClick={submit} disabled={busy}>

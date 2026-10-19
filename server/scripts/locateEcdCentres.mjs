@@ -19,12 +19,12 @@
 //      It matches each by name to a centre in this warehouse's database
 //      and writes the address, suburb and pin.
 //   2. With --geocode-missing, also looks up every centre that has an
-//      address or suburb but no pin (one an admin typed without placing
+//      address or suburb but no pin (one a manager typed without placing
 //      it), using OpenStreetMap's Nominatim.
 //
-// NEVER OVER AN ADMIN. A centre whose pin an admin placed on the Centre
-// locations screen (location_source 'manual') is left alone, so this is
-// safe to run again after admins have corrected pins.
+// NEVER OVER A PERSON. A centre whose pin someone placed by hand while
+// editing it on Beneficiaries (location_source 'manual') is left alone,
+// so this is safe to run again after pins have been corrected.
 //
 // NOMINATIM'S RULES (operations.osmfoundation.org/policies/nominatim):
 // one request a second at most, a User-Agent naming the application and
@@ -112,7 +112,7 @@ const locateOne = async (label) => {
     }
   }
 
-  console.log(`[${label}] ${counts.set} placed, ${counts.geocoded} geocoded, ${counts.manual} left to the admin's pin, `
+  console.log(`[${label}] ${counts.set} placed, ${counts.geocoded} geocoded, ${counts.manual} left to a hand-placed pin, `
     + `${counts.missing} in the data file but not in this warehouse, ${counts.notFound} not found.`);
 };
 

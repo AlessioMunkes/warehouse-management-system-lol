@@ -69,7 +69,6 @@ export const SCREEN_PATHS = {
   settings:           ADMIN.settings,
   warehouseLayout:    ADMIN.warehouseLayout,
   impactMap:          STAFF.impactMap,
-  centreLocations:    ADMIN.centreLocations,
 };
 
 // The two screens each side has its own page for. A worker is sent to

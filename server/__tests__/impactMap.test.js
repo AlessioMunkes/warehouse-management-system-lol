@@ -175,10 +175,11 @@ describe('routes', () => {
   app.use('/api/centre-locations', locationRouter);
   const cookieFor = (role) => [`wms_token=${jwt.sign({ id: 5, username: 'u', role }, process.env.JWT_SECRET, { expiresIn: '1h' })}`];
 
-  it('lets a manager read the map but not set locations', async () => {
+  it('lets a manager read the map and set locations', async () => {
+    poolMock.query.mockImplementation(async (sql) => (sql.startsWith('UPDATE') ? { rowCount: 1 } : { rows: [{ id: 1, name: 'A', latitude: null, longitude: null }] }));
     expect((await request(app).get('/api/impact-map').set('Cookie', cookieFor(ROLES.MANAGER))).status).toBe(200);
-    expect((await request(app).get('/api/centre-locations').set('Cookie', cookieFor(ROLES.MANAGER))).status).toBe(403);
-    expect((await request(app).patch('/api/centre-locations/1').set('Cookie', cookieFor(ROLES.MANAGER)).send({})).status).toBe(403);
+    expect((await request(app).get('/api/centre-locations').set('Cookie', cookieFor(ROLES.MANAGER))).status).toBe(200);
+    expect((await request(app).patch('/api/centre-locations/1').set('Cookie', cookieFor(ROLES.MANAGER)).send({ suburb: 'Delft' })).status).toBe(200);
   });
 
   it('turns the floor away from both', async () => {

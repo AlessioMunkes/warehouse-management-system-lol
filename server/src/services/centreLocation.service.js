@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/services/centreLocation.service.js
 //
-// The admin's Centre locations: where each beneficiary centre is, for
-// the manager's Impact map. An admin types the address and suburb and
-// places the pin; nothing else about a centre is changed here (that is
-// the manager's Beneficiaries screen).
+// Where each beneficiary centre is, for the Impact map. A manager types
+// the address and suburb and places the pin while editing a centre on
+// Beneficiaries; only the location is changed here, the rest of the
+// centre is saved by beneficiary.service.js as before.
 //
 // A pin is both coordinates or neither, and inside South Africa: the
 // database checks the same (migration 050). Saving here marks the pin

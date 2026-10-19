@@ -57,7 +57,6 @@ const TABLES = {
   'features/reporting/ReorderPlanner.jsx': 1,
   'features/volunteerManagement/BookingTable.jsx': 1,
   'pages/AdminArchivePage.jsx': 1,
-  'pages/CentreLocationsPage.jsx': 1,
   'pages/CommunityRequestsPage.jsx': 1,
   'pages/EcdCollectionRemindersPage.jsx': 1,
   'pages/MessageHistoryPage.jsx': 1,

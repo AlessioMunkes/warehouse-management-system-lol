@@ -3,8 +3,8 @@
 //
 // The Impact map: centres, their pins and what reached them. Gated like
 // the rest of reporting (reporting.routes.js): managers and admins.
-// The screen itself is the manager's; an admin sets the pins on Centre
-// locations (centreLocation.routes.js).
+// The screen itself is the manager's, who also places each centre while
+// editing it on Beneficiaries (centreLocation.routes.js).
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';

@@ -120,7 +120,5 @@ export const ADMIN = {
   archive:  '/admin/archive',
   // The floor plan managers count stock into on Inventory's Map tab.
   warehouseLayout: '/admin/warehouse-layout',
-  // Where each centre is, for the manager's Impact map.
-  centreLocations: '/admin/centre-locations',
 };
 

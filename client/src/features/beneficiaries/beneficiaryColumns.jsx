@@ -13,6 +13,7 @@
 import StatusBadge from '@/components/ui/status-badge';
 import { COHORT_LABELS } from '@/lib/cohorts';
 import { formatShortDate as fmtDate } from '@/lib/dates';
+import { hasPin, placeLine } from './beneficiaryLocation';
 
 export const BENEFICIARY_COLUMNS = [
   { key: 'name', label: 'Beneficiary', alwaysOn: true, weight: 3,
@@ -39,6 +40,14 @@ export const BENEFICIARY_COLUMNS = [
   { key: 'lastCollected', label: 'Last collected', weight: 2.2, minWidth: 'lg', numeric: true,
     sort: (b) => (b.lastCollectedDate ? new Date(b.lastCollectedDate).getTime() : null),
     cell: (b) => fmtDate(b.lastCollectedDate) },
+
+  // Where the centre is: its suburb (or address), or that it has no pin
+  // and so is not drawn on the Impact map.
+  { key: 'location', label: 'Location', weight: 2.4, minWidth: 'lg',
+    sort: (b) => (b.suburb || b.address || (hasPin(b) ? '~' : '')).toLowerCase() || null,
+    cell: (b) => (hasPin(b)
+      ? (b.suburb || placeLine(b) || 'Pin only')
+      : <StatusBadge tone="warn">No location</StatusBadge>) },
 
   // Two badges can land here at once, so it carries more width than a
   // one-badge status column would.

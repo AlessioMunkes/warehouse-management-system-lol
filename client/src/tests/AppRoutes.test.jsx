@@ -108,7 +108,6 @@ describe('sidebars built from the table', () => {
         'Users /admin/users',
         'Products /admin/products',
         'Suppliers /admin/suppliers',
-        'Centre locations /admin/centre-locations',
       ]],
       ['Logs', [
         'Activity log /admin/activity-log', 'Archive /admin/archive',

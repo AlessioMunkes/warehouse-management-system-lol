@@ -191,11 +191,6 @@ const ADMIN = [
       'A purchase order can only include products its supplier is listed as supplying.',
       'Deactivate a supplier to stop new orders. Existing orders keep their history.',
     ] },
-  { title: 'Centre locations',
-    steps: [
-      'Open a centre, type its address and suburb, then click the map where it is or choose Find. Drag the pin to correct it, then save.',
-      'Needs a location lists the active centres not yet on the Impact map. Suburb only lists pins at the middle of a suburb, worth checking.',
-    ] },
   { title: 'Warehouse layout',
     steps: [
       'Add dry stores, cold rooms, floor areas, pallet staging areas and doors, then drag each into place. Drag the corner to size it.',

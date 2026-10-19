@@ -289,6 +289,6 @@
   "warehouseMap.routes.js PUT /layout": "admin",
   "warehouseMap.routes.js POST /areas/:id/counts": "admin,manager",
   "impactMap.routes.js GET /": "admin,manager",
-  "centreLocation.routes.js GET /": "admin",
-  "centreLocation.routes.js PATCH /:id": "admin"
+  "centreLocation.routes.js GET /": "admin,manager",
+  "centreLocation.routes.js PATCH /:id": "admin,manager"
 }

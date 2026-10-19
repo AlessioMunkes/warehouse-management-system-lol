@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/services/impactMapAPI.js
 //
-// The Impact map (managers) and Centre locations (admins). Mirrors
+// The Impact map, and where each centre is (set while editing a centre
+// on Beneficiaries). Mirrors
 // impactMap.controller.js. The server already sends numbers, worked out
 // in JavaScript, not NUMERIC strings.
 // ─────────────────────────────────────────────────────────────

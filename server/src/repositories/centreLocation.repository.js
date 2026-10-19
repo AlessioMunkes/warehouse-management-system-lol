@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/centreLocation.repository.js
 //
-// Where each beneficiary centre is (migration 050): the admin's Centre
-// locations screen and the one-off scripts/locateEcdCentres.mjs. Only
+// Where each beneficiary centre is (migration 050): the location part of
+// editing a centre on Beneficiaries, and the one-off
+// scripts/locateEcdCentres.mjs. Only
 // the location columns are read or written here; the rest of a centre
 // stays with beneficiary.repository.js.
 // ─────────────────────────────────────────────────────────────

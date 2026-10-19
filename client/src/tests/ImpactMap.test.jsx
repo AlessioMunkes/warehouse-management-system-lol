@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // src/tests/ImpactMap.test.jsx
 //
-// The Impact map and Centre locations: the circle scale (area in
+// The Impact map: the circle scale (area in
 // proportion to meals), the filters and totals, the period presets in
 // South African days, the manager's page (strip, filters, the
 // not-served list) and the admin's list (views, saving a pin). Leaflet
@@ -28,15 +28,9 @@ vi.mock('../features/impactMap/ImpactLeafletMap', () => ({
     </ul>
   ),
 }));
-vi.mock('../features/impactMap/LocationPicker', () => ({
-  default: ({ lat, lng, onChange }) => (
-    <button type="button" onClick={() => onChange({ lat: -34.05, lng: 18.67 })}>{`pin ${lat},${lng}`}</button>
-  ),
-}));
 
-const { getImpactMap, listCentreLocations, setCentreLocation } = await import('../services/impactMapAPI');
+const { getImpactMap } = await import('../services/impactMapAPI');
 const { default: ImpactMapPage } = await import('../pages/ImpactMapPage');
-const { default: CentreLocationsPage } = await import('../pages/CentreLocationsPage');
 
 const centre = (id, extra = {}) => ({
   id, name: `Centre ${id}`, cohort: 'tuesday', childCount: 30, isActive: true, suburb: 'Delft',
@@ -161,39 +155,5 @@ describe('ImpactMapPage', () => {
     render(<ImpactMapPage />);
     expect(await screen.findByText('No meals factor set')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Drawn on the map' })).getAllByRole('listitem')[0]).toHaveTextContent('Alfa Educare|tuesday|100.25');
-  });
-});
-
-// ── The admin's list ──────────────────────────────────────────
-describe('CentreLocationsPage', () => {
-  const ROWS = [
-    { id: 1, name: 'Alfa Educare', cohort: 'tuesday', isActive: true, childCount: 35, address: null, suburb: null, lat: null, lng: null, source: null, note: null, updatedAt: null, updatedByName: null },
-    { id: 2, name: 'Delft Pooh Bear', cohort: 'thursday', isActive: true, childCount: 20, address: null, suburb: 'Delft', lat: -33.99, lng: 18.63, source: 'geocoded', note: 'Pin: the middle of the suburb, not the building.', updatedAt: '2026-10-19T08:00:00Z', updatedByName: null },
-    { id: 3, name: 'Victory Educare', cohort: 'tuesday', isActive: true, childCount: 40, address: 'Mew Way', suburb: 'Harare', lat: -34.06, lng: 18.67, source: 'imported', note: 'OpenStreetMap node/1', updatedAt: '2026-10-19T08:00:00Z', updatedByName: null },
-  ];
-
-  beforeEach(() => {
-    listCentreLocations.mockResolvedValue(ROWS);
-    setCentreLocation.mockImplementation(async (id, body) => ({ ...ROWS[0], ...body, source: 'manual' }));
-  });
-
-  it('opens on the centres that need a location, with counts for each view', async () => {
-    render(<CentreLocationsPage />);
-    expect(await screen.findByRole('tab', { name: /Needs a location 1/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: /Suburb only 1/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Alfa Educare' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Victory Educare' })).toBeNull();
-  });
-
-  it('saves an address and a pin placed on the map', async () => {
-    const user = userEvent.setup();
-    render(<CentreLocationsPage />);
-    await user.click(await screen.findByRole('button', { name: 'Alfa Educare' }));
-    const panel = within(await screen.findByRole('dialog'));
-    await user.type(panel.getByLabelText('Street address'), '12 Ncumo Road');
-    await user.type(panel.getByLabelText('Suburb'), 'Harare');
-    await user.click(panel.getByRole('button', { name: 'pin null,null' }));
-    await user.click(screen.getByRole('button', { name: 'Save location' }));
-    await waitFor(() => expect(setCentreLocation).toHaveBeenCalledWith(1, { address: '12 Ncumo Road', suburb: 'Harare', lat: -34.05, lng: 18.67 }));
   });
 });
