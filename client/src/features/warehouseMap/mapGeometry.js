@@ -328,3 +328,53 @@ export const northBearing = (cam) => {
   const b = cam.project(0, 0, 0);
   return (Math.atan2(b.px - a.px, -(b.py - a.py)) * 180) / Math.PI;
 };
+
+// ── Stock as stacks ───────────────────────────────────────────
+// What an area holds, when how full it is cannot be worked out (no
+// capacity set, or stock with no weight on record): one stack per
+// product, set out in a grid over the area's floor, as tall as the
+// quantity on a log scale, so 5 and 5,000 both show and the bigger
+// one is plainly taller. The capped list keeps a crowded area legible.
+export const MAX_STACKS = 24;
+
+export const stackHeight = (quantity, roof) => {
+  const q = Math.max(Number(quantity) || 0, 0);
+  if (q <= 0) return 0;
+  return Math.min(0.2 + 0.32 * Math.log10(1 + q), roof);
+};
+
+/** Boxes for an area's products: [{ id, item, x, y, w, h, z0, z1 }]. */
+export const productStacks = (area, items) => {
+  // One stack per product: counted and expected stock of it together.
+  const merged = new Map();
+  for (const i of items.filter((x) => x.about > 0)) {
+    const m = merged.get(i.productId);
+    merged.set(i.productId, m ? { ...m, about: m.about + i.about, kg: m.kg === null || i.kg === null ? null : m.kg + i.kg } : { ...i });
+  }
+  const list = [...merged.values()].sort((p, q) => q.about - p.about).slice(0, MAX_STACKS);
+  if (list.length === 0) return [];
+  const inset = 0.25;
+  const W = area.w - 2 * inset;
+  const H = area.h - 2 * inset;
+  const cols = Math.max(1, Math.min(list.length, Math.round(Math.sqrt(list.length * (W / Math.max(H, 0.1))))));
+  const rows = Math.ceil(list.length / cols);
+  // A stack is about a pallet's footprint (up to 2 squares), set out from
+  // the back corner, so one product in a long store is one stack, not a
+  // block that fills it.
+  const STACK_MAX = 2;
+  const cw = Math.min(W / cols, STACK_MAX);
+  const ch = Math.min(H / rows, STACK_MAX);
+  const gap = Math.min(cw, ch) * 0.18;
+  const floor = area.kind === 'floor' ? 0.35 : 0;
+  const roof = area.kind === 'floor' ? 1.6 : Math.max(heightOf(area) - 0.08, 0.3);
+  return list.map((item, i) => ({
+    id: `${area.id}-stack-${item.productId}`,
+    item,
+    x: area.x + inset + (i % cols) * cw + gap / 2,
+    y: area.y + inset + Math.floor(i / cols) * ch + gap / 2,
+    w: Math.max(cw - gap, 0.15),
+    h: Math.max(ch - gap, 0.15),
+    z0: floor,
+    z1: floor + stackHeight(item.about, roof),
+  }));
+};

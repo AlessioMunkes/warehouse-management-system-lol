@@ -18,9 +18,14 @@
 //   today       the server's 'YYYY-MM-DD', for expiry and pallet days
 //
 // WHAT THE 3D VIEW SHOWS, on top of the colour:
-//   - an area with a capacity is a glass frame with its stock as a solid
-//     block inside, as high as it is full; past full, a red cap rises
-//     out of the top. Shelf levels are lines on the walls.
+//   - an area with a capacity (and weights for all it holds) is a glass
+//     frame with its stock as a solid block inside, as high as it is
+//     full; past full, a red cap rises out of the top. Any other area
+//     with stock is glass with a stack per product inside, as tall as
+//     its quantity, so stock with no weight or no capacity still shows.
+//     Shelf levels are lines on the walls.
+//   - hovering a stack names the product and how much; a product search
+//     lights up its own stacks (matchProduct).
 //   - a badge floats over an area that needs someone (mapIndicators.js),
 //     pulsing when it is urgent, on a label with its name and figure.
 //   - packed pallets are coloured by their collection day; today's
@@ -46,11 +51,13 @@ import { fmtQty } from '@/lib/quantity';
 import {
   CELL, DEFAULT_CAMERA, DEFAULT_GRID, LEVEL_HEIGHT, TILT_RANGE, anchorAbove, areaBox, boxFaces, camera, clamp,
   drawOrder, floorGrid, floorOutline, holdsStock, isOpenable, isStaging, kindById, northBearing, palletBoxes,
-  planFocus, shadowPoints, shelfLines,
+  planFocus, productStacks, shadowPoints, shelfLines,
 } from './mapGeometry';
 import useMapZoom from './useMapZoom';
 import { TONES, fillTone } from './mapOverlays';
-import { BADGE_CLASS, alertsFor, badgeFor, figureOf, palletDue, palletLook } from './mapIndicators';
+import {
+  BADGE_CLASS, alertsFor, badgeFor, figureOf, heldText, palletDue, palletLook, stockLines, stockMode,
+} from './mapIndicators';
 import { cn } from '@/lib/utils';
 
 const FONT = 11;
@@ -83,7 +90,10 @@ const pressable = (area, onSelect) => (onSelect ? {
   className: 'cursor-pointer outline-none focus-visible:[&>*:first-child]:stroke-[3]',
 } : {});
 
-const hasCapacity = (area) => holdsStock(area) && Array.isArray(area.items) && area.fill !== null && area.fill !== undefined;
+// Stock with nothing to flag looks like goods, not like an empty grey box.
+const STACK_LOOK = { neutral: 'fill-chart-tan stroke-gold', empty: 'fill-chart-tan stroke-gold' };
+const fmtCount = (n) => Math.round(Number(n) || 0).toLocaleString('en-ZA');
+const matches = (item, q) => Boolean(q) && [item.name, item.sku].some((v) => v?.toLowerCase().includes(q));
 
 // A badge: a filled circle with a glyph, and a spreading ring when urgent.
 function Badge({ x, y, badge, r = 7 }) {
@@ -100,7 +110,7 @@ function Badge({ x, y, badge, r = 7 }) {
 }
 
 // ── Top view ──────────────────────────────────────────────────
-function TopArea({ area, tone, note, selected, dimmed, onSelect, label, badge, today }) {
+function TopArea({ area, tone, note, selected, dimmed, onSelect, label, badge, today, matchProduct }) {
   const t = TONES[tone] ?? TONES.neutral;
   const x = area.x * CELL;
   const y = area.y * CELL;
@@ -109,7 +119,12 @@ function TopArea({ area, tone, note, selected, dimmed, onSelect, label, badge, t
   const name = shorten(area.name, w);
   const showNote = note && h >= 2 * CELL && fits(note, w);
   const pallets = palletBoxes(area, area.pallets?.length ?? 0).filter((p) => p.z0 < 0.1);
-  const bar = hasCapacity(area) || (isStaging(area) && area.fill !== null && area.fill !== undefined);
+  const mode = stockMode(area);
+  const bar = mode === 'fill' || (isStaging(area) && area.fill !== null && area.fill !== undefined);
+  // No fill to show: a marker per product along the bottom instead, so an
+  // area holding stock never looks empty. Up to as many as fit.
+  const markers = mode === 'stacks' ? stockLines(area).slice(0, Math.max(Math.floor((w - 10) / 11), 0)) : [];
+  const q = matchProduct?.trim().toLowerCase() || '';
   return (
     <g {...pressable(area, onSelect)} aria-label={label} opacity={dimmed ? 0.3 : 1}>
       <rect
@@ -134,6 +149,17 @@ function TopArea({ area, tone, note, selected, dimmed, onSelect, label, badge, t
             x={x + 5} y={y + h - 8} width={Math.max((w - 10) * Math.min(area.fill, 1), 0)} height={3.5} rx={1.75}
             className={TONES[fillTone(area.fill)].solid}
           />
+        </g>
+      ) : null}
+      {markers.length ? (
+        <g className="pointer-events-none" aria-hidden="true">
+          {markers.map((m, i) => (
+            <rect
+              key={m.productId} x={x + 5 + i * 11} y={y + h - 13} width={9} height={9} rx={2}
+              className={matches(m, q) ? 'fill-info stroke-ink' : (STACK_LOOK[tone] ?? cn(t.solid, t.stroke))} strokeWidth={matches(m, q) ? 1.2 : 0.75}
+              opacity={q && !matches(m, q) ? 0.35 : (m.expected ? 0.6 : 1)}
+            />
+          ))}
         </g>
       ) : null}
       {name ? (
@@ -175,13 +201,15 @@ function Area3D({ box, view, s }) {
   const { area } = box;
   const t = TONES[s.tone] ?? TONES.neutral;
   const stroke = s.selected ? 2.5 : (s.hovered ? 1.8 : 1);
-  const glass = hasCapacity(area);
+  const mode = stockMode(area);
+  const glass = mode === 'fill' || (mode === 'stacks' && area.kind !== 'floor');
+  const stacks = mode === 'stacks' ? drawOrder(productStacks(area, stockLines(area)), view) : [];
   const H = box.z1;
   const inset = 0.1;
-  const inner = glass && area.fill > 0
+  const inner = mode === 'fill' && area.fill > 0
     ? { x: box.x + inset, y: box.y + inset, w: box.w - 2 * inset, h: box.h - 2 * inset, z0: 0, z1: Math.max(Math.min(area.fill, 1) * H, 0.03) }
     : null;
-  const cap = glass && area.fill > 1
+  const cap = mode === 'fill' && area.fill > 1
     ? { ...inner, z0: H, z1: H + Math.min(area.fill - 1, 0.6) * H }
     : null;
   const levels = (area.kind === 'dry' || area.kind === 'cold') ? Math.round(H / LEVEL_HEIGHT) : 0;
@@ -198,9 +226,31 @@ function Area3D({ box, view, s }) {
       onPointerMove={s.onHover}
       onPointerLeave={s.onLeave}
     >
+      {area.kind === 'floor' ? <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} /> : null}
+      {stacks.map((st) => {
+        const hit = matches(st.item, s.matchProduct);
+        return (
+          <g
+            key={st.id}
+            onPointerEnter={(e) => s.onHover(e, st.item)}
+            onPointerMove={(e) => s.onHover(e, st.item)}
+            opacity={s.matchProduct && !hit ? 0.35 : 1}
+          >
+            <title>{`${st.item.name}: ${fmtCount(st.item.about)} ${st.item.unit}`}</title>
+            <Box
+              faces={boxFaces(st, view)}
+              className={cn(hit ? 'fill-info stroke-ink' : (STACK_LOOK[s.tone] ?? cn(t.solid, t.stroke)), st.item.expected && !hit && 'opacity-60')}
+              strokeWidth={hit ? 1.5 : 0.6}
+              fillOpacity={0.95}
+            />
+          </g>
+        );
+      })}
       {inner ? <Box faces={boxFaces(inner, view)} className={cn(t.solid, t.stroke)} strokeWidth={0.75} fillOpacity={0.92} /> : null}
       {cap ? <Box faces={boxFaces(cap, view)} className="fill-danger stroke-danger" strokeWidth={0.75} fillOpacity={0.85} /> : null}
-      <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} fillOpacity={glass ? 0.3 : undefined} />
+      {area.kind === 'floor' ? null : (
+        <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} fillOpacity={glass ? (mode === 'stacks' ? 0.22 : 0.3) : undefined} />
+      )}
       {shelves.map((l) => (
         <line key={`${l.x1},${l.y1}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className={cn('pointer-events-none', t.stroke)} strokeWidth={0.75} strokeOpacity={0.6} />
       ))}
@@ -239,17 +289,19 @@ function Label3D({ box, view, s, showText }) {
 }
 
 // Everything about an area, by the pointer.
-function HoverCard({ area, at, today }) {
+function HoverCard({ area, at, today, stack }) {
   const alerts = alertsFor(area, { today, now: new Date() });
-  const products = Array.isArray(area.items) ? new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size : null;
+  const products = stockLines(area);
   const lines = [];
   if (isStaging(area)) {
     lines.push(`${area.pallets?.length ?? 0} packed pallet${area.pallets?.length === 1 ? '' : 's'}${area.palletSpaces ? ` of ${area.palletSpaces} spaces` : ''}`);
   } else if (holdsStock(area) && Array.isArray(area.items)) {
-    lines.push(area.capacityKg
-      ? `About ${fmtQty(Math.round(area.heldKg))} kg of ${fmtQty(area.capacityKg)} kg`
-      : `About ${fmtQty(Math.round(area.heldKg ?? 0))} kg held`);
-    lines.push(products ? `${products} product${products === 1 ? '' : 's'}` : 'Empty');
+    const held = heldText(area);
+    lines.push(held
+      ? (area.capacityKg ? `${held} · capacity ${fmtQty(area.capacityKg)} kg` : held)
+      : 'Empty');
+    if (!area.capacityKg) lines.push('No capacity set');
+    else if (area.unweighed > 0) lines.push('Some stock has no weight on record, so how full it is is not shown');
   }
   return (
     <div
@@ -259,7 +311,23 @@ function HoverCard({ area, at, today }) {
     >
       <p className="text-sm font-medium">{area.name}</p>
       <p className="text-muted-foreground">{kindById(area.kind).label}</p>
-      {lines.map((l) => <p key={l} className="mt-0.5">{l}</p>)}
+      {stack ? (
+        <p className="mt-1 rounded-md bg-info-soft px-2 py-1 font-medium text-info">
+          {stack.name}: {fmtCount(stack.about)} {stack.unit}{stack.expected ? ' (expected)' : ''}
+        </p>
+      ) : null}
+      {lines.map((l) => <p key={l} className={cn('mt-0.5', l === 'No capacity set' && 'text-muted-foreground')}>{l}</p>)}
+      {products.length && !isStaging(area) ? (
+        <ul className="mt-1 space-y-0.5">
+          {products.slice(0, 4).map((p) => (
+            <li key={p.productId} className="flex justify-between gap-2">
+              <span className="truncate">{p.name}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{fmtCount(p.about)} {p.unit}</span>
+            </li>
+          ))}
+          {products.length > 4 ? <li className="text-muted-foreground">and {products.length - 4} more</li> : null}
+        </ul>
+      ) : null}
       {alerts.length ? (
         <ul className="mt-1.5 space-y-0.5 border-t pt-1.5">
           {alerts.map((a) => (
@@ -310,7 +378,7 @@ function ZoomControls({ z }) {
   );
 }
 
-function ThreeD({ grid, areas, shared, title, className, today }) {
+function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) {
   const [cam, setCam] = useState(DEFAULT_CAMERA);
   const [showLabels, setShowLabels] = useState(true);
   const [spinning, setSpinning] = useState(false);
@@ -419,16 +487,19 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
     if (step && e.target === e.currentTarget) { e.preventDefault(); step(); }
   };
 
-  const hoverOn = (area) => (e) => {
+  // Over an area, or over one of its stacks (then the card names it).
+  const hoverOn = (area) => (e, stack = null) => {
     if (drag.current?.active) return;
+    e.stopPropagation?.();
     const box = wrapRef.current?.getBoundingClientRect();
     if (!box) return;
-    setHover({ id: area.id, x: e.clientX - box.left, y: e.clientY - box.top });
+    setHover({ id: area.id, x: e.clientX - box.left, y: e.clientY - box.top, stack });
   };
   const s3 = (area) => ({
     ...shared(area),
     hovered: hover?.id === area.id,
     onHover: hoverOn(area),
+    matchProduct: matchProduct?.trim().toLowerCase() || '',
     onLeave: () => setHover((h) => (h?.id === area.id ? null : h)),
   });
   const hovered = hover ? areas.find((a) => a.id === hover.id) : null;
@@ -472,7 +543,7 @@ function ThreeD({ grid, areas, shared, title, className, today }) {
         {labelled.map((box) => <Label3D key={`label-${box.area.id}`} box={box} view={view} s={s3(box.area)} showText={showLabels} />)}
       </svg>
 
-      {hovered ? <HoverCard area={hovered} at={hover} today={today} /> : null}
+      {hovered ? <HoverCard area={hovered} at={hover} today={today} stack={hover.stack} /> : null}
 
       <div className="absolute bottom-2 left-2"><Compass bearing={northBearing(view)} /></div>
       <ZoomControls z={z} />
@@ -513,6 +584,7 @@ export default function WarehouseMap({
   title = 'Warehouse map',
   className,
   today = null,
+  matchProduct = '',
 }) {
   const ctx = { today, now: new Date() };
   const labelOf = (area) => {
@@ -530,14 +602,14 @@ export default function WarehouseMap({
   });
 
   if (view === '3d') {
-    return <ThreeD grid={grid} areas={areas} shared={shared} title={title} className={className} today={today} />;
+    return <ThreeD grid={grid} areas={areas} shared={shared} title={title} className={className} today={today} matchProduct={matchProduct} />;
   }
 
-  return <TopView grid={grid} areas={areas} shared={shared} noteOf={noteOf} title={title} className={className} today={today} />;
+  return <TopView grid={grid} areas={areas} shared={shared} noteOf={noteOf} title={title} className={className} today={today} matchProduct={matchProduct} />;
 }
 
 // The plan from above, fitted to what is drawn with a square of room round it.
-function TopView({ grid, areas, shared, noteOf, title, className, today }) {
+function TopView({ grid, areas, shared, noteOf, title, className, today, matchProduct }) {
   const svgRef = useRef(null);
   const width = grid.cols * CELL;
   const height = grid.rows * CELL;
@@ -579,7 +651,7 @@ function TopView({ grid, areas, shared, noteOf, title, className, today }) {
       </defs>
       <rect width={width} height={height} className="fill-surface-2" />
       <rect width={width} height={height} fill="url(#wm-grid)" />
-      {areas.map((area) => <TopArea key={area.id} {...shared(area)} note={noteOf?.(area)} today={today} />)}
+      {areas.map((area) => <TopArea key={area.id} {...shared(area)} note={noteOf?.(area)} today={today} matchProduct={matchProduct} />)}
       </svg>
       <ZoomControls z={z} />
     </div>

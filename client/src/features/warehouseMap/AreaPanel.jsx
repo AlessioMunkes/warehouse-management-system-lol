@@ -157,6 +157,7 @@ export default function AreaPanel({
   canAdjust = false,
   onCount,
   onAdjust,
+  onFind,
   onClose,
 }) {
   if (!area) {
@@ -171,7 +172,9 @@ export default function AreaPanel({
             {rows.map((p) => (
               <li key={p.id} className="px-3 py-2">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate text-sm font-medium">{p.name}</span>
+                  {onFind ? (
+                    <button type="button" className="min-w-0 truncate text-left text-sm font-medium hover:underline" title="Show where it is on the map" onClick={() => onFind(p.name)}>{p.name}</button>
+                  ) : <span className="min-w-0 truncate text-sm font-medium">{p.name}</span>}
                   <span className="shrink-0 text-sm tabular-nums">{fmtQtyUnit(p.unplaced, p.unit)}</span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -229,7 +232,9 @@ export default function AreaPanel({
             return (
               <li key={`${i.productId}-${i.source}`} className="px-3 py-2">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate text-sm font-medium">{i.name}</span>
+                  {onFind ? (
+                    <button type="button" className="min-w-0 truncate text-left text-sm font-medium hover:underline" title="Show where it is on the map" onClick={() => onFind(i.name)}>{i.name}</button>
+                  ) : <span className="min-w-0 truncate text-sm font-medium">{i.name}</span>}
                   <span className="shrink-0 text-sm tabular-nums">
                     {i.scaled || !counted ? `about ${fmtQtyUnit(i.about, i.unit)}` : fmtQtyUnit(i.about, i.unit)}
                   </span>

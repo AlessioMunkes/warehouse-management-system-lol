@@ -41,7 +41,7 @@ import CountAreaDialog from './CountAreaDialog';
 import CapacitySummary from './CapacitySummary';
 import { holdsStock, isOpenable, isStaging } from './mapGeometry';
 import { OVERLAYS, TONES, areasMatching, legendFor, percent, programmeTones, toneFor } from './mapOverlays';
-import { BADGE_CLASS, PALLET_DUE, badgeFor } from './mapIndicators';
+import { BADGE_CLASS, PALLET_DUE, badgeFor, stockLines, stockMode } from './mapIndicators';
 
 const REFRESH_MS = 60_000;
 const UNPLACED = 'unplaced';
@@ -54,8 +54,13 @@ const areaNote = (area) => {
     return [n === 0 ? 'No pallets' : `${n} pallet${n === 1 ? '' : 's'}`, full].filter(Boolean).join(' · ');
   }
   if (!holdsStock(area)) return null;
-  const n = new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size;
-  return [n === 0 ? 'Empty' : `${n} product${n === 1 ? '' : 's'}`, full].filter(Boolean).join(' · ');
+  // One product: how much of it (500 each); more: how many. The fill
+  // only where it means something (stockMode 'fill').
+  const lines = stockLines(area);
+  const held = lines.length === 0 ? 'Empty'
+    : lines.length === 1 ? `${Math.round(lines[0].about).toLocaleString('en-ZA')} ${lines[0].unit ?? ''}`.trim()
+      : `${lines.length} products`;
+  return [held, stockMode(area) === 'fill' ? full : null].filter(Boolean).join(' · ');
 };
 
 // What the marks on the map mean, whatever it is coloured by.
@@ -84,7 +89,9 @@ function MarksLegend({ view, hasPallets }) {
           {p.label}
         </li>
       )) : null}
-      {view === '3d' ? <li>Solid block: stock against capacity. Red top: over capacity.</li> : <li>Bar: how full the area is.</li>}
+      {view === '3d'
+        ? <li>Solid block: stock against capacity. Red top: over capacity. Stacks: each product, where no capacity is set or a weight is missing.</li>
+        : <li>Bar: how full the area is. Squares: each product, where no capacity is set or a weight is missing.</li>}
     </ul>
   );
 }
@@ -252,6 +259,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
       <div className="overflow-hidden rounded-xl border bg-card p-2">
         <WarehouseMap
           today={map.today}
+          matchProduct={query}
           grid={map.grid}
           areas={areas}
           view={view}
@@ -274,6 +282,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           unstagedPallets={map.unstagedPallets ?? []}
           productsById={productsById}
           today={map.today}
+          onFind={(name) => { setQuery(name); setAttentionOnly(false); }}
           onClose={() => setOpenId(null)}
         />
       ) : null}
@@ -288,6 +297,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           canAdjust={canAdjust}
           onCount={() => setCounting(true)}
           onAdjust={(productId) => onAdjust?.(productId)}
+          onFind={(name) => { setQuery(name); setAttentionOnly(false); }}
           onClose={() => setOpenId(null)}
         />
       ) : null}

@@ -89,9 +89,11 @@ export const figureOf = (area) => {
     return area.palletSpaces ? `${n}/${area.palletSpaces}` : plural(n, 'pallet');
   }
   if (!holdsStock(area) || !Array.isArray(area.items)) return null;
-  if (area.fill !== null && area.fill !== undefined) return percent(area.fill);
-  const n = new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size;
-  return n ? plural(n, 'product') : 'Empty';
+  if (area.fill !== null && area.fill !== undefined && !(area.unweighed > 0)) return percent(area.fill);
+  const lines = stockLines(area);
+  if (lines.length === 0) return 'Empty';
+  // One product: how much of it. More: how many.
+  return lines.length === 1 ? `${Math.round(lines[0].about).toLocaleString('en-ZA')} ${lines[0].unit ?? ''}`.trim() : plural(lines.length, 'product');
 };
 
 export const BADGE_CLASS = {
@@ -99,4 +101,51 @@ export const BADGE_CLASS = {
   warn:  { fill: 'fill-warn', text: 'fill-white' },
   info:  { fill: 'fill-info', text: 'fill-white' },
   muted: { fill: 'fill-ink-soft', text: 'fill-white' },
+};
+
+// ── What an area holds, in words ──────────────────────────────
+const fmt = (n) => Math.round(Number(n) || 0).toLocaleString('en-ZA');
+
+/** The products an area holds, one line each, counted and expected together, most first. */
+export const stockLines = (area) => {
+  if (!Array.isArray(area.items)) return [];
+  const byProduct = new Map();
+  for (const i of area.items.filter((x) => x.about > 0)) {
+    const m = byProduct.get(i.productId);
+    byProduct.set(i.productId, m ? { ...m, about: m.about + i.about, expected: m.expected || i.source === 'expected' } : { ...i, expected: i.source === 'expected' });
+  }
+  return [...byProduct.values()].sort((a, b) => b.about - a.about);
+};
+
+/**
+ * "About 900 kg", "500 each", "About 120 kg and 500 each": the weight
+ * where it is known, and the rest in its own units, so stock with no
+ * weight on record never reads as nothing. '' for an empty area.
+ */
+export const heldText = (area) => {
+  const lines = stockLines(area);
+  if (lines.length === 0) return '';
+  const kg = lines.reduce((s, l) => s + (l.kg ?? 0), 0);
+  const other = new Map();
+  for (const l of lines.filter((x) => x.kg === null || x.kg === undefined)) {
+    other.set(l.unit || 'units', (other.get(l.unit || 'units') ?? 0) + l.about);
+  }
+  const parts = [];
+  if (kg > 0) parts.push(`About ${fmt(kg)} kg`);
+  for (const [unit, n] of other) parts.push(`${fmt(n)} ${unit}`);
+  return parts.join(' and ');
+};
+
+/**
+ * How an area's stock is drawn in 3D:
+ *   'fill'    a capacity, and every product's weight known: one block,
+ *             as high as the area is full
+ *   'stacks'  otherwise, when it holds anything: a stack per product
+ *   'none'    nothing in it (or no stock figures, as in the builder)
+ */
+export const stockMode = (area) => {
+  if (!holdsStock(area) || !Array.isArray(area.items)) return 'none';
+  const stocked = area.items.some((i) => i.about > 0);
+  if (area.fill !== null && area.fill !== undefined && !(area.unweighed > 0)) return 'fill';
+  return stocked ? 'stacks' : 'none';
 };

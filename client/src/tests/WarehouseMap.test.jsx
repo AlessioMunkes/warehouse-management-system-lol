@@ -11,9 +11,10 @@ import { render, screen, within, waitFor, fireEvent } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import {
   DEFAULT_CAMERA, boxFaces, camera, drawOrder, freeSpot, keepOnGrid, nextName, overlapping, palletBoxes,
+  productStacks,
 } from '../features/warehouseMap/mapGeometry';
 import { areasMatching, countedWhen, fillTone, legendFor, toneFor } from '../features/warehouseMap/mapOverlays';
-import { alertsFor, badgeFor, figureOf, palletDue } from '../features/warehouseMap/mapIndicators';
+import { alertsFor, badgeFor, figureOf, heldText, palletDue, stockMode } from '../features/warehouseMap/mapIndicators';
 import { zoomAbout, zoomedBox } from '../features/warehouseMap/useMapZoom';
 
 vi.mock('../services/warehouseMapAPI', () => ({
@@ -334,7 +335,10 @@ describe('mapIndicators', () => {
 
   it('labels an area with how full it is, or what it holds', () => {
     expect(figureOf({ kind: 'dry', fill: 0.456, items: [] })).toBe('46%');
-    expect(figureOf({ kind: 'cold', fill: null, items: [{ productId: 1, about: 2 }, { productId: 1, about: 1 }] })).toBe('1 product');
+    expect(figureOf({ kind: 'cold', fill: null, items: [{ productId: 1, about: 2, unit: 'each' }, { productId: 1, about: 1, unit: 'each' }] })).toBe('3 each');
+    expect(figureOf({ kind: 'cold', fill: null, items: [{ productId: 1, about: 2 }, { productId: 2, about: 1 }] })).toBe('2 products');
+    // A capacity is no use for stock with no weight: say what it holds instead.
+    expect(figureOf({ kind: 'dry', fill: 0, unweighed: 1, items: [{ productId: 1, about: 500, unit: 'each', kg: null }] })).toBe('500 each');
     expect(figureOf({ kind: 'door' })).toBeNull();
   });
 });
@@ -349,7 +353,7 @@ describe('the 3D marks', () => {
     const store = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
     expect(store.querySelectorAll('polygon.fill-danger').length).toBeGreaterThan(0);
     expect(store.getAttribute('aria-label')).toMatch(/Over capacity: 140% full/);
-    expect(screen.getByText('Solid block: stock against capacity. Red top: over capacity.')).toBeInTheDocument();
+    expect(screen.getByText(/Solid block: stock against capacity. Red top: over capacity. Stacks: each product/)).toBeInTheDocument();
   });
 
   it('lights up the areas that need attention', async () => {
@@ -423,5 +427,69 @@ describe('the area panel marks', () => {
     expect(within(rows[1]).getByText('Collected today')).toBeInTheDocument();
     expect(panel.getByText('1 pallet past the collection day')).toBeInTheDocument();
     expect(panel.getByText('1 pallet to be collected today')).toBeInTheDocument();
+  });
+});
+
+// ── Stock with no weight or no capacity still shows ───────────
+describe('stock with no weight or capacity', () => {
+  const beans = { productId: 1265, name: 'Baked Beans', sku: 'BB', unit: 'each', about: 500, kg: null, source: 'counted', counted: 500, scaled: false, countedAt: '2026-10-18T08:00:00Z' };
+  const store = { ...MAP.areas[0], name: 'Dry store 1', capacityKg: null, fill: null, heldKg: 0, unweighed: 1, items: [beans] };
+
+  it('says what an area holds in its own units, never 0 kg', () => {
+    expect(heldText(store)).toBe('500 each');
+    expect(heldText({ items: [{ ...beans, productId: 2, unit: 'kg', about: 120, kg: 120 }, beans] })).toBe('About 120 kg and 500 each');
+    expect(stockMode(store)).toBe('stacks');
+    expect(stockMode({ ...store, fill: 0.4, unweighed: 0 })).toBe('fill');
+    expect(stockMode({ ...store, items: [] })).toBe('none');
+  });
+
+  it('lays out a stack per product, taller for more', () => {
+    const stacks = productStacks({ id: 1, kind: 'dry', x: 0, y: 0, w: 10, h: 4, levels: 2 }, [
+      { productId: 1, about: 5 }, { productId: 2, about: 5000 }, { productId: 1, about: 3 },
+    ]);
+    expect(stacks).toHaveLength(2);
+    expect(stacks[0].item).toMatchObject({ productId: 2 });
+    expect(stacks[0].z1).toBeGreaterThan(stacks[1].z1);
+    expect(stacks[1].item.about).toBe(8);
+  });
+
+  it('draws the beans as a stack in 3D, names them on hover and lights them on search', async () => {
+    const user = userEvent.setup();
+    getWarehouseMap.mockResolvedValue({ ...MAP, areas: [store, ...MAP.areas.slice(1)] });
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const area = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
+    const title = [...area.querySelectorAll('title')].map((t) => t.textContent);
+    expect(title).toContain('Baked Beans: 500 each');
+    expect(area.getAttribute('aria-label')).toMatch(/500 each/);
+    await user.type(screen.getByRole('searchbox', { name: /Find a product/ }), 'beans');
+    expect(area.querySelector('polygon.fill-info')).not.toBeNull();
+  });
+
+  it('shows the beans in the capacity summary, and asks for a capacity', async () => {
+    getWarehouseMap.mockResolvedValue({
+      ...MAP,
+      areas: [store, ...MAP.areas.slice(1)].map((a) => ({ ...a, capacityKg: null, palletSpaces: null, fill: null })),
+      totals: { ...MAP.totals, storage: { heldKg: 0, heldInSizedKg: 0, capacityKg: null, unweighed: 1 } },
+    });
+    render(<WarehouseMapTab />);
+    const meter = await screen.findByRole('meter', { name: 'Dry store 1' });
+    expect(meter.closest('button')).toHaveTextContent('500 each');
+    expect(meter).toHaveAttribute('title', 'No capacity set');
+    expect(screen.getByText(/Dashed bars have no capacity set/)).toBeInTheDocument();
+    expect(screen.getByText(/shown in its own units/)).toBeInTheDocument();
+  });
+});
+
+describe('finding a product from its area', () => {
+  it('lights up where a product is when its name is chosen in the panel', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    await user.click(panel.getByRole('button', { name: 'Rice' }));
+    // Behind the panel, which is modal on a narrow screen.
+    expect(screen.getByRole('searchbox', { name: /Find a product/, hidden: true })).toHaveValue('Rice');
+    expect(screen.getByRole('button', { name: /^Cold room 1, Cold room/, hidden: true })).toHaveAttribute('opacity', '0.3');
   });
 });

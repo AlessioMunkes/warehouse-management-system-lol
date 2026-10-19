@@ -7,7 +7,7 @@
 // database.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { placeStock, weightKg } from '../src/features/warehouseMap/placement.js';
+import { placeStock, sizeInName, weightKg } from '../src/features/warehouseMap/placement.js';
 import { checkLayout } from '../src/features/warehouseMap/layout.js';
 
 const area = (id, extra = {}) => ({ id, name: `Area ${id}`, kind: 'dry', x: id * 5, y: 0, w: 4, h: 3, levels: 1, ...extra });
@@ -153,6 +153,15 @@ describe('weightKg', () => {
     expect(weightKg({ unit: 'l' }, 3)).toBe(3);
     expect(weightKg({ unit: 'each', weightKg: 0.4 }, 10)).toBe(4);
     expect(weightKg({ unit: 'each' }, 10)).toBeNull();
+  });
+
+  it('reads a size from the name when an item has no weight', () => {
+    expect(sizeInName('Canned Baked Beans 410g')).toBeCloseTo(0.41, 6);
+    expect(sizeInName('Cooking oil 2L')).toBe(2);
+    expect(sizeInName('Rice 2,5 kg')).toBe(2.5);
+    expect(sizeInName('Baked Beans')).toBeNull();
+    expect(weightKg({ unit: 'each', name: 'Pilchards 400g' }, 10)).toBeCloseTo(4, 6);
+    expect(weightKg({ unit: 'each', name: 'Baked Beans' }, 10)).toBeNull();
   });
 });
 
