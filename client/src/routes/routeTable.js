@@ -39,7 +39,7 @@
 // weight for.
 import {
   Archive, Bank, Basket, BowlFood, CalendarDots, ChartBar, ChatCircleText,
-  ClipboardText, Flask, Gear, Gift, HandCoins, HandHeart, MapTrifold, Package, PhoneCall, Plant,
+  ClipboardText, Flask, Gear, Gift, HandCoins, HandHeart, MapPin, MapPinArea, MapTrifold, Package, PhoneCall, Plant,
   Pulse, Receipt, Scroll, ShoppingCart, SquaresFour, Storefront, Tray, TrayArrowDown,
   Truck, UsersThree, Warehouse,
 } from '@phosphor-icons/react';
@@ -149,6 +149,8 @@ export const ROUTES = [
     nav: [nav('manager', 'Insights', 'Operations reports', ChartBar)] },
   { id: 'impactReport', path: STAFF.impactReport, roles: MANAGER_ONLY, shell: true,
     nav: [nav('manager', 'Insights', 'Impact report', BowlFood)] },
+  { id: 'impactMap', path: STAFF.impactMap, roles: MANAGER_ONLY, shell: true,
+    nav: [nav('manager', 'Insights', 'Impact map', MapPin)] },
 
   // ── Admin ──────────────────────────────────────────────────
   { id: 'users', path: ADMIN.users, roles: ADMIN_ONLY, shell: true,
@@ -157,6 +159,9 @@ export const ROUTES = [
     nav: [nav('admin', 'Master data', 'Products', Basket)] },
   { id: 'suppliers', path: ADMIN.suppliers, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Master data', 'Suppliers', Storefront)] },
+  // Where each centre is; the manager sees them on the Impact map.
+  { id: 'centreLocations', path: ADMIN.centreLocations, roles: ADMIN_ONLY, shell: true,
+    nav: [nav('admin', 'Master data', 'Centre locations', MapPinArea)] },
   // Staff activity and the door sign-in log. Managers use Volunteer
   // Events instead.
   { id: 'activityLog', path: ADMIN.activityLog, roles: ADMIN_ONLY, shell: true,

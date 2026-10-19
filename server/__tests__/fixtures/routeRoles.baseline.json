@@ -287,5 +287,8 @@
   "volunteer.routes.js POST /:id/sign-out": "admin,manager",
   "warehouseMap.routes.js GET /": "admin,manager",
   "warehouseMap.routes.js PUT /layout": "admin",
-  "warehouseMap.routes.js POST /areas/:id/counts": "admin,manager"
+  "warehouseMap.routes.js POST /areas/:id/counts": "admin,manager",
+  "impactMap.routes.js GET /": "admin,manager",
+  "centreLocation.routes.js GET /": "admin",
+  "centreLocation.routes.js PATCH /:id": "admin"
 }

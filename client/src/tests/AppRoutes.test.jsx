@@ -97,7 +97,7 @@ describe('sidebars built from the table', () => {
         'Benevolent requests /noc/community-requests',
       ]],
       ['Programmes', ['Feed the Soil /noc/feed-the-soil', 'Volunteer events /volunteers']],
-      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report']],
+      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report', 'Impact map /noc/impact-map']],
     ]);
   });
 
@@ -108,6 +108,7 @@ describe('sidebars built from the table', () => {
         'Users /admin/users',
         'Products /admin/products',
         'Suppliers /admin/suppliers',
+        'Centre locations /admin/centre-locations',
       ]],
       ['Logs', [
         'Activity log /admin/activity-log', 'Archive /admin/archive',

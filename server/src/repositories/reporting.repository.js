@@ -82,7 +82,9 @@ function sortWeekdays(series) {
 // left today, the report said nothing until the booked day arrived.
 // Reports about the planned cycle (compliance, missed and late
 // collections, packing) still go by the booked day: `ps.dispatch_date`.
-const LEFT_DAY = `COALESCE(${sastDate('de.collected_at')}, ps.dispatch_date)`;
+// Exported so the Impact map (impactMap.repository.js) dates a collection
+// the same way every report does.
+export const LEFT_DAY = `COALESCE(${sastDate('de.collected_at')}, ps.dispatch_date)`;
 
 const slipDimension = (dimension, day = 'ps.dispatch_date') => {
   switch (dimension) {

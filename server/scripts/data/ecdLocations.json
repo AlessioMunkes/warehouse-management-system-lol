@@ -1,0 +1,281 @@
+[
+  {
+    "name": "Footsteps",
+    "address": "45 Aloe Street",
+    "suburb": "Racing Park",
+    "lat": -33.817415,
+    "lng": 18.540577,
+    "precision": "exact",
+    "note": "OpenStreetMap way/911636975 \"Footsteps Educare\""
+  },
+  {
+    "name": "Fountain of Love Educare",
+    "address": "Nxala Street",
+    "suburb": "Endlovini",
+    "lat": -34.065422,
+    "lng": 18.688,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9490108477 \"Fountain of Love\""
+  },
+  {
+    "name": "Green Pastures",
+    "address": "Gamka Street",
+    "suburb": "Primrose Park",
+    "lat": -33.977292,
+    "lng": 18.554505,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9485765332 \"Green Pastures Educare\""
+  },
+  {
+    "name": "Inkwenkwezi",
+    "address": "Terminus Road",
+    "suburb": null,
+    "lat": -33.992571,
+    "lng": 18.581171,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9490024388 \"Inkwenkwezi Educare\""
+  },
+  {
+    "name": "Ithemba",
+    "address": "Diya Street",
+    "suburb": "Harare",
+    "lat": -34.058699,
+    "lng": 18.677702,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9490187105 \"Ithemba Educare\""
+  },
+  {
+    "name": "Khanya Educare",
+    "address": "J. Makateng Street",
+    "suburb": "Nyanga",
+    "lat": -33.990128,
+    "lng": 18.579494,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9489980583 \"Khanya Educare Centre\""
+  },
+  {
+    "name": "Little Penguins",
+    "address": "Market Street",
+    "suburb": "Klipkop",
+    "lat": -33.911723,
+    "lng": 18.598874,
+    "precision": "exact",
+    "note": "OpenStreetMap node/4477729949 \"Little Penguins Day Care Centre\""
+  },
+  {
+    "name": "Masonwabe",
+    "address": "Settlers Way",
+    "suburb": null,
+    "lat": -33.977363,
+    "lng": 18.58033,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9489601119 \"Masonwabe Educare center\""
+  },
+  {
+    "name": "Melokuhle Educare",
+    "address": "Swartklip Road",
+    "suburb": "Endlovini",
+    "lat": -34.066376,
+    "lng": 18.668155,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9490308281 \"Melokuhle educare\""
+  },
+  {
+    "name": "Onethemba Daycare",
+    "address": "Nqico Walk",
+    "suburb": null,
+    "lat": -33.965384,
+    "lng": 18.567127,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9489070193 \"Onethemba\""
+  },
+  {
+    "name": "Takalani Educare",
+    "address": "Groenall A Walk",
+    "suburb": "Hanover Park",
+    "lat": -33.998099,
+    "lng": 18.529919,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9473799234 \"Takalani\""
+  },
+  {
+    "name": "Toddlers Corner",
+    "address": "Manenberg Avenue",
+    "suburb": "Manenberg",
+    "lat": -33.998243,
+    "lng": 18.554101,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9486049107 \"Toddlers corner educare\""
+  },
+  {
+    "name": "UPC Sunshine Corner Educare",
+    "address": "Rio Grande Walk",
+    "suburb": "Primrose Park",
+    "lat": -33.991735,
+    "lng": 18.551253,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9486011079 \"UPC Sunshine Corner\""
+  },
+  {
+    "name": "Victory Educare",
+    "address": "Mew Way",
+    "suburb": "Harare",
+    "lat": -34.061817,
+    "lng": 18.667888,
+    "precision": "exact",
+    "note": "OpenStreetMap node/9490318183 \"Victory Educare\""
+  },
+  {
+    "name": "Blooming Stars Educare",
+    "address": "85 Ingqura Street",
+    "suburb": "Mfuleni",
+    "lat": -33.992662,
+    "lng": 18.669585,
+    "precision": "street",
+    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Blooming Stars Educare Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+  },
+  {
+    "name": "Imbasa Educare",
+    "address": "66 Qhwayela Crescent",
+    "suburb": "Umrhabulo Triangle, Khayelitsha",
+    "lat": -34.039438,
+    "lng": 18.696831,
+    "precision": "street",
+    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Imbasa Educare Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+  },
+  {
+    "name": "Nantes Educare Centre",
+    "address": "2 Excelsior Street",
+    "suburb": "Highbury, Kuils River",
+    "lat": -33.948863,
+    "lng": 18.678427,
+    "precision": "street",
+    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Nantes Ecd Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+  },
+  {
+    "name": "Nomonde Pre-School",
+    "address": "63A Victoria Road",
+    "suburb": "Camps Bay",
+    "lat": -33.946163,
+    "lng": 18.378738,
+    "precision": "street",
+    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Nomonde Pre-school\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+  },
+  {
+    "name": "Nosizwe Educare",
+    "address": "17 Gordon Road",
+    "suburb": "Heathfield",
+    "lat": -34.047259,
+    "lng": 18.467762,
+    "precision": "street",
+    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Nosizwe Educare Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+  },
+  {
+    "name": "Qhamani Educare",
+    "address": "48A Solomon Tshuku Avenue",
+    "suburb": "Mxolisi Phetani, Khayelitsha",
+    "lat": -34.013212,
+    "lng": 18.645934,
+    "precision": "street",
+    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Qhamani Ecd\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+  },
+  {
+    "name": "Wings of Hope",
+    "address": "37 Siyabonga Street",
+    "suburb": "Dunoon",
+    "lat": -33.81731,
+    "lng": 18.538424,
+    "precision": "suburb",
+    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Wings of Hope\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+  },
+  {
+    "name": "Baphumelela",
+    "address": "Z 118 Dabula Street, Site B",
+    "suburb": "Khayelitsha",
+    "lat": -34.041646,
+    "lng": 18.708175,
+    "precision": "suburb",
+    "note": "Address of Baphumelele Children's Home, Western Cape Government facility directory; the educare runs on the same site."
+  },
+  {
+    "name": "Blackheath ECD",
+    "address": null,
+    "suburb": "Blackheath, Kuils River",
+    "lat": -33.958333,
+    "lng": 18.702778,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Delft Little Star",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Delft Pooh Bear",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Harare Kids",
+    "address": null,
+    "suburb": "Harare, Khayelitsha",
+    "lat": -34.057685,
+    "lng": 18.673492,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Harare Little Flower",
+    "address": null,
+    "suburb": "Harare, Khayelitsha",
+    "lat": -34.057685,
+    "lng": 18.673492,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Manenberg Kiddies Academy",
+    "address": null,
+    "suburb": "Manenberg",
+    "lat": -33.989722,
+    "lng": 18.554444,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Sunflower Educare (Langa)",
+    "address": null,
+    "suburb": "Langa",
+    "lat": -33.945556,
+    "lng": 18.53,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Twinkle Star - Lavender Hill",
+    "address": null,
+    "suburb": "Lavender Hill",
+    "lat": -34.073611,
+    "lng": 18.483333,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Little Angels( Hout Bay Assembly)",
+    "address": null,
+    "suburb": "Hout Bay",
+    "lat": -34.015847,
+    "lng": 18.382607,
+    "precision": "suburb",
+    "note": "Suburb taken from the centre's name."
+  }
+]

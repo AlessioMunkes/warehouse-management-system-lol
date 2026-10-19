@@ -47,6 +47,8 @@ export const STAFF = {
   reporting: '/noc/reporting',
   donation:  DONATIONS_NEW,
   impactReport: '/noc/impact-report',
+  // Centres on a map, sized by meals enabled; the not-served list beside it.
+  impactMap: '/noc/impact-map',
   purchaseOrders: '/noc/purchase-orders',
   // Past delivery notes and dispatch notes.
   receipts: '/noc/receipts',
@@ -118,5 +120,7 @@ export const ADMIN = {
   archive:  '/admin/archive',
   // The floor plan managers count stock into on Inventory's Map tab.
   warehouseLayout: '/admin/warehouse-layout',
+  // Where each centre is, for the manager's Impact map.
+  centreLocations: '/admin/centre-locations',
 };
 

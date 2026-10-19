@@ -150,6 +150,7 @@ const MANAGER = [
     steps: [
       'Operations reports chart dispatch, spend, wastage and collection over a period, and can be saved and exported.',
       'The impact report turns the same data into figures for funders, and can be printed as a PDF.',
+      'The impact map shows each centre as a circle sized by meals enabled in the period, grey where nothing reached it. The list beside it is the active centres not served, longest waiting first.',
     ] },
   { title: 'Donations',
     steps: [
@@ -189,6 +190,11 @@ const ADMIN = [
       'Add a supplier with its contact details and the products it supplies.',
       'A purchase order can only include products its supplier is listed as supplying.',
       'Deactivate a supplier to stop new orders. Existing orders keep their history.',
+    ] },
+  { title: 'Centre locations',
+    steps: [
+      'Open a centre, type its address and suburb, then click the map where it is or choose Find. Drag the pin to correct it, then save.',
+      'Needs a location lists the active centres not yet on the Impact map. Suburb only lists pins at the middle of a suburb, worth checking.',
     ] },
   { title: 'Warehouse layout',
     steps: [

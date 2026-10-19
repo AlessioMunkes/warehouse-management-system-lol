@@ -75,6 +75,8 @@ import calendarRouter from './src/routes/calendar.routes.js';
 import recipeRouter from './src/routes/recipe.routes.js';
 import photoRouter from './src/routes/photo.routes.js';
 import warehouseMapRouter from './src/routes/warehouseMap.routes.js';
+import impactMapRouter from './src/routes/impactMap.routes.js';
+import centreLocationRouter from './src/routes/centreLocation.routes.js';
 import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
@@ -256,6 +258,9 @@ app.use('/api/recipes', recipeRouter);
 app.use('/api/photos', photoRouter);
 // The floor plan and the counts managers record into it.
 app.use('/api/warehouse-map', warehouseMapRouter);
+// Where each centre is, and what reached it.
+app.use('/api/impact-map', impactMapRouter);
+app.use('/api/centre-locations', centreLocationRouter);
 app.use('/api/public/warehouses', publicWarehousesRouter);
 app.use('/api/public',      publicImpactRouter);
 
