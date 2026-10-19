@@ -1903,6 +1903,28 @@ color:white;
     :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton))::before { animation: none; }
   }
 }
+/* The warehouse map's attention marks (features/warehouseMap/): a ring
+   that spreads from an urgent badge, and a packed pallet due today that
+   breathes. Both stop under Reduce movement and the system setting. */
+@keyframes wm-ping {
+  from { transform: scale(1); opacity: 0.55; }
+  to   { transform: scale(2.4); opacity: 0; }
+}
+@keyframes wm-breathe {
+  50% { opacity: 0.55; }
+}
+.wm-ping { transform-box: fill-box; transform-origin: center; animation: wm-ping 1.6s ease-out infinite; }
+.wm-breathe { animation: wm-breathe 1.8s ease-in-out infinite; }
+.wm-lift { transition: transform 160ms ease-out; }
+[data-stf-motion="reduced"] :is(.wm-ping, .wm-breathe) { animation: none; }
+[data-stf-motion="reduced"] .wm-ping { opacity: 0; }
+[data-stf-motion="reduced"] .wm-lift { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .wm-ping { animation: none; opacity: 0; }
+  .wm-breathe { animation: none; }
+  .wm-lift { transition: none; }
+}
+
 @keyframes loading-ring-turn {
   to { transform: rotate(360deg); }
 }

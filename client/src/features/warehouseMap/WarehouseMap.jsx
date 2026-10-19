@@ -4,10 +4,9 @@
 // The floor plan, drawn: every area a shape coloured by the tone it is
 // given, in the top view or the 3D view (mapGeometry.js has the
 // arithmetic for both). Hand-drawn SVG, like the process map on
-// Operations reports. Packed pallets stand in staging areas as small
-// boxes in 3D and small squares from the top.
+// Operations reports: no 3D library, nothing extra to download.
 //
-//   areas       [{ id, name, kind, x, y, w, h, levels, pallets?, ... }]
+//   areas       [{ id, name, kind, x, y, w, h, levels, pallets?, fill?, ... }]
 //   view        'top' | '3d'
 //   toneOf      (area) => a tone name from mapOverlays.js TONES
 //   noteOf      (area) => a short second line ("3 products"), optional
@@ -16,26 +15,48 @@
 //               when nothing is being searched for.
 //   onSelect    (area) => void; makes each area but a door a button.
 //               Leave it off for a picture only.
+//   today       the server's 'YYYY-MM-DD', for expiry and pallet days
 //
-// TURNING THE 3D VIEW. Drag across it to turn the floor round, drag up
-// or down to look from higher or lower. The buttons turn it a quarter
-// at a time and put it back, and the arrow keys do the same once the
-// view has focus. A drag never counts as choosing an area.
+// WHAT THE 3D VIEW SHOWS, on top of the colour:
+//   - an area with a capacity is a glass frame with its stock as a solid
+//     block inside, as high as it is full; past full, a red cap rises
+//     out of the top. Shelf levels are lines on the walls.
+//   - a badge floats over an area that needs someone (mapIndicators.js),
+//     pulsing when it is urgent, on a label with its name and figure.
+//   - packed pallets are coloured by their collection day; today's
+//     breathe.
+//   - shadows and a floor grid for depth, a compass that turns with the
+//     view, and a card on hover with everything about the area.
+//
+// TURNING IT. Drag across it to turn the floor round, up or down to look
+// from higher or lower. The buttons turn it a quarter at a time, put it
+// back, or set it turning slowly by itself; the arrow keys turn it once
+// the view has focus. A drag never counts as choosing an area. Under
+// Reduce movement every turn is instant and there is no slow turning.
 // ─────────────────────────────────────────────────────────────
-import { useMemo, useRef, useState } from 'react';
-import { RotateCcw, RotateCw, Undo2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pause, Play, RotateCcw, RotateCw, Tags, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { fmtQty } from '@/lib/quantity';
 import {
-  CELL, DEFAULT_CAMERA, DEFAULT_GRID, TILT_RANGE, areaBox, boxFaces, camera, clamp, drawOrder,
-  floorOutline, isOpenable, kindById, palletBoxes,
+  CELL, DEFAULT_CAMERA, DEFAULT_GRID, LEVEL_HEIGHT, TILT_RANGE, anchorAbove, areaBox, boxFaces, camera, clamp,
+  drawOrder, floorGrid, floorOutline, holdsStock, isOpenable, isStaging, kindById, northBearing, palletBoxes,
+  shadowPoints, shelfLines,
 } from './mapGeometry';
-import { TONES } from './mapOverlays';
+import { TONES, fillTone } from './mapOverlays';
+import { BADGE_CLASS, alertsFor, badgeFor, figureOf, palletDue, palletLook } from './mapIndicators';
 import { cn } from '@/lib/utils';
 
 const FONT = 11;
 const DRAG_START_PX = 4;
 const YAW_PER_PX = 0.4;
 const TILT_PER_PX = 0.25;
+const TURN_MS = 450;
+const SPIN_DEG_PER_S = 8;
+
+const lessMotion = () => typeof document !== 'undefined' && (
+  document.documentElement.getAttribute('data-stf-motion') === 'reduced'
+  || Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches));
 
 // About how many characters fit across a width, at the label size.
 const fits = (text, width) => text.length * FONT * 0.56 <= width - 6;
@@ -44,6 +65,7 @@ const shorten = (text, width) => {
   const room = Math.floor((width - 6) / (FONT * 0.56)) - 1;
   return room >= 3 ? `${text.slice(0, room)}…` : '';
 };
+const clip = (text, n) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
 
 const pressable = (area, onSelect) => (onSelect ? {
   role: 'button',
@@ -55,7 +77,24 @@ const pressable = (area, onSelect) => (onSelect ? {
   className: 'cursor-pointer outline-none focus-visible:[&>*:first-child]:stroke-[3]',
 } : {});
 
-function TopArea({ area, tone, note, selected, dimmed, onSelect, label }) {
+const hasCapacity = (area) => holdsStock(area) && Array.isArray(area.items) && area.fill !== null && area.fill !== undefined;
+
+// A badge: a filled circle with a glyph, and a spreading ring when urgent.
+function Badge({ x, y, badge, r = 7 }) {
+  const look = BADGE_CLASS[badge.level];
+  return (
+    <g className="pointer-events-none" aria-hidden="true">
+      {badge.level === 'bad' ? <circle cx={x} cy={y} r={r} className={cn('wm-ping', look.fill)} /> : null}
+      <circle cx={x} cy={y} r={r} className={cn(look.fill, 'stroke-surface')} strokeWidth={1.5} />
+      <text x={x} y={y + 3.5} textAnchor="middle" fontSize={r + 3} className={cn('select-none font-bold', look.text)}>
+        {badge.glyph.length > 2 ? '9+' : badge.glyph}
+      </text>
+    </g>
+  );
+}
+
+// ── Top view ──────────────────────────────────────────────────
+function TopArea({ area, tone, note, selected, dimmed, onSelect, label, badge, today }) {
   const t = TONES[tone] ?? TONES.neutral;
   const x = area.x * CELL;
   const y = area.y * CELL;
@@ -64,6 +103,7 @@ function TopArea({ area, tone, note, selected, dimmed, onSelect, label }) {
   const name = shorten(area.name, w);
   const showNote = note && h >= 2 * CELL && fits(note, w);
   const pallets = palletBoxes(area, area.pallets?.length ?? 0).filter((p) => p.z0 < 0.1);
+  const bar = hasCapacity(area) || (isStaging(area) && area.fill !== null && area.fill !== undefined);
   return (
     <g {...pressable(area, onSelect)} aria-label={label} opacity={dimmed ? 0.3 : 1}>
       <rect
@@ -72,61 +112,240 @@ function TopArea({ area, tone, note, selected, dimmed, onSelect, label }) {
         strokeWidth={selected ? 3 : 1.25}
         strokeDasharray={t.dashed ? '4 3' : undefined}
       />
-      {pallets.map((p) => (
-        <rect
-          key={p.id} x={p.x * CELL} y={p.y * CELL} width={p.w * CELL} height={p.h * CELL} rx={2}
-          className="pointer-events-none fill-chart-tan stroke-gold" strokeWidth={1}
-        />
-      ))}
+      {pallets.map((p, i) => {
+        const look = palletLook(palletDue(area.pallets[i], today));
+        return (
+          <rect
+            key={p.id} x={p.x * CELL} y={p.y * CELL} width={p.w * CELL} height={p.h * CELL} rx={2}
+            className={cn('pointer-events-none', look.fill, look.stroke)} strokeWidth={1}
+          />
+        );
+      })}
+      {bar && w > 3 * CELL ? (
+        <g className="pointer-events-none" aria-hidden="true">
+          <rect x={x + 5} y={y + h - 8} width={w - 10} height={3.5} rx={1.75} className="fill-surface-2" />
+          <rect
+            x={x + 5} y={y + h - 8} width={Math.max((w - 10) * Math.min(area.fill, 1), 0)} height={3.5} rx={1.75}
+            className={TONES[fillTone(area.fill)].solid}
+          />
+        </g>
+      ) : null}
       {name ? (
         <text
           x={x + w / 2} y={y + h / 2 + (showNote ? -3 : 4)} textAnchor="middle"
-          className={cn('pointer-events-none select-none font-medium', tone === 'door' ? 'fill-on-brand' : 'fill-ink')}
-          fontSize={FONT}
+          className={cn('pointer-events-none select-none font-medium', tone === 'door' ? 'fill-on-brand' : 'fill-ink stroke-surface')}
+          fontSize={FONT} strokeWidth={tone === 'door' ? 0 : 3} paintOrder="stroke" strokeLinejoin="round"
         >
           {name}
         </text>
       ) : null}
       {showNote ? (
-        <text x={x + w / 2} y={y + h / 2 + 11} textAnchor="middle" className="pointer-events-none select-none fill-ink-soft" fontSize={FONT - 1}>
+        <text x={x + w / 2} y={y + h / 2 + 11} textAnchor="middle" className="pointer-events-none select-none fill-ink-soft stroke-surface" fontSize={FONT - 1} strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">
           {note}
         </text>
       ) : null}
+      {badge ? <Badge x={x + w - 4} y={y + 4} badge={badge} r={6.5} /> : null}
     </g>
   );
 }
 
-function Box({ faces, className, strokeWidth = 1, dashed }) {
+// ── 3D view ───────────────────────────────────────────────────
+function Box({ faces, className, strokeWidth = 1, dashed, fillOpacity }) {
   return (
     <>
-      <polygon points={faces.top} className={className} strokeWidth={strokeWidth} strokeLinejoin="round" strokeDasharray={dashed ? '4 3' : undefined} />
       {faces.walls.map((wall) => (
         <g key={wall.points}>
-          <polygon points={wall.points} className={className} strokeWidth={strokeWidth} strokeLinejoin="round" />
-          <polygon points={wall.points} className="pointer-events-none fill-black" fillOpacity={wall.shade} />
+          <polygon points={wall.points} className={className} strokeWidth={strokeWidth} strokeLinejoin="round" fillOpacity={fillOpacity} />
+          <polygon points={wall.points} className="pointer-events-none fill-black" fillOpacity={wall.shade * (fillOpacity ?? 1)} />
         </g>
       ))}
+      <polygon points={faces.top} className={className} strokeWidth={strokeWidth} strokeLinejoin="round" strokeDasharray={dashed ? '4 3' : undefined} fillOpacity={fillOpacity} />
     </>
   );
 }
 
-function ThreeD({ grid, areas, shared, title, className }) {
+// An area in 3D: its frame, and inside it the stock as high as it is full.
+function Area3D({ box, view, s }) {
+  const { area } = box;
+  const t = TONES[s.tone] ?? TONES.neutral;
+  const stroke = s.selected ? 2.5 : (s.hovered ? 1.8 : 1);
+  const glass = hasCapacity(area);
+  const H = box.z1;
+  const inset = 0.1;
+  const inner = glass && area.fill > 0
+    ? { x: box.x + inset, y: box.y + inset, w: box.w - 2 * inset, h: box.h - 2 * inset, z0: 0, z1: Math.max(Math.min(area.fill, 1) * H, 0.03) }
+    : null;
+  const cap = glass && area.fill > 1
+    ? { ...inner, z0: H, z1: H + Math.min(area.fill - 1, 0.6) * H }
+    : null;
+  const levels = (area.kind === 'dry' || area.kind === 'cold') ? Math.round(H / LEVEL_HEIGHT) : 0;
+  const shelves = levels > 1 ? shelfLines(box, view, Array.from({ length: levels - 1 }, (_, i) => (i + 1) * LEVEL_HEIGHT)) : [];
+
+  return (
+    <g
+      {...pressable(area, s.onSelect)}
+      aria-label={s.label}
+      opacity={s.dimmed ? 0.25 : 1}
+      className={cn(s.onSelect ? 'cursor-pointer outline-none focus-visible:[&_polygon]:stroke-[2.5]' : '', 'wm-lift')}
+      transform={s.hovered ? 'translate(0 -4)' : undefined}
+      onPointerEnter={s.onHover}
+      onPointerMove={s.onHover}
+      onPointerLeave={s.onLeave}
+    >
+      {inner ? <Box faces={boxFaces(inner, view)} className={cn(t.solid, t.stroke)} strokeWidth={0.75} fillOpacity={0.92} /> : null}
+      {cap ? <Box faces={boxFaces(cap, view)} className="fill-danger stroke-danger" strokeWidth={0.75} fillOpacity={0.85} /> : null}
+      <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} fillOpacity={glass ? 0.3 : undefined} />
+      {shelves.map((l) => (
+        <line key={`${l.x1},${l.y1}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className={cn('pointer-events-none', t.stroke)} strokeWidth={0.75} strokeOpacity={0.6} />
+      ))}
+    </g>
+  );
+}
+
+// The label that floats over an area: badge, name and figure, on a line
+// down to the top of its box.
+function Label3D({ box, view, s, showText }) {
+  const { area } = box;
+  const lift = isStaging(area) && area.pallets?.length ? 3.2 : 1.1;
+  const { top, float } = anchorAbove(box, view, showText ? lift : 0.7);
+  const name = clip(area.name, 18);
+  const figure = area.kind === 'door' ? null : figureOf(area);
+  const text = figure ? `${name} · ${figure}` : name;
+  const width = text.length * 5.9 + (s.badge ? 26 : 14);
+  if (!showText && !s.badge) return null;
+  return (
+    <g className="pointer-events-none" opacity={s.dimmed ? 0.25 : 1} transform={s.hovered ? 'translate(0 -4)' : undefined}>
+      <line x1={top.px} y1={top.py} x2={float.px} y2={float.py} className="stroke-ink-soft" strokeWidth={0.75} strokeDasharray="2 2" />
+      {showText ? (
+        <>
+          <rect
+            x={float.px - width / 2} y={float.py - 9} width={width} height={18} rx={9}
+            className={cn('fill-surface', s.selected || s.hovered ? 'stroke-ink' : 'stroke-line-strong')} strokeWidth={s.selected ? 1.5 : 1}
+          />
+          <text x={float.px + (s.badge ? 6 : 0)} y={float.py + 3.5} textAnchor="middle" fontSize={FONT - 1} className="select-none fill-ink font-medium">
+            {text}
+          </text>
+          {s.badge ? <Badge x={float.px - width / 2 + 9} y={float.py} badge={s.badge} r={6.5} /> : null}
+        </>
+      ) : <Badge x={float.px} y={float.py} badge={s.badge} />}
+    </g>
+  );
+}
+
+// Everything about an area, by the pointer.
+function HoverCard({ area, at, today }) {
+  const alerts = alertsFor(area, { today, now: new Date() });
+  const products = Array.isArray(area.items) ? new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size : null;
+  const lines = [];
+  if (isStaging(area)) {
+    lines.push(`${area.pallets?.length ?? 0} packed pallet${area.pallets?.length === 1 ? '' : 's'}${area.palletSpaces ? ` of ${area.palletSpaces} spaces` : ''}`);
+  } else if (holdsStock(area) && Array.isArray(area.items)) {
+    lines.push(area.capacityKg
+      ? `About ${fmtQty(Math.round(area.heldKg))} kg of ${fmtQty(area.capacityKg)} kg`
+      : `About ${fmtQty(Math.round(area.heldKg ?? 0))} kg held`);
+    lines.push(products ? `${products} product${products === 1 ? '' : 's'}` : 'Empty');
+  }
+  return (
+    <div
+      role="tooltip"
+      className="pointer-events-none absolute z-10 w-56 rounded-xl border bg-card/95 px-3 py-2 text-xs shadow-lg backdrop-blur"
+      style={{ left: at.x + 14, top: at.y + 14 }}
+    >
+      <p className="text-sm font-medium">{area.name}</p>
+      <p className="text-muted-foreground">{kindById(area.kind).label}</p>
+      {lines.map((l) => <p key={l} className="mt-0.5">{l}</p>)}
+      {alerts.length ? (
+        <ul className="mt-1.5 space-y-0.5 border-t pt-1.5">
+          {alerts.map((a) => (
+            <li key={a.text} className={cn('flex items-center gap-1.5', a.level === 'bad' ? 'text-danger' : a.level === 'warn' ? 'text-warn' : a.level === 'info' ? 'text-info' : 'text-muted-foreground')}>
+              <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-current" />
+              {a.text}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function Compass({ bearing }) {
+  return (
+    <svg width="52" height="52" viewBox="-26 -26 52 52" role="img" aria-label={`North points ${Math.round((bearing + 360) % 360)} degrees round`} className="drop-shadow-sm">
+      <circle r="24" className="fill-card stroke-line" strokeWidth="1" />
+      <g transform={`rotate(${bearing})`}>
+        <path d="M0 -12 L4.5 1 L0 -1.5 L-4.5 1 Z" className="fill-danger" />
+        <path d="M0 12 L4.5 -1 L0 1.5 L-4.5 -1 Z" className="fill-ink-faint" />
+        <text y="-14.5" textAnchor="middle" fontSize="8" className="fill-ink font-bold">N</text>
+      </g>
+    </svg>
+  );
+}
+
+function ThreeD({ grid, areas, shared, title, className, today }) {
   const [cam, setCam] = useState(DEFAULT_CAMERA);
+  const [showLabels, setShowLabels] = useState(true);
+  const [spinning, setSpinning] = useState(false);
+  const [hover, setHover] = useState(null); // { id, x, y }
+  const [calm] = useState(lessMotion);
+  const wrapRef = useRef(null);
   const drag = useRef(null);
   const moved = useRef(false);
+  const frame = useRef(0);
+  const camRef = useRef(cam);
   const view = useMemo(() => camera(cam, grid), [cam, grid]);
 
-  // Areas and their pallets, as one list of boxes, far first.
-  const boxes = useMemo(() => drawOrder([
-    ...areas.map((area) => ({ ...areaBox(area), area })),
-    ...areas.flatMap((area) => palletBoxes(area, area.pallets?.length ?? 0).map((p) => ({ ...p, palletOf: area }))),
-  ], view), [areas, view]);
+  useEffect(() => { camRef.current = cam; }, [cam]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
-  const turn = (deg) => setCam((c) => ({ ...c, yaw: (c.yaw + deg + 360) % 360 }));
-  const lean = (deg) => setCam((c) => ({ ...c, tilt: clamp(c.tilt + deg, TILT_RANGE.min, TILT_RANGE.max) }));
+  // Turning by itself, slowly, until anything else touches the view.
+  useEffect(() => {
+    if (!spinning || calm) return undefined;
+    let last = performance.now();
+    const step = (now) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      if (document.visibilityState === 'visible') setCam((c) => ({ ...c, yaw: (c.yaw - SPIN_DEG_PER_S * dt + 360) % 360 }));
+      frame.current = requestAnimationFrame(step);
+    };
+    frame.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame.current);
+  }, [spinning, calm]);
+
+  // A smooth turn to a camera, the short way round.
+  const animateTo = (target) => {
+    cancelAnimationFrame(frame.current);
+    setSpinning(false);
+    if (calm) { setCam(target); return; }
+    const from = camRef.current;
+    const dYaw = ((target.yaw - from.yaw + 540) % 360) - 180;
+    const dTilt = target.tilt - from.tilt;
+    const t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - t0) / TURN_MS, 1);
+      const e = p < 0.5 ? 2 * p * p : 1 - ((-2 * p + 2) ** 2) / 2;
+      setCam({ yaw: (from.yaw + dYaw * e + 360) % 360, tilt: from.tilt + dTilt * e });
+      if (p < 1) frame.current = requestAnimationFrame(step);
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+  const turn = (deg) => animateTo({ ...camRef.current, yaw: (camRef.current.yaw + deg + 360) % 360 });
+
+  const items = useMemo(() => [
+    ...areas.map((area) => ({ ...areaBox(area), area })),
+    ...areas.flatMap((area) => palletBoxes(area, area.pallets?.length ?? 0).map((p, i) => ({
+      ...p, palletOf: area, due: palletDue(area.pallets[i % area.pallets.length], today),
+    }))),
+  ], [areas, today]);
+  const ordered = useMemo(() => drawOrder(items, view), [items, view]);
+  const labelled = useMemo(
+    () => ordered.filter((b) => b.area && (isOpenable(b.area) || b.area.kind === 'door')),
+    [ordered],
+  );
 
   const down = (e) => {
-    drag.current = { x: e.clientX, y: e.clientY, from: cam, active: false };
+    cancelAnimationFrame(frame.current);
+    setSpinning(false);
+    drag.current = { x: e.clientX, y: e.clientY, from: camRef.current, active: false };
     moved.current = false;
   };
   const move = (e) => {
@@ -135,7 +354,7 @@ function ThreeD({ grid, areas, shared, title, className }) {
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     if (!d.active && Math.hypot(dx, dy) < DRAG_START_PX) return;
-    if (!d.active) { d.active = true; e.currentTarget.setPointerCapture?.(e.pointerId); }
+    if (!d.active) { d.active = true; e.currentTarget.setPointerCapture?.(e.pointerId); setHover(null); }
     moved.current = true;
     setCam({
       yaw: (d.from.yaw - dx * YAW_PER_PX + 360) % 360,
@@ -152,12 +371,30 @@ function ThreeD({ grid, areas, shared, title, className }) {
   };
 
   const keyDown = (e) => {
-    const step = { ArrowLeft: () => turn(15), ArrowRight: () => turn(-15), ArrowUp: () => lean(5), ArrowDown: () => lean(-5) }[e.key];
+    const step = {
+      ArrowLeft: () => turn(15), ArrowRight: () => turn(-15),
+      ArrowUp: () => animateTo({ ...camRef.current, tilt: clamp(camRef.current.tilt + 5, TILT_RANGE.min, TILT_RANGE.max) }),
+      ArrowDown: () => animateTo({ ...camRef.current, tilt: clamp(camRef.current.tilt - 5, TILT_RANGE.min, TILT_RANGE.max) }),
+    }[e.key];
     if (step && e.target === e.currentTarget) { e.preventDefault(); step(); }
   };
 
+  const hoverOn = (area) => (e) => {
+    if (drag.current?.active) return;
+    const box = wrapRef.current?.getBoundingClientRect();
+    if (!box) return;
+    setHover({ id: area.id, x: e.clientX - box.left, y: e.clientY - box.top });
+  };
+  const s3 = (area) => ({
+    ...shared(area),
+    hovered: hover?.id === area.id,
+    onHover: hoverOn(area),
+    onLeave: () => setHover((h) => (h?.id === area.id ? null : h)),
+  });
+  const hovered = hover ? areas.find((a) => a.id === hover.id) : null;
+
   return (
-    <div className="relative">
+    <div ref={wrapRef} className="relative overflow-hidden rounded-lg bg-linear-to-b from-surface to-surface-2">
       <svg
         viewBox={view.viewBox()}
         role="group"
@@ -171,39 +408,52 @@ function ThreeD({ grid, areas, shared, title, className }) {
         onKeyDown={keyDown}
         onClickCapture={swallowDragClick}
       >
-        <polygon points={floorOutline(view, grid)} className="fill-surface-2 stroke-line" strokeWidth={1} />
-        {boxes.map((box) => {
-          const faces = boxFaces(box, view);
+        <polygon points={floorOutline(view, grid)} className="fill-surface-2 stroke-line-strong" strokeWidth={1.25} />
+        <g className="pointer-events-none" aria-hidden="true">
+          {floorGrid(view, grid, 2).map((l) => (
+            <line key={`${l.x1.toFixed(1)},${l.y1.toFixed(1)}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className="stroke-line" strokeWidth={0.5} />
+          ))}
+          {ordered.filter((b) => b.area && b.z1 >= 0.3).map((b) => (
+            <polygon key={`shadow-${b.area.id}`} points={shadowPoints(b, view)} className="fill-black" fillOpacity={shared(b.area).dimmed ? 0.03 : 0.09} />
+          ))}
+        </g>
+        {ordered.map((box) => {
           if (box.palletOf) {
-            const s = shared(box.palletOf);
+            const look = palletLook(box.due);
             return (
-              <g key={box.id} className="pointer-events-none" opacity={s.dimmed ? 0.3 : 1}>
-                <Box faces={faces} className="fill-chart-tan stroke-gold" strokeWidth={0.75} />
+              <g key={box.id} className={cn('pointer-events-none', box.due === 'today' && 'wm-breathe')} opacity={shared(box.palletOf).dimmed ? 0.25 : 1}>
+                <Box faces={boxFaces(box, view)} className={cn(look.fill, look.stroke)} strokeWidth={0.75} />
               </g>
             );
           }
-          const s = shared(box.area);
-          const t = TONES[s.tone] ?? TONES.neutral;
-          const name = shorten(box.area.name, Math.min(box.area.w, box.area.h) * 22 * 1.4);
-          return (
-            <g key={box.area.id} {...pressable(box.area, s.onSelect)} aria-label={s.label} opacity={s.dimmed ? 0.3 : 1}>
-              <Box faces={faces} className={cn(t.fill, t.stroke)} strokeWidth={s.selected ? 2.5 : 1} dashed={t.dashed} />
-              {name && box.area.kind !== 'door' ? (
-                <text
-                  x={faces.label.px} y={faces.label.py + 4} textAnchor="middle"
-                  className="pointer-events-none select-none fill-ink font-medium" fontSize={FONT - 1}
-                >
-                  {name}
-                </text>
-              ) : null}
-            </g>
-          );
+          return <Area3D key={box.area.id} box={box} view={view} s={s3(box.area)} />;
         })}
+        {labelled.map((box) => <Label3D key={`label-${box.area.id}`} box={box} view={view} s={s3(box.area)} showText={showLabels} />)}
       </svg>
-      <div className="absolute right-2 top-2 flex gap-1 rounded-4xl border bg-card/90 p-0.5 shadow-sm" role="group" aria-label="Turn the view">
+
+      {hovered ? <HoverCard area={hovered} at={hover} today={today} /> : null}
+
+      <div className="absolute bottom-2 left-2"><Compass bearing={northBearing(view)} /></div>
+
+      <div className="absolute right-2 top-2 flex gap-1 rounded-4xl border bg-card/90 p-0.5 shadow-sm backdrop-blur" role="group" aria-label="Turn the view">
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Turn left" title="Turn left" onClick={() => turn(90)}><RotateCcw /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Turn right" title="Turn right" onClick={() => turn(-90)}><RotateCw /></Button>
-        <Button type="button" size="icon-sm" variant="ghost" aria-label="Reset the view" title="Reset the view" onClick={() => setCam(DEFAULT_CAMERA)}><Undo2 /></Button>
+        <Button type="button" size="icon-sm" variant="ghost" aria-label="Reset the view" title="Reset the view" onClick={() => animateTo(DEFAULT_CAMERA)}><Undo2 /></Button>
+        {calm ? null : (
+          <Button
+            type="button" size="icon-sm" variant={spinning ? 'secondary' : 'ghost'} aria-pressed={spinning}
+            aria-label={spinning ? 'Stop turning' : 'Turn slowly'} title={spinning ? 'Stop turning' : 'Turn slowly'}
+            onClick={() => { cancelAnimationFrame(frame.current); setSpinning((v) => !v); }}
+          >
+            {spinning ? <Pause /> : <Play />}
+          </Button>
+        )}
+        <Button
+          type="button" size="icon-sm" variant={showLabels ? 'secondary' : 'ghost'} aria-pressed={showLabels}
+          aria-label="Show labels" title="Show labels" onClick={() => setShowLabels((v) => !v)}
+        >
+          <Tags />
+        </Button>
       </div>
     </div>
   );
@@ -220,8 +470,13 @@ export default function WarehouseMap({
   onSelect,
   title = 'Warehouse map',
   className,
+  today = null,
 }) {
-  const labelOf = (area) => [area.name, kindById(area.kind).label, noteOf?.(area)].filter(Boolean).join(', ');
+  const ctx = { today, now: new Date() };
+  const labelOf = (area) => {
+    const badge = badgeFor(area, ctx);
+    return [area.name, kindById(area.kind).label, noteOf?.(area), badge?.text].filter(Boolean).join(', ');
+  };
   const shared = (area) => ({
     area,
     tone: toneOf(area),
@@ -229,10 +484,11 @@ export default function WarehouseMap({
     dimmed: highlighted ? !highlighted.has(area.id) : false,
     onSelect: isOpenable(area) ? onSelect : undefined,
     label: labelOf(area),
+    badge: badgeFor(area, ctx),
   });
 
   if (view === '3d') {
-    return <ThreeD grid={grid} areas={areas} shared={shared} title={title} className={className} />;
+    return <ThreeD grid={grid} areas={areas} shared={shared} title={title} className={className} today={today} />;
   }
 
   const width = grid.cols * CELL;
@@ -246,7 +502,7 @@ export default function WarehouseMap({
       </defs>
       <rect width={width} height={height} className="fill-surface-2" />
       <rect width={width} height={height} fill="url(#wm-grid)" />
-      {areas.map((area) => <TopArea key={area.id} {...shared(area)} note={noteOf?.(area)} />)}
+      {areas.map((area) => <TopArea key={area.id} {...shared(area)} note={noteOf?.(area)} today={today} />)}
     </svg>
   );
 }

@@ -229,3 +229,76 @@ export const drawOrder = (boxes, cam) => {
   }
   return [...lying, ...ordered];
 };
+
+// ── 3D view: the extras ───────────────────────────────────────
+export const LEVEL_HEIGHT = LEVEL;
+
+/**
+ * Lines across the walls the camera sees, at each height in `zs`: the
+ * shelves of a dry store or cold room. [{ x1, y1, x2, y2 }]
+ */
+export const shelfLines = (box, cam, zs) => WALLS
+  .filter((wall) => cam.turnNormal(...wall.normal).Y > 0.001)
+  .flatMap((wall) => {
+    const [[ax, ay], [bx, by]] = wall.edge(box);
+    return zs.map((z) => {
+      const a = cam.project(ax, ay, z);
+      const b = cam.project(bx, by, z);
+      return { x1: a.px, y1: a.py, x2: b.px, y2: b.py };
+    });
+  });
+
+const hull = (pts) => {
+  const p = [...pts].sort((a, b) => a.px - b.px || a.py - b.py);
+  const cross = (o, a, b) => (a.px - o.px) * (b.py - o.py) - (a.py - o.py) * (b.px - o.px);
+  const lower = [];
+  for (const q of p) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q); }
+  const upper = [];
+  for (const q of [...p].reverse()) { while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop(); upper.push(q); }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+};
+
+// The light stands to one side of the plan, so a shadow falls the same
+// way on the floor whichever way the view is turned, longer for a
+// taller box.
+const SHADOW = { x: 0.45, y: 0.3 };
+
+/** The shadow a box casts on the floor, as polygon points. */
+export const shadowPoints = (box, cam) => {
+  const h = box.z1 ?? 0;
+  if (h < 0.1) return '';
+  const { x, y, w } = box;
+  const d = box.h;
+  const sx = SHADOW.x * h;
+  const sy = SHADOW.y * h;
+  const corners = [[x, y], [x + w, y], [x + w, y + d], [x, y + d]];
+  const pts = [...corners, ...corners.map(([cx, cy]) => [cx + sx, cy + sy])].map(([px, py]) => cam.project(px, py, 0));
+  return hull(pts).map((q) => `${q.px.toFixed(1)},${q.py.toFixed(1)}`).join(' ');
+};
+
+/** Grid lines across the floor, every `step` squares. [{ x1, y1, x2, y2 }] */
+export const floorGrid = (cam, grid = DEFAULT_GRID, step = 2) => {
+  const lines = [];
+  for (let x = step; x < grid.cols; x += step) {
+    const a = cam.project(x, 0, 0); const b = cam.project(x, grid.rows, 0);
+    lines.push({ x1: a.px, y1: a.py, x2: b.px, y2: b.py });
+  }
+  for (let y = step; y < grid.rows; y += step) {
+    const a = cam.project(0, y, 0); const b = cam.project(grid.cols, y, 0);
+    lines.push({ x1: a.px, y1: a.py, x2: b.px, y2: b.py });
+  }
+  return lines;
+};
+
+/** The point `dz` squares above the middle of a box's top: where its label floats. */
+export const anchorAbove = (box, cam, dz = 0.8) => ({
+  top: cam.project(box.x + box.w / 2, box.y + box.h / 2, box.z1),
+  float: cam.project(box.x + box.w / 2, box.y + box.h / 2, box.z1 + dz),
+});
+
+/** Which way north (the top of the plan) points on screen, in degrees clockwise from up. */
+export const northBearing = (cam) => {
+  const a = cam.project(0, 1, 0);
+  const b = cam.project(0, 0, 0);
+  return (Math.atan2(b.px - a.px, -(b.py - a.py)) * 180) / Math.PI;
+};

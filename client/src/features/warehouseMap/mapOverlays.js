@@ -19,17 +19,19 @@
 import { expiryState } from '../inventory/inventoryViews';
 import { isStaging, kindById } from './mapGeometry';
 
+// fill and stroke draw an area; solid is the stronger colour of the
+// same tone, for the stock block inside a 3D area and the fill bar.
 export const TONES = {
-  bad:     { fill: 'fill-danger-soft', stroke: 'stroke-danger' },
-  warn:    { fill: 'fill-warn-soft', stroke: 'stroke-warn' },
-  good:    { fill: 'fill-good-soft', stroke: 'stroke-good' },
-  info:    { fill: 'fill-info-soft', stroke: 'stroke-info' },
-  violet:  { fill: 'fill-violet-soft', stroke: 'stroke-violet' },
-  tan:     { fill: 'fill-chart-tan', stroke: 'stroke-gold' },
-  sage:    { fill: 'fill-chart-sage', stroke: 'stroke-good' },
-  neutral: { fill: 'fill-surface-2', stroke: 'stroke-line-strong' },
-  empty:   { fill: 'fill-surface', stroke: 'stroke-line-strong', dashed: true },
-  door:    { fill: 'fill-brand', stroke: 'stroke-brand' },
+  bad:     { fill: 'fill-danger-soft', stroke: 'stroke-danger', solid: 'fill-danger' },
+  warn:    { fill: 'fill-warn-soft', stroke: 'stroke-warn', solid: 'fill-warn' },
+  good:    { fill: 'fill-good-soft', stroke: 'stroke-good', solid: 'fill-good' },
+  info:    { fill: 'fill-info-soft', stroke: 'stroke-info', solid: 'fill-info' },
+  violet:  { fill: 'fill-violet-soft', stroke: 'stroke-violet', solid: 'fill-violet' },
+  tan:     { fill: 'fill-chart-tan', stroke: 'stroke-gold', solid: 'fill-gold' },
+  sage:    { fill: 'fill-chart-sage', stroke: 'stroke-good', solid: 'fill-good' },
+  neutral: { fill: 'fill-surface-2', stroke: 'stroke-line-strong', solid: 'fill-chart-grey' },
+  empty:   { fill: 'fill-surface', stroke: 'stroke-line-strong', dashed: true, solid: 'fill-ink-faint' },
+  door:    { fill: 'fill-brand', stroke: 'stroke-brand', solid: 'fill-brand' },
 };
 
 export const OVERLAYS = [

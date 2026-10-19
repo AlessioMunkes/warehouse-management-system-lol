@@ -23,7 +23,7 @@
 // database connections.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Box, Map as MapIcon, Search, Square } from 'lucide-react';
+import { AlertTriangle, Box, Map as MapIcon, Search, Square } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import NativeSelect from '@/components/ui/native-select';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ import CountAreaDialog from './CountAreaDialog';
 import CapacitySummary from './CapacitySummary';
 import { holdsStock, isOpenable, isStaging } from './mapGeometry';
 import { OVERLAYS, TONES, areasMatching, legendFor, percent, programmeTones, toneFor } from './mapOverlays';
+import { BADGE_CLASS, PALLET_DUE, badgeFor } from './mapIndicators';
 
 const REFRESH_MS = 60_000;
 const UNPLACED = 'unplaced';
@@ -56,6 +57,37 @@ const areaNote = (area) => {
   const n = new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size;
   return [n === 0 ? 'Empty' : `${n} product${n === 1 ? '' : 's'}`, full].filter(Boolean).join(' · ');
 };
+
+// What the marks on the map mean, whatever it is coloured by.
+const BADGE_LEGEND = [
+  { level: 'bad', glyph: '!', label: 'Over capacity, expiring or overdue' },
+  { level: 'warn', glyph: '!', label: 'Nearly full or expiring this month' },
+  { level: 'info', glyph: '1', label: 'Pallets to collect today' },
+  { level: 'muted', glyph: '?', label: 'Not counted for a month' },
+];
+
+function MarksLegend({ view, hasPallets }) {
+  return (
+    <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground" aria-label="What the marks mean">
+      {BADGE_LEGEND.map((b) => (
+        <li key={b.level} className="inline-flex items-center gap-1.5">
+          <svg width="14" height="14" viewBox="-7 -7 14 14" aria-hidden="true">
+            <circle r="6" className={BADGE_CLASS[b.level].fill} />
+            <text y="3.2" textAnchor="middle" fontSize="8.5" className="fill-white font-bold">{b.glyph}</text>
+          </svg>
+          {b.label}
+        </li>
+      ))}
+      {hasPallets ? PALLET_DUE.map((p) => (
+        <li key={p.id} className="inline-flex items-center gap-1.5">
+          <svg width="12" height="12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" rx="2" className={cn(p.fill, p.stroke)} /></svg>
+          {p.label}
+        </li>
+      )) : null}
+      {view === '3d' ? <li>Solid block: stock against capacity. Red top: over capacity.</li> : <li>Bar: how full the area is.</li>}
+    </ul>
+  );
+}
 
 function Legend({ entries }) {
   return (
@@ -85,6 +117,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
   const [openId, setOpenId] = useState(null);
   const [counting, setCounting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [attentionOnly, setAttentionOnly] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -119,7 +152,16 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
     [products],
   );
   const ctx = useMemo(() => ({ today: map?.today, programmeTones: programmeTones(products) }), [map, products]);
-  const highlighted = useMemo(() => areasMatching(areas, query), [areas, query]);
+  // Areas with an urgent or warning badge: the Needs attention toggle
+  // lights these up and dims the rest.
+  const needing = useMemo(() => {
+    const ctxNow = { today: map?.today, now: new Date() };
+    return new Set(areas.filter((a) => ['bad', 'warn'].includes(badgeFor(a, ctxNow)?.level)).map((a) => a.id));
+  }, [areas, map]);
+  const highlighted = useMemo(
+    () => (attentionOnly ? needing : areasMatching(areas, query)),
+    [attentionOnly, needing, areas, query],
+  );
 
   // A search for something no counted area holds says where it is instead.
   const searchNote = useMemo(() => {
@@ -179,7 +221,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           <Search aria-hidden="true" className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search" className="pl-8" placeholder="Find a product"
-            aria-label="Find a product on the map" value={query} onChange={(e) => setQuery(e.target.value)}
+            aria-label="Find a product on the map" value={query} onChange={(e) => { setQuery(e.target.value); setAttentionOnly(false); }}
           />
         </div>
         <NativeSelect aria-label="Colour by" value={overlay} onChange={(e) => setOverlay(e.target.value)} className="w-40">
@@ -193,7 +235,14 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
             <Box /> 3D
           </Button>
         </div>
-        <Button type="button" variant="outline" size="sm" className="ml-auto" onClick={() => setOpenId(UNPLACED)}>
+        <Button
+          type="button" size="sm" variant={attentionOnly ? 'secondary' : 'outline'} aria-pressed={attentionOnly}
+          className="ml-auto" disabled={needing.size === 0 && !attentionOnly}
+          onClick={() => { setAttentionOnly((v) => !v); setQuery(''); }}
+        >
+          <AlertTriangle className={needing.size ? 'text-danger' : undefined} /> Needs attention <span className="tabular-nums text-muted-foreground">{needing.size}</span>
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpenId(UNPLACED)}>
           Not placed <span className="tabular-nums text-muted-foreground">{unplaced.length}</span>
         </Button>
       </div>
@@ -202,6 +251,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
 
       <div className="overflow-hidden rounded-xl border bg-card p-2">
         <WarehouseMap
+          today={map.today}
           grid={map.grid}
           areas={areas}
           view={view}
@@ -214,6 +264,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
       </div>
 
       <Legend entries={legendFor(overlay, { products })} />
+      <MarksLegend view={view} hasPallets={areas.some(isStaging)} />
 
       <CapacitySummary areas={areas} totals={map.totals} onOpen={(a) => isOpenable(a) && setOpenId(a.id)} />
 

@@ -13,6 +13,7 @@ import {
   DEFAULT_CAMERA, boxFaces, camera, drawOrder, freeSpot, keepOnGrid, nextName, overlapping, palletBoxes,
 } from '../features/warehouseMap/mapGeometry';
 import { areasMatching, countedWhen, fillTone, legendFor, toneFor } from '../features/warehouseMap/mapOverlays';
+import { alertsFor, badgeFor, figureOf, palletDue } from '../features/warehouseMap/mapIndicators';
 
 vi.mock('../services/warehouseMapAPI', () => ({
   getWarehouseMap: vi.fn(),
@@ -229,7 +230,8 @@ describe('WarehouseMapTab', () => {
     const shape = () => screen.getByRole('button', { name: /^Dry store 1, Dry store/ }).querySelector('polygon').getAttribute('points');
     const first = shape();
     await user.click(screen.getByRole('button', { name: 'Turn left' }));
-    expect(shape()).not.toBe(first);
+    // The turn is animated (or instant under Reduce movement).
+    await waitFor(() => expect(shape()).not.toBe(first));
     expect(screen.getByRole('group', { name: /3D view/ }).getAttribute('viewBox')).toBe(before);
   });
 
@@ -296,5 +298,68 @@ describe('WarehouseLayoutPage', () => {
     render(<WarehouseLayoutPage />);
     expect(await screen.findByText('This warehouse needs a database update')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save layout' })).toBeNull();
+  });
+});
+
+// ── Marks: alerts, pallets and the 3D stock block ─────────────
+describe('mapIndicators', () => {
+  const now = new Date('2026-10-18T10:00:00Z');
+  const ctx = { today: '2026-10-18', now };
+
+  it('flags an area over capacity first, then expiry, then an old count', () => {
+    const area = { id: 9, kind: 'dry', fill: 1.2, earliestExpiry: '2026-11-05', lastCountedAt: '2026-08-01T08:00:00Z', items: [{ productId: 1, about: 5 }] };
+    expect(alertsFor(area, ctx).map((a) => [a.level, a.text])).toEqual([
+      ['bad', 'Over capacity: 120% full'],
+      ['warn', 'Stock expires in 18 days'],
+      ['muted', 'Not counted for 78 days'],
+    ]);
+    expect(badgeFor(area, ctx)).toMatchObject({ level: 'bad', glyph: '!', more: 2 });
+  });
+
+  it('says nothing about a plan with no stock figures, or a calm area', () => {
+    expect(alertsFor({ id: 1, kind: 'dry' }, ctx)).toEqual([]);
+    expect(badgeFor({ id: 1, kind: 'dry', fill: 0.2, items: [], lastCountedAt: null }, ctx)).toBeNull();
+  });
+
+  it('dates pallets against today and flags a staging area', () => {
+    expect(palletDue({ dispatchDate: '2026-10-17' }, '2026-10-18')).toBe('overdue');
+    expect(palletDue({ dispatchDate: '2026-10-18' }, '2026-10-18')).toBe('today');
+    expect(palletDue({ dispatchDate: '2026-10-19' }, '2026-10-18')).toBe('tomorrow');
+    expect(palletDue({ dispatchDate: '2026-10-25' }, '2026-10-18')).toBe('later');
+    const bay = { id: 4, kind: 'staging', palletSpaces: 6, fill: 0.5, pallets: [{ dispatchDate: '2026-10-17' }, { dispatchDate: '2026-10-18' }, { dispatchDate: '2026-10-18' }] };
+    expect(alertsFor(bay, ctx).map((a) => [a.level, a.glyph])).toEqual([['bad', '1'], ['info', '2']]);
+    expect(figureOf(bay)).toBe('3/6');
+  });
+
+  it('labels an area with how full it is, or what it holds', () => {
+    expect(figureOf({ kind: 'dry', fill: 0.456, items: [] })).toBe('46%');
+    expect(figureOf({ kind: 'cold', fill: null, items: [{ productId: 1, about: 2 }, { productId: 1, about: 1 }] })).toBe('1 product');
+    expect(figureOf({ kind: 'door' })).toBeNull();
+  });
+});
+
+describe('the 3D marks', () => {
+  it('draws stock inside a glass frame, and a red cap over capacity', async () => {
+    const user = userEvent.setup();
+    const over = { ...MAP.areas[0], fill: 1.4 };
+    getWarehouseMap.mockResolvedValue({ ...MAP, areas: [over, ...MAP.areas.slice(1)] });
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const store = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
+    expect(store.querySelectorAll('polygon.fill-danger').length).toBeGreaterThan(0);
+    expect(store.getAttribute('aria-label')).toMatch(/Over capacity: 140% full/);
+    expect(screen.getByText('Solid block: stock against capacity. Red top: over capacity.')).toBeInTheDocument();
+  });
+
+  it('lights up the areas that need attention', async () => {
+    const user = userEvent.setup();
+    const over = { ...MAP.areas[0], fill: 1.4 };
+    getWarehouseMap.mockResolvedValue({ ...MAP, areas: [over, ...MAP.areas.slice(1)] });
+    render(<WarehouseMapTab />);
+    const toggle = await screen.findByRole('button', { name: /Needs attention 1/ });
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Dry store 1, Dry store/ })).toHaveAttribute('opacity', '1');
+    expect(screen.getByRole('button', { name: /^Cold room 1, Cold room/ })).toHaveAttribute('opacity', '0.3');
   });
 });
