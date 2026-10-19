@@ -50,7 +50,7 @@
 // Reduce movement every turn is instant and there is no slow turning.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Maximize2, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Tags, Undo2 } from 'lucide-react';
+import { Expand, Maximize2, Minus, Pause, Play, Plus, RotateCcw, RotateCw, Shrink, Tags, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fmtQty } from '@/lib/quantity';
 import {
@@ -60,6 +60,7 @@ import {
 } from './mapGeometry';
 import { routesFor } from './mapActivity';
 import useMapZoom from './useMapZoom';
+import useMapFrame, { FRAME, FRAME_FULL, grab, noNativeDrag } from './useMapFrame';
 import { TONES, fillTone } from './mapOverlays';
 import {
   BADGE_CLASS, alertsFor, badgeFor, figureOf, heldText, palletDue, palletLook, stockLines, stockMode,
@@ -404,10 +405,19 @@ const trucksOf = (areas) => areas
     .map((b) => ({ ...b, truckOf: gate, centre: gate.gate.vehicles?.[b.truck]?.name ?? null })));
 
 // + / - / Fit, bottom right, and the scroll hint while it is needed.
-function ZoomControls({ z }) {
+function ZoomControls({ z, frame }) {
   return (
     <>
       <div className="absolute bottom-2 right-2 flex flex-col gap-1 rounded-2xl border bg-card/90 p-0.5 shadow-sm backdrop-blur" role="group" aria-label="Zoom">
+        {frame ? (
+          <Button
+            type="button" size="icon-sm" variant={frame.expanded ? 'secondary' : 'ghost'} aria-pressed={frame.expanded}
+            aria-label={frame.expanded ? 'Exit full screen' : 'Full screen'} title={frame.expanded ? 'Exit full screen (Esc)' : 'Full screen'}
+            onClick={frame.toggle}
+          >
+            {frame.expanded ? <Shrink /> : <Expand />}
+          </Button>
+        ) : null}
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Zoom in" title="Zoom in" onClick={z.zoomIn}><Plus /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Zoom out" title="Zoom out" onClick={z.zoomOut}><Minus /></Button>
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Fit the plan" title="Fit the plan" onClick={z.fitPlan}><Maximize2 /></Button>
@@ -437,7 +447,10 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
   const drag = useRef(null);
   const moved = useRef(false);
   const frame = useRef(0);
+  const dragFrame = useRef(0);
+  const pendingCam = useRef(null);
   const camRef = useRef(cam);
+  const box = useMapFrame();
   const trucks = useMemo(() => trucksOf(areas), [areas]);
   const routes = useMemo(() => routesFor(areas), [areas]);
   const focus = useMemo(() => planFocus(withOutside(areas, trucks), grid), [areas, trucks, grid]);
@@ -446,7 +459,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
   const z = useMapZoom({ fit, svgRef });
 
   useEffect(() => { camRef.current = cam; }, [cam]);
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  useEffect(() => () => { cancelAnimationFrame(frame.current); cancelAnimationFrame(dragFrame.current); }, []);
 
   // Turning by itself, slowly, until anything else touches the view.
   useEffect(() => {
@@ -495,6 +508,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
   );
 
   const down = (e) => {
+    grab(e);
     cancelAnimationFrame(frame.current);
     setSpinning(false);
     moved.current = false;
@@ -511,10 +525,17 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
     if (!d.active && Math.hypot(dx, dy) < DRAG_START_PX) return;
     if (!d.active) { d.active = true; e.currentTarget.setPointerCapture?.(e.pointerId); setHover(null); }
     moved.current = true;
-    setCam({
+    // At most one redraw a screen frame, however fast the pointer moves.
+    pendingCam.current = {
       yaw: (d.from.yaw - dx * YAW_PER_PX + 360) % 360,
       tilt: clamp(d.from.tilt + dy * TILT_PER_PX, TILT_RANGE.min, TILT_RANGE.max),
-    });
+    };
+    if (!dragFrame.current) {
+      dragFrame.current = requestAnimationFrame(() => {
+        dragFrame.current = 0;
+        if (pendingCam.current) setCam(pendingCam.current);
+      });
+    }
   };
   const up = (e) => {
     if (z.onPointerUp(e)) moved.current = true;
@@ -556,14 +577,18 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
   const hovered = hover ? areas.find((a) => a.id === hover.id) : null;
 
   return (
-    <div ref={wrapRef} className="relative overflow-hidden rounded-lg bg-linear-to-b from-surface to-surface-2">
+    <div
+      ref={wrapRef}
+      className={cn('relative overflow-hidden rounded-lg bg-linear-to-b from-surface to-surface-2', box.expanded ? FRAME_FULL : FRAME)}
+    >
       <svg
         ref={svgRef}
         viewBox={z.viewBox}
         role="group"
         tabIndex={0}
+        onMouseDown={noNativeDrag}
         aria-label={`${title}, 3D view. Drag or use the arrow keys to turn it; plus and minus zoom.`}
-        className={cn('h-auto w-full cursor-grab touch-none select-none outline-none active:cursor-grabbing', className)}
+        className={cn('h-full w-full cursor-grab touch-none select-none outline-none active:cursor-grabbing', className)}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
@@ -660,7 +685,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
       {hovered ? <HoverCard area={hovered} at={hover} today={today} stack={hover.stack} /> : null}
 
       <div className="absolute bottom-2 left-2"><Compass bearing={northBearing(view)} /></div>
-      <ZoomControls z={z} />
+      <ZoomControls z={z} frame={box} />
 
       <div className="absolute right-2 top-2 flex gap-1 rounded-4xl border bg-card/90 p-0.5 shadow-sm backdrop-blur" role="group" aria-label="Turn the view">
         <Button type="button" size="icon-sm" variant="ghost" aria-label="Turn left" title="Turn left" onClick={() => turn(90)}><RotateCcw /></Button>
@@ -746,18 +771,19 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
   }, [areas, trucks, grid, width, height]);
   const z = useMapZoom({ fit, svgRef, dragPans: true });
   const panned = useRef(false);
+  const box = useMapFrame();
 
   return (
-    <div className="relative">
+    <div className={cn('relative overflow-hidden rounded-lg bg-surface-2', box.expanded ? FRAME_FULL : FRAME)}>
       <svg
         ref={svgRef}
         viewBox={z.viewBox}
         role="group"
         tabIndex={0}
         aria-label={`${title}, top view. Drag to move round it; plus and minus zoom.`}
-        className={cn('h-auto w-full touch-none outline-none', className)}
-        style={{ aspectRatio: `${width} / ${height}` }}
-        onPointerDown={(e) => { panned.current = false; z.onPointerDown(e); }}
+        className={cn('h-full w-full cursor-grab touch-none select-none outline-none active:cursor-grabbing', className)}
+        onMouseDown={noNativeDrag}
+        onPointerDown={(e) => { grab(e); panned.current = false; z.onPointerDown(e); }}
         onPointerMove={z.onPointerMove}
         onPointerUp={(e) => { if (z.onPointerUp(e)) panned.current = true; }}
         onPointerCancel={z.onPointerUp}
@@ -800,7 +826,7 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
         );
       })}
       </svg>
-      <ZoomControls z={z} />
+      <ZoomControls z={z} frame={box} />
     </div>
   );
 }
