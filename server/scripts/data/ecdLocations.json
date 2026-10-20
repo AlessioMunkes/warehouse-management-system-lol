@@ -262,12 +262,12 @@
   },
   {
     "name": "Twinkle Star - Lavender Hill",
-    "address": null,
+    "address": "Witsenberg Street",
     "suburb": "Lavender Hill",
-    "lat": -34.073611,
-    "lng": 18.483333,
-    "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "lat": -34.0796,
+    "lng": 18.4948,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Twinklestar Educare\")."
   },
   {
     "name": "Little Angels( Hout Bay Assembly)",
@@ -277,5 +277,410 @@
     "lng": 18.382607,
     "precision": "suburb",
     "note": "Suburb taken from the centre's name."
+  },
+  {
+    "name": "Andi's Educare and Aftercare",
+    "address": "41 Gothenburg Crescent",
+    "suburb": "Avondale",
+    "lat": -33.568172,
+    "lng": 18.48627,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Andi's educare\")."
+  },
+  {
+    "name": "Angels Only",
+    "address": "5 Peter Mokaba St",
+    "suburb": "Fisantekraal",
+    "lat": -33.781815,
+    "lng": 18.71591,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Angels Only Creche\")."
+  },
+  {
+    "name": "Annie's Ark Preschool",
+    "address": null,
+    "suburb": "Grassy Park",
+    "lat": -34.04686,
+    "lng": 18.50119,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Annies Ark\"). Only the area is listed, so the pin is its middle. Common name; check the pin."
+  },
+  {
+    "name": "Babes Educare",
+    "address": null,
+    "suburb": "Cosmos",
+    "lat": -33.815478,
+    "lng": 18.541095,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Babes Educare\")."
+  },
+  {
+    "name": "Bashee Educare",
+    "address": null,
+    "suburb": "Portland",
+    "lat": -34.04987,
+    "lng": 18.61442,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Bashee Educare\")."
+  },
+  {
+    "name": "Bollie Kabouter 1 & 2",
+    "address": null,
+    "suburb": "Fisantekraal",
+    "lat": -33.78389,
+    "lng": 18.71659,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Bollie Kabouter Durbanville\")."
+  },
+  {
+    "name": "Cuddles and Care",
+    "address": "22 Cilicia Crescent",
+    "suburb": "Avondale",
+    "lat": -33.57305,
+    "lng": 18.482635,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Cuddles & Care Educare Centre\")."
+  },
+  {
+    "name": "Ekhaya Kids 1 & 2",
+    "address": "5 Grandiflora St",
+    "suburb": "Dunoon",
+    "lat": -33.8225,
+    "lng": 18.54046,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Ekhaya kids Educare\")."
+  },
+  {
+    "name": "Honey Bee Educare",
+    "address": "14 Nyamakazi Street",
+    "suburb": "Dunoon",
+    "lat": -33.817947,
+    "lng": 18.537907,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Honey bee Educare\")."
+  },
+  {
+    "name": "Ikwezi Lokusa Educare",
+    "address": "128 Oliver Tambo Ave",
+    "suburb": "Manenberg",
+    "lat": -33.981698,
+    "lng": 18.559068,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Ikwezi Lokusa Educare\")."
+  },
+  {
+    "name": "Inga ECD",
+    "address": "30 Seven St",
+    "suburb": "Langa",
+    "lat": -33.946136,
+    "lng": 18.531945,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Inga Educare Centre\")."
+  },
+  {
+    "name": "Kwanda Educare",
+    "address": "Magubudela St",
+    "suburb": "Bloekombos",
+    "lat": -33.845152,
+    "lng": 18.746987,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Kwanda Educare\")."
+  },
+  {
+    "name": "Lerato",
+    "address": null,
+    "suburb": "Dunoon",
+    "lat": -33.81643,
+    "lng": 18.54099,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Lerato Educare\"). Only the area is listed, so the pin is its middle. Common name; check the pin."
+  },
+  {
+    "name": "Lingomso Educare",
+    "address": "Mtamvuna Rd",
+    "suburb": "Mfuleni",
+    "lat": -33.994478,
+    "lng": 18.672659,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"LINGOMSO\")."
+  },
+  {
+    "name": "Little Feet Educare",
+    "address": null,
+    "suburb": "Mitchells Plain",
+    "lat": -34.05123,
+    "lng": 18.62076,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Little Feet Educare\"). Only the area is listed, so the pin is its middle. Common name; check the pin."
+  },
+  {
+    "name": "Little Lambs Academy",
+    "address": "Van Hoogstraten St",
+    "suburb": "Penzance Estate",
+    "lat": -34.033547,
+    "lng": 18.360775,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"LITTLE LAMBS\"). Common name; check the pin."
+  },
+  {
+    "name": "Little Treasures",
+    "address": "Daniell St",
+    "suburb": "Sanddrift",
+    "lat": -33.88216,
+    "lng": 18.508255,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Little Treasures\"). Common name; check the pin."
+  },
+  {
+    "name": "Lofland",
+    "address": "11 Alabama St",
+    "suburb": "Weltevreden",
+    "lat": -34.125723,
+    "lng": 18.844853,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Lofland Educare\")."
+  },
+  {
+    "name": "Love and Care",
+    "address": "Guinea Fowl Ave",
+    "suburb": "Imhofs Gift",
+    "lat": -34.131934,
+    "lng": 18.376377,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Love and Care\"). Common name; check the pin."
+  },
+  {
+    "name": "Luberon Educare",
+    "address": "Nottingham Rd",
+    "suburb": "Sherwood",
+    "lat": -33.55948,
+    "lng": 18.497756,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Luberon Creche\")."
+  },
+  {
+    "name": "Metropolitan Educare",
+    "address": "71 Metropolitan Street",
+    "suburb": "Beacon Valley",
+    "lat": -34.043782,
+    "lng": 18.628759,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Metropolitan Educare Centre\")."
+  },
+  {
+    "name": "Milas Angels",
+    "address": "826 Mataung Street",
+    "suburb": "Sun City",
+    "lat": -34.12041,
+    "lng": 18.909,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Mila's Angels\")."
+  },
+  {
+    "name": "Nolukhanyo ECD",
+    "address": "54 Bhunga Ave",
+    "suburb": "Langa",
+    "lat": -33.945351,
+    "lng": 18.521704,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Nolukhanyo Educare Centre\")."
+  },
+  {
+    "name": "RooiKappie",
+    "address": "Bruce Ave & Edward Ave",
+    "suburb": "Lotus River",
+    "lat": -34.028685,
+    "lng": 18.515776,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"ROOIKAPPIE PRESCHOOL\")."
+  },
+  {
+    "name": "Siphamandla",
+    "address": "Stulo St",
+    "suburb": "Crossroads",
+    "lat": -33.993835,
+    "lng": 18.595142,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Siphamandla Educare\")."
+  },
+  {
+    "name": "Siyakhanyisa ECD",
+    "address": "Washington St",
+    "suburb": "Langa",
+    "lat": -33.943892,
+    "lng": 18.52328,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Siyakhanyisa Educare Centre\")."
+  },
+  {
+    "name": "Sticky Fingers",
+    "address": null,
+    "suburb": "Bridgewater",
+    "lat": -34.08917,
+    "lng": 18.85356,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Sticky Fingers\"). Common name; check the pin."
+  },
+  {
+    "name": "The Ark ECD",
+    "address": null,
+    "suburb": "Khayelitsha",
+    "lat": -34.01972,
+    "lng": 18.67328,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"The Ark\"). Only the area is listed, so the pin is its middle. Common name; check the pin."
+  },
+  {
+    "name": "The Learning Tree",
+    "address": "61 Mydrecht St",
+    "suburb": "Bothasig",
+    "lat": -33.858149,
+    "lng": 18.549104,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"The Learning Tree Educare & Aftercare Centre\"). Common name; check the pin."
+  },
+  {
+    "name": "Ukhanyo ECD",
+    "address": null,
+    "suburb": "Khayelitsha",
+    "lat": -34.01972,
+    "lng": 18.67328,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Ukhanyo\"). Only the area is listed, so the pin is its middle. Common name; check the pin."
+  },
+  {
+    "name": "Where Rainbows Meet",
+    "address": "90 Siljeur Clos",
+    "suburb": "Lotus River",
+    "lat": -34.035054,
+    "lng": 18.523269,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Where Rainbows Meet\")."
+  },
+  {
+    "name": "Young Eagles Educare",
+    "address": "56 Knysna Rd",
+    "suburb": "Sherwood",
+    "lat": -33.550111,
+    "lng": 18.499419,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Young eagles educare\")."
+  },
+  {
+    "name": "Zama Educare",
+    "address": "Phezukomkhono Rd",
+    "suburb": "Philippi East",
+    "lat": -34.009567,
+    "lng": 18.619177,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Zama-Zama Educare\")."
+  },
+  {
+    "name": "Zamat Educare",
+    "address": null,
+    "suburb": "Portland",
+    "lat": -34.04987,
+    "lng": 18.61442,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Zamat Educare\")."
+  },
+  {
+    "name": "Zamuxolo ECD",
+    "address": null,
+    "suburb": "Khayelitsha",
+    "lat": -34.01972,
+    "lng": 18.67328,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Zamuxolo\"). Only the area is listed, so the pin is its middle."
+  },
+  {
+    "name": "Zusakhe",
+    "address": null,
+    "suburb": "Waxberry",
+    "lat": -33.814372,
+    "lng": 18.539889,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Zusakhe Educare\")."
+  },
+  {
+    "name": "Anne's Toddlers",
+    "address": null,
+    "suburb": "Bellville",
+    "lat": -33.90022,
+    "lng": 18.62847,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Ann's Toddlers\"). Only the area is listed, so the pin is its middle. Common name; check the pin."
+  },
+  {
+    "name": "Masikhululeka",
+    "address": "1 South Rd",
+    "suburb": "Plumstead",
+    "lat": -34.014499,
+    "lng": 18.48093,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Masikhululeke Educare\"). Common name; check the pin."
+  },
+  {
+    "name": "Proverbs1",
+    "address": "27 Glenside Road",
+    "suburb": "Morgans Village",
+    "lat": -34.04129,
+    "lng": 18.591057,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Proverbs 1. Educare\"). Common name; check the pin."
+  },
+  {
+    "name": "LA Tiny Tots",
+    "address": "14 Lincoln Crescent",
+    "suburb": "Beacon Valley",
+    "lat": -34.041994,
+    "lng": 18.631723,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"L.A Tiny Tots Educare\")."
+  },
+  {
+    "name": "Hope of Africa College",
+    "address": "Wellington Street",
+    "suburb": "Vasco",
+    "lat": -33.903858,
+    "lng": 18.559409,
+    "precision": "exact",
+    "note": "OpenStreetMap \"Hope of Africa Junior Christian College\"."
+  },
+  {
+    "name": "Hlumelo Educare 1",
+    "address": null,
+    "suburb": "New Crossroads",
+    "lat": -33.995556,
+    "lng": 18.582222,
+    "precision": "suburb",
+    "note": "Web search: Hlumelo Educare runs from the founder's home in New Crossroads."
+  },
+  {
+    "name": "Hlumelo Educare 2",
+    "address": null,
+    "suburb": "New Crossroads",
+    "lat": -33.995556,
+    "lng": 18.582222,
+    "precision": "suburb",
+    "note": "Web search: Hlumelo Educare runs from the founder's home in New Crossroads."
+  },
+  {
+    "name": "Uyanda Academy",
+    "address": null,
+    "suburb": "Sir Lowry's Pass",
+    "lat": -34.11768,
+    "lng": 18.910297,
+    "precision": "suburb",
+    "note": "Bolander, Aug 2024: Uyanda Academy and Daycare Centre, Rastakamp, Sir Lowry's Pass Village."
+  },
+  {
+    "name": "Alfa Educare",
+    "address": "Hanover Park Avenue",
+    "suburb": "Hanover Park",
+    "lat": -33.990403,
+    "lng": 18.52321,
+    "precision": "street",
+    "note": "Web search: \"Alpha Educare Centre\", Hanover Park Avenue (at Morgenson Primary). Spelling differs; check the pin."
   }
 ]
