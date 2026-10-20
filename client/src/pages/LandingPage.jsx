@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate }           from 'react-router-dom';
+import { useNavigate }                 from 'react-router-dom';
 import L                               from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getPublicImpactSummary }      from '../services/publicImpactAPI';
-import { LEGAL }                       from '../routes/paths';
 
 // ── Image fallback ───────────────────────────────────────────
 function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
