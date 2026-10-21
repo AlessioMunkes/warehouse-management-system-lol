@@ -27,7 +27,8 @@
 //
 // onMatch returns what to say about the scan: a string, or
 // { tone: 'warn', text } when it could not be used (a product that is
-// not on this order).
+// not on this order). The bar's own words are in translations/
+// messages.js (barcode.*), because packing is read in three languages.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useId, useRef, useState } from 'react';
 import { Camera, X } from 'lucide-react';
@@ -36,14 +37,9 @@ import { ProductMatchCombobox } from '../donation/ProductMatchComboBox';
 import { lookupBarcode, linkBarcode } from '../../services/productBarcodeAPI';
 import PalletScanner from './PalletScanner';
 import { normaliseBarcode } from './productCode';
+import { useT } from '../../translations';
 
-const NOT_A_BARCODE = 'That is not a barcode the system can read. Scan it again or type the numbers under the bars.';
-
-const CAMERA_TROUBLE = {
-  denied: 'The camera is blocked. Type the numbers under the bars instead.',
-  noCamera: 'There is no camera on this device. Type the numbers under the bars instead.',
-  failed: 'The camera could not start. Type the numbers under the bars instead.',
-};
+const CAMERA_TROUBLE = ['denied', 'noCamera', 'failed'];
 
 const asMessage = (said) => {
   if (!said) return null;
@@ -53,6 +49,7 @@ const asMessage = (said) => {
 
 // ── Linking a code nobody knows yet ───────────────────────────
 export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
+  const t = useT();
   const fieldId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [productId, setProductId] = useState(choices?.length === 1 ? choices[0].productId : null);
   const [productName, setProductName] = useState(choices?.length === 1 ? choices[0].label : '');
@@ -84,21 +81,19 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
 
   return (
     <section className="stf-scan" aria-labelledby={`${fieldId}-title`}>
-      <h3 className="stf-scan-title" id={`${fieldId}-title`}>New barcode</h3>
-      <p className="stf-scan-hint">
-        {code} is not linked to a product yet. Choose the product once and it is known from now on.
-      </p>
+      <h3 className="stf-scan-title" id={`${fieldId}-title`}>{t('barcode.new.title')}</h3>
+      <p className="stf-scan-hint">{t('barcode.new.body', { code })}</p>
 
       {choices ? (
         <ChoiceList
-          legend="Which product"
+          legend={t('barcode.new.which')}
           options={choices.map((c) => ({ value: c.productId, label: c.label, meta: c.meta }))}
           value={productId ?? ''}
           onChange={(value) => setProductId(Number(value))}
         />
       ) : (
         <div className="stf-field">
-          <span className="stf-field-label">Which product</span>
+          <span className="stf-field-label">{t('barcode.new.which')}</span>
           <ProductMatchCombobox
             value={productId}
             label={productName}
@@ -109,8 +104,8 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
 
       <NumberField
         id={`${fieldId}-units`}
-        label="Units per scan"
-        hint={`How many ${chosen?.unit || 'units'} one scan counts for. A box of 12 is 12.`}
+        label={t('barcode.new.units')}
+        hint={t('barcode.new.unitsHint')}
         value={units}
         onChange={setUnits}
         flagged={!unitsValid}
@@ -120,9 +115,9 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
 
       <Actions row>
         <Button onClick={link} disabled={busy || !productId || !unitsValid}>
-          {busy ? 'Linking' : 'Link and count'}
+          {busy ? t('barcode.new.linking') : t('barcode.new.link')}
         </Button>
-        <Button variant="secondary" onClick={onCancel} disabled={busy}>Not now</Button>
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>{t('barcode.new.notNow')}</Button>
       </Actions>
     </section>
   );
@@ -130,6 +125,7 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
 
 // ── The bar ───────────────────────────────────────────────────
 export default function ProductScanBar({ onMatch, linkChoices, disabled = false }) {
+  const t = useT();
   const fieldId = `stf-barcode-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [typed, setTyped] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -152,7 +148,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false 
 
   const handle = async (raw) => {
     const parsed = normaliseBarcode(raw);
-    if (!parsed) { setMessage({ tone: 'warn', text: NOT_A_BARCODE }); return; }
+    if (!parsed) { setMessage({ tone: 'warn', text: t('barcode.notBarcode') }); return; }
 
     const cached = known.current.get(parsed.code);
     if (cached) { apply(cached); return; }
@@ -164,7 +160,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false 
         setUnknownCode(code);
         setMessage(null);
       } else if (!match.available) {
-        setMessage({ tone: 'warn', text: `${match.productName} is no longer in the catalogue. Find the item by name instead.` });
+        setMessage({ tone: 'warn', text: t('barcode.gone', { name: match.productName }) });
       } else {
         known.current.set(code, match);
         apply(match);
@@ -201,8 +197,8 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false 
         <TextField
           id={fieldId}
           ref={inputRef}
-          label="Barcode"
-          hint="Scan, or type the numbers under the bars."
+          label={t('barcode.label')}
+          hint={t('barcode.hint')}
           value={typed}
           onChange={setTyped}
           autoComplete="off"
@@ -211,7 +207,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false 
           enterKeyHint="search"
           disabled={disabled}
         />
-        <Button type="submit" disabled={disabled || !typed.trim()}>Find</Button>
+        <Button type="submit" disabled={disabled || !typed.trim()}>{t('barcode.find')}</Button>
         <Button
           variant="secondary"
           onClick={() => { setCameraOpen((open) => !open); setCameraTrouble(null); }}
@@ -219,24 +215,24 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false 
           disabled={disabled}
         >
           {cameraOpen ? <X size={18} aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />}
-          {cameraOpen ? 'Close camera' : 'Use camera'}
+          {cameraOpen ? t('barcode.closeCamera') : t('barcode.useCamera')}
         </Button>
       </form>
 
       {cameraOpen ? (
         cameraTrouble ? (
-          <Notice tone="warn">{CAMERA_TROUBLE[cameraTrouble] ?? CAMERA_TROUBLE.failed}</Notice>
+          <Notice tone="warn">{t(`barcode.${CAMERA_TROUBLE.includes(cameraTrouble) ? cameraTrouble : 'failed'}`)}</Notice>
         ) : (
           <PalletScanner
             kind="product"
-            label="Camera for barcodes"
+            label={t('barcode.cameraLabel')}
             onCode={read}
             onUnavailable={setCameraTrouble}
           />
         )
       ) : null}
 
-      {looking ? <p className="stf-scan-hint" role="status">Looking it up</p> : null}
+      {looking ? <p className="stf-scan-hint" role="status">{t('barcode.looking')}</p> : null}
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
 
       {unknownCode ? (

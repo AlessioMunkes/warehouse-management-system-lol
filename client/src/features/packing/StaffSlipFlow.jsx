@@ -17,12 +17,23 @@
 //
 // Wraps the same confirmItem / flagItem / completeSlip endpoints the
 // manager's PackingDetail.jsx already uses — no new backend here, only
-// a phone-shaped read of it. Batch numbers and use-by dates are NOT
+// a phone-shaped read of it.
+//
+// SCANNING, AS A CHECK
+// The barcode bar above the list is optional, like typing is on
+// Receiving. Scanning a pack finds the pending line for that product
+// and opens its Confirm step with the count scanned so far, so the
+// packer still presses Save: a scan never packs anything on its own.
+// What it adds is the check a tick cannot make: scan the 800 g beans
+// on a slip that wants 410 g and it says the product is not on this
+// pallet. Lines whose stock has no barcode are ticked exactly as before.
+//
+// Batch numbers and use-by dates are NOT
 // shown: picking_slip_items carries product/quantity/status only, no
 // batch reference yet, so "oldest first" stays an instruction in the
 // sub-text rather than a fabricated batch code on screen.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   fetchPickingSlip, assignSlip, releaseSlip, confirmItem, flagItem, completeSlip,
 } from '../../services/pickingAPI';
@@ -42,6 +53,7 @@ import { useT } from '../../translations';
 import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../staff/workerStatus';
 import { subscribe as onOutboxChange } from '../../services/outbox';
+import ProductScanBar from '../scan/ProductScanBar';
 
 const MODE_KEY = 'stf_packing_view_mode';
 // label and hint are keys in translations/messages.js.
@@ -88,9 +100,18 @@ function hasQuantityVariance(item) {
   return Number(item.packed_quantity) !== Number(item.required_quantity);
 }
 
-function ItemDecisionPanel({ item, slipId, onDone }) {
+function ItemDecisionPanel({ item, slipId, onDone, scan }) {
   const [mode, setMode] = useState('idle');
   const [qty, setQty] = useState(Number(item.required_quantity) || 0);
+  // A scan of this item ({ count, seq }) opens Confirm with what has been
+  // scanned. Applied during render with a previous-value guard, the same
+  // way ProductMatchComboBox syncs, rather than a setState in an effect.
+  const [seenScan, setSeenScan] = useState(null);
+  if (scan && scan.seq !== seenScan) {
+    setSeenScan(scan.seq);
+    setMode('confirm');
+    setQty(scan.count);
+  }
   const [flagQty, setFlagQty] = useState('');
   const [reason, setReason] = useState('');
   // The paper slip's "Comment" column — on every line, not only a
@@ -213,6 +234,12 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
   const [mode, setMode] = useState(readStoredMode);
   const [focusId, setFocusId] = useState(null);
+  // What each item has been scanned up to, by item id. The ref is the
+  // running total, so two scans answered at once both count; the state
+  // is what the item's panel is handed.
+  const scanCounts = useRef(new Map());
+  const scanSeq = useRef(0);
+  const [scanHits, setScanHits] = useState({});
   const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('packing-view-toggle');
 
   useEffect(() => {
@@ -329,6 +356,36 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
     const next = pendingItems[idx + 1] ?? pendingItems.find((i) => i.id !== decidedItemId);
     setFocusId(next ? next.id : null);
   };
+
+  // One scan: the pending line for that product opens with the count.
+  const scanItem = (match) => {
+    const forProduct = items.filter((i) => String(i.product_id) === String(match.productId));
+    if (forProduct.length === 0) {
+      return { tone: 'warn', text: t('slip.scan.notOnPallet', { name: match.productName }) };
+    }
+    const item = forProduct.find((i) => i.status === 'pending');
+    if (!item) return { tone: 'warn', text: t('slip.scan.alreadyDone', { name: forProduct[0].product_name }) };
+
+    const count = Math.round(((scanCounts.current.get(item.id) ?? 0) + match.unitsPerScan) * 1000) / 1000;
+    scanCounts.current.set(item.id, count);
+    scanSeq.current += 1;
+    const seq = scanSeq.current;
+    setScanHits((hits) => ({ ...hits, [item.id]: { count, seq } }));
+    if (mode === 'guided') setFocusId(item.id);
+    requestAnimationFrame(() => {
+      document.getElementById(`stf-slip-item-${item.id}`)?.scrollIntoView?.({ block: 'nearest' });
+    });
+    return t('slip.scan.counted', {
+      name: item.product_name,
+      n: fmtQty(count, item.unit),
+      need: fmtQty(item.required_quantity, item.unit),
+    });
+  };
+
+  // The pallet's own products, for linking a barcode nobody knows yet.
+  const scanChoices = [...new Map(pendingItems.map((i) => [i.product_id, {
+    productId: i.product_id, label: i.product_name,
+  }])).values()];
 
   const handleClaim = async () => {
     setClaiming(true);
@@ -457,6 +514,10 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
         </p>
       ) : null}
 
+      {canEdit && !locked && pending > 0 ? (
+        <ProductScanBar onMatch={scanItem} linkChoices={scanChoices} />
+      ) : null}
+
       {items.length === 0 ? (
         <Notice>{t('slip.noItems')}</Notice>
       ) : (
@@ -472,7 +533,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                 { status: 'pending', label: t('slip.badge.pending') };
 
               return (
-                <div key={item.id} className="stf-row is-static stf-row--check">
+                <div key={item.id} id={`stf-slip-item-${item.id}`} className="stf-row is-static stf-row--check">
                   {/* .stf-row--check already exists for exactly this
                       shape (see DonationItemsList.jsx) — a row that
                       stacks extra content below its main line instead
@@ -513,6 +574,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                     <ItemDecisionPanel
                       item={item}
                       slipId={slip.id}
+                      scan={scanHits[item.id]}
                       onDone={() => { advanceGuidedFocus(item.id); reload(); }}
                     />
                   ) : null}

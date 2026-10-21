@@ -804,17 +804,19 @@ export const TOPICS = [
     id: 'barcode-scanning',
     title: 'Scanning barcodes',
     roles: WORKERS_ONLY,
-    screens: ['receiving', 'donation'],
+    screens: ['receiving', 'donation', 'packing'],
     asks: [
       'scan a barcode', 'barcode scanner', 'scan the box', 'scan items', 'use the camera to count',
       'barcode not found', 'new barcode', 'link a barcode', 'scan instead of typing',
+      'scan when packing', 'check the right item',
     ],
     body:
-      'On Receiving and on food donations you can scan the barcode on a pack instead of ' +
-      'finding the item by name. Use the camera, or a USB or Bluetooth scanner in the ' +
-      'Barcode box. Typing still works the same way.',
+      'On Receiving, on food donations and when packing a pallet you can scan the barcode ' +
+      'on a pack instead of finding the item by name. Use the camera, or a USB or Bluetooth ' +
+      'scanner in the Barcode box. Typing and ticking still work the same way.',
     steps: [
       'Scan the barcode. On Receiving it opens that line and counts one scan at a time; on a donation it fills the item.',
+      'When packing, a scan opens that item with the count scanned, and you press Save. A product that is not on the pallet is pointed out.',
       'Each scan adds the barcode’s units per scan. A box of 12 counts as 12.',
       'If the barcode is new, choose which product it is and how many one scan counts for. From then on it is known.',
       'Check the numbers before you finish. You can still type over any count.',
