@@ -20,6 +20,14 @@
 //
 // Reasons: 'denied' (permission refused), 'noCamera', 'failed'.
 //
+// TWO KINDS OF CODE. kind="pallet" (the default) reads QR codes only:
+// the labels this system prints. kind="product" reads the barcodes on
+// stock instead (EAN-13, EAN-8, UPC-A, UPC-E, Code 128) through a wide,
+// short window, because a barcode is a wide, short thing. Holding a box
+// still over the camera counts once: the same product code is not
+// handed over again until it has been out of view for a moment, so the
+// next identical box is a new read and a lingering one is not.
+//
 // Motion: the library's own scanning UI is not used (only its camera and
 // decoder), and nothing here animates.
 // ─────────────────────────────────────────────────────────────
@@ -31,8 +39,26 @@ const START_TIMEOUT_MS = 20000;
 // After a read, the same screen does not get another for this long: a
 // phone held over a code reads it dozens of times a second.
 const REPEAT_QUIET_MS = 1500;
+// For product barcodes: how long a code must be out of view before the
+// same code counts again. Long enough to bridge a frame or two the
+// decoder misses while the box is held still.
+const PRODUCT_GONE_MS = 800;
 
-export default function PalletScanner({ onCode, onUnavailable, onReady, label }) {
+const PRODUCT_FORMATS = ['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128'];
+
+// QR: a square. Product barcodes: nearly the full width, under half as tall.
+const scanWindow = (kind) => (width, height) => {
+  if (kind === 'product') {
+    return {
+      width: Math.max(50, Math.floor(width * 0.9)),
+      height: Math.max(50, Math.floor(Math.min(width, height) * 0.45)),
+    };
+  }
+  const side = Math.floor(Math.min(width, height) * 0.7);
+  return { width: side, height: side };
+};
+
+export default function PalletScanner({ onCode, onUnavailable, onReady, label, kind = 'pallet' }) {
   const reactId = useId();
   const elementId = `pallet-scanner-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
@@ -47,6 +73,8 @@ export default function PalletScanner({ onCode, onUnavailable, onReady, label })
     let started = false;
     let settled = false;
     let quietUntil = 0;
+    let lastText = null;
+    let lastSeenAt = 0;
     let timer = null;
 
     const stop = async () => {
@@ -85,8 +113,11 @@ export default function PalletScanner({ onCode, onUnavailable, onReady, label })
       if (cancelled) return;
 
       try {
+        const formats = kind === 'product'
+          ? PRODUCT_FORMATS.map((f) => lib.Html5QrcodeSupportedFormats[f]).filter((f) => f !== undefined)
+          : [lib.Html5QrcodeSupportedFormats.QR_CODE];
         scanner = new lib.Html5Qrcode(elementId, {
-          formatsToSupport: [lib.Html5QrcodeSupportedFormats.QR_CODE],
+          formatsToSupport: formats,
           useBarCodeDetectorIfSupported: true,
           verbose: false,
         });
@@ -94,15 +125,20 @@ export default function PalletScanner({ onCode, onUnavailable, onReady, label })
           { facingMode: 'environment' },
           {
             fps: 10,
-            qrbox: (width, height) => {
-              const side = Math.floor(Math.min(width, height) * 0.7);
-              return { width: side, height: side };
-            },
+            qrbox: scanWindow(kind),
           },
           (text) => {
             const now = Date.now();
-            if (cancelled || now < quietUntil) return;
-            quietUntil = now + REPEAT_QUIET_MS;
+            if (cancelled) return;
+            if (kind === 'product') {
+              const same = text === lastText && now - lastSeenAt < PRODUCT_GONE_MS;
+              lastText = text;
+              lastSeenAt = now;
+              if (same) return;
+            } else {
+              if (now < quietUntil) return;
+              quietUntil = now + REPEAT_QUIET_MS;
+            }
             handlers.current.onCode?.(text);
           },
           () => { /* a frame with no code in it: the normal case, not an error */ },
@@ -122,7 +158,14 @@ export default function PalletScanner({ onCode, onUnavailable, onReady, label })
       window.clearTimeout(timer);
       stop();
     };
-  }, [elementId]);
+  }, [elementId, kind]);
 
-  return <div id={elementId} className="scan-view" role="img" aria-label={label} />;
+  return (
+    <div
+      id={elementId}
+      className={`scan-view${kind === 'product' ? ' is-product' : ''}`}
+      role="img"
+      aria-label={label}
+    />
+  );
 }

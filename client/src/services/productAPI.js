@@ -70,6 +70,9 @@ export const toProduct = (row) => ({
   quantityPerMeal:  row.quantity_per_meal === null || row.quantity_per_meal === undefined
                       ? null
                       : Number(row.quantity_per_meal),
+  // The codes linked to it (migration 052). Units per scan and who
+  // linked each one come from productBarcodeAPI on the product's panel.
+  barcodes:         Array.isArray(row.barcodes) ? row.barcodes : [],
 });
 
 export const getProducts = async ({ includeInactive = false, search = "" } = {}) => {

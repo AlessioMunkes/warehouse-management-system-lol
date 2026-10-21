@@ -798,7 +798,48 @@ export const TOPICS = [
       topic: 'receiving-discrepancy',
     },
     rules: ['BR-05', 'BR-07', 'BR-08'],
-    related: ['receiving-discrepancy', 'receiving-partial', 'receiving-expiry'],
+    related: ['receiving-discrepancy', 'receiving-partial', 'receiving-expiry', 'barcode-scanning'],
+  },
+  {
+    id: 'barcode-scanning',
+    title: 'Scanning barcodes',
+    roles: WORKERS_ONLY,
+    screens: ['receiving', 'donation'],
+    asks: [
+      'scan a barcode', 'barcode scanner', 'scan the box', 'scan items', 'use the camera to count',
+      'barcode not found', 'new barcode', 'link a barcode', 'scan instead of typing',
+    ],
+    body:
+      'On Receiving and on food donations you can scan the barcode on a pack instead of ' +
+      'finding the item by name. Use the camera, or a USB or Bluetooth scanner in the ' +
+      'Barcode box. Typing still works the same way.',
+    steps: [
+      'Scan the barcode. On Receiving it opens that line and counts one scan at a time; on a donation it fills the item.',
+      'Each scan adds the barcode’s units per scan. A box of 12 counts as 12.',
+      'If the barcode is new, choose which product it is and how many one scan counts for. From then on it is known.',
+      'Check the numbers before you finish. You can still type over any count.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to record a delivery?',
+      topic: 'receiving-record',
+    },
+    related: ['receiving-record'],
+  },
+  {
+    id: 'product-barcodes-admin',
+    title: 'Barcodes on a product',
+    roles: ADMIN_ONLY,
+    screens: ['products'],
+    asks: ['add a barcode', 'remove a barcode', 'wrong barcode', 'product barcodes', 'ean code'],
+    body:
+      'A product can have several barcodes, one per supplier or pack size, or none. Most ' +
+      'are linked on the floor the first time a box is scanned. Open the product on ' +
+      'Products to see them, add one, or remove one that was linked to the wrong product.',
+    followUp: {
+      question: 'Would you like to know what the other product fields do?',
+      topic: 'product-fields',
+    },
+    related: ['product-fields'],
   },
   {
     id: 'receiving-discrepancy',

@@ -12,11 +12,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }  from '../context/AuthContext';
 import ProductForm  from '../features/products/ProductForm';
+import ProductBarcodes from '../features/products/ProductBarcodes';
 import productAPI   from '../services/productAPI';
 import ConfirmRemoveDialog from '../features/masterdata/ConfirmRemoveDialog';
 import useOpenFromQuery    from '../features/masterdata/useOpenFromQuery';
 import useTableView        from '../features/masterdata/useTableView';
 import useListFilters from '../features/masterdata/useListFilters';
+
+// A product's linked barcodes. A record from before migration 052 (a
+// cached read, an older server) has none rather than breaking the table.
+const codesOf = (p) => p.barcodes ?? [];
 
 // "+ Filter" beyond the Dry / Cold tabs: what the product is and how it
 // is handled.
@@ -25,6 +30,7 @@ const PRODUCT_FILTERS = [
   { key: 'unit', label: 'Unit', valueOf: (p) => p.defaultUnit },
   { key: 'perishable', label: 'Perishable', valueOf: (p) => (p.isPerishable ? 'yes' : 'no'), labelOf: (v) => (v === 'yes' ? 'Perishable' : 'Not perishable') },
   { key: 'decantable', label: 'Decantable', valueOf: (p) => (p.isDecantable ? 'yes' : 'no'), labelOf: (v) => (v === 'yes' ? 'Decantable' : 'Not decantable') },
+  { key: 'barcode', label: 'Barcode', valueOf: (p) => (codesOf(p).length ? 'yes' : 'no'), labelOf: (v) => (v === 'yes' ? 'Has a barcode' : 'No barcode') },
 ];
 import MasterDataTable     from '../features/masterdata/MasterDataTable';
 
@@ -93,13 +99,20 @@ const COLUMNS = [
   { key: 'decantable', label: 'Decantable', weight: 1.7, minWidth: 'lg',
     sort: (p) => (p.isDecantable ? 'yes' : 'no'),
     cell: (p) => (p.isDecantable ? 'Yes' : 'No') },
+  { key: 'barcodes', label: 'Barcodes', weight: 2.2, minWidth: 'lg',
+    sort: (p) => codesOf(p)[0] ?? null,
+    cell: (p) => {
+      const codes = codesOf(p);
+      if (codes.length === 0) return '-';
+      return codes.length === 1 ? codes[0] : `${codes[0]} +${codes.length - 1}`;
+    } },
   { key: 'status',   label: 'Status', sort: null, weight: 1.8,
     cell: (p) => (!p.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null) },
 ];
 
 // Same markup as the global fetch error banner in
 // SupplierDirectoryPage/InventoryManagementPage. One error style per app.
-const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onRemove, onClose }) => (
+const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onRemove, onClose, onBarcodesChanged }) => (
   <DetailPanel
     open
     onClose={onClose}
@@ -146,6 +159,7 @@ const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onRemove, o
         <dd>{product.isDecantable ? 'Yes' : 'No, whole numbers only'}</dd>
       </div>
     </dl>
+    <ProductBarcodes product={product} canManage={canManage} onChanged={onBarcodesChanged} />
   </DetailPanel>
 );
 
@@ -311,7 +325,7 @@ export default function ProductManagementPage() {
               search={{
                 value: search,
                 onChange: (value) => { setIsLoading(true); setSearch(value); },
-                placeholder: 'Search by name, SKU or category',
+                placeholder: 'Search by name, SKU, category or barcode',
               }}
               filters={[{
                 key: 'inactive', label: 'Show inactive', active: includeInactive,
@@ -361,6 +375,7 @@ export default function ProductManagementPage() {
           onToggleActive={toggleActive}
           onRemove={() => setConfirmRemove(true)}
           onClose={() => setSelected(null)}
+          onBarcodesChanged={loadProducts}
         />
       ) : null}
 
