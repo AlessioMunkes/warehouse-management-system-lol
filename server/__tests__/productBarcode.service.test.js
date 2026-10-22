@@ -11,6 +11,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const barcodeRepoMock = {
   findByCode: vi.fn(),
+  listAll: vi.fn(),
+  recordScan: vi.fn(),
   listForProduct: vi.fn(),
   create: vi.fn(),
   remove: vi.fn(),
@@ -19,6 +21,9 @@ const productRepoMock = { getProductById: vi.fn() };
 
 vi.mock('../src/repositories/productBarcode.repository.js', () => ({ default: barcodeRepoMock }));
 vi.mock('../src/repositories/product.repository.js', () => ({ default: productRepoMock }));
+
+const offMock = { lookupProduct: vi.fn() };
+vi.mock('../src/integrations/openFoodFacts.js', () => ({ default: offMock }));
 
 const { default: service } = await import('../src/services/productBarcode.service.js');
 
@@ -31,7 +36,7 @@ const linkedRow = (over = {}) => ({
 });
 
 beforeEach(() => {
-  for (const fn of [...Object.values(barcodeRepoMock), ...Object.values(productRepoMock)]) fn.mockReset();
+  for (const fn of [...Object.values(barcodeRepoMock), ...Object.values(productRepoMock), offMock.lookupProduct]) fn.mockReset();
 });
 
 describe('lookup', () => {
@@ -45,7 +50,7 @@ describe('lookup', () => {
   it('answers an unknown code with match: null, not an error', async () => {
     barcodeRepoMock.findByCode.mockResolvedValue(null);
     await expect(service.lookup('4006381333931')).resolves.toEqual({
-      code: '4006381333931', format: 'ean13', match: null,
+      code: '4006381333931', format: 'ean13', gs1: null, match: null,
     });
   });
 
@@ -116,5 +121,55 @@ describe('unlink', () => {
     barcodeRepoMock.remove.mockResolvedValue(null);
     await expect(service.unlink(7, 3, 1)).rejects.toMatchObject({ status: 404 });
     expect(barcodeRepoMock.remove).toHaveBeenCalledWith({ productId: 7, barcodeId: 3, actorId: 1 });
+  });
+});
+
+describe('lookup of a GS1 case label', () => {
+  it('finds the product by its GTIN and hands back the use-by date and batch', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(null);
+    const result = await service.lookup('(01)10036000291459(17)261231(10)AB12');
+    expect(barcodeRepoMock.findByCode).toHaveBeenCalledWith('10036000291459');
+    expect(result.gs1).toEqual({ useBy: '2026-12-31', batch: 'AB12' });
+  });
+});
+
+describe('listAll', () => {
+  it('gives every link as a match keyed by its code', async () => {
+    barcodeRepoMock.listAll.mockResolvedValue([linkedRow()]);
+    expect(await service.listAll()).toEqual([
+      expect.objectContaining({ code: '0036000291452', productId: 7, unitsPerScan: 12, available: true }),
+    ]);
+  });
+});
+
+describe('recordScan', () => {
+  it('records a known screen and outcome against who scanned', async () => {
+    await service.recordScan({ screen: 'packing', outcome: 'not_on_list', productId: 7, referenceId: 12 }, 3);
+    expect(barcodeRepoMock.recordScan).toHaveBeenCalledWith({
+      screen: 'packing', outcome: 'not_on_list', productId: 7, referenceId: 12, userId: 3,
+    });
+  });
+
+  it('refuses a screen or outcome it does not know', async () => {
+    await expect(service.recordScan({ screen: 'office', outcome: 'counted' })).rejects.toMatchObject({ status: 400 });
+    await expect(service.recordScan({ screen: 'packing', outcome: 'maybe' })).rejects.toMatchObject({ status: 400 });
+    expect(barcodeRepoMock.recordScan).not.toHaveBeenCalled();
+  });
+});
+
+describe('suggest', () => {
+  it('says which product already has the code, without asking outside', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(linkedRow());
+    const result = await service.suggest('036000291452');
+    expect(result.linkedTo).toEqual({ productId: 7, productName: 'Rice 1kg' });
+    expect(offMock.lookupProduct).not.toHaveBeenCalled();
+  });
+
+  it('asks Open Food Facts about a code nobody has linked', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(null);
+    offMock.lookupProduct.mockResolvedValue({ name: 'Koo Baked beans 410 g', weightKg: 0.41 });
+    const result = await service.suggest('4006381333931');
+    expect(offMock.lookupProduct).toHaveBeenCalledWith('4006381333931');
+    expect(result).toMatchObject({ linkedTo: null, suggestion: { name: 'Koo Baked beans 410 g' } });
   });
 });

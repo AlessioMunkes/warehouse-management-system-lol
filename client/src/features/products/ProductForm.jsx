@@ -78,15 +78,18 @@ const BLANK = {
   storageType: 'dry',
 };
 
+// `seed` pre-fills a NEW product (a barcode suggestion) without making
+// it an edit: `initial` is what marks an edit.
 export default function ProductForm({
   initial = null,
+  seed = null,
   submitLabel = 'Add product',
   onSubmit,
   onCancel,
   busy = false,
   error = null,
 }) {
-  const [form, setForm] = useState({ ...BLANK, ...(initial ?? {}) });
+  const [form, setForm] = useState({ ...BLANK, ...(initial ?? seed ?? {}) });
   const [touchedName, setTouchedName] = useState(false);
   const [touchedSku,  setTouchedSku]  = useState(false);
   const [touchedUnit, setTouchedUnit] = useState(false);

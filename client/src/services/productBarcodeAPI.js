@@ -10,6 +10,15 @@
 // that needs an answer now, and a link made while offline would be a
 // guess about a code nobody can check; both say so and leave the
 // typed product search, which is how items were logged before.
+//
+// OFFLINE SCANNING is getAllBarcodes: every link at once, which
+// readCache.js keeps on the device like any other read, so a phone
+// that has been online once can still name what it scans
+// (features/scan/useBarcodeReader.js).
+//
+// recordScan is fire and forget: a record for the "caught by scanning"
+// report, never worth an error on the floor, and dropped (not queued)
+// when there is no signal.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost, apiDelete } from './api';
 
@@ -46,4 +55,25 @@ export const removeBarcode = async (productId, barcodeId) => {
   return toBarcode(body.data ?? {});
 };
 
-export default { lookupBarcode, listBarcodes, linkBarcode, removeBarcode };
+// [{ code, productId, productName, sku, defaultUnit, unitsPerScan, available }]
+export const getAllBarcodes = async () => {
+  const body = await apiGet('/api/products/barcodes');
+  return body.data ?? [];
+};
+
+export const recordScan = async ({ screen, outcome, productId = null, referenceId = null }) => {
+  try {
+    await apiPost('/api/products/barcodes/events', { screen, outcome, productId, referenceId });
+  } catch { /* a record, not the work: never in the way */ }
+};
+
+// { code, linkedTo: { productId, productName } | null,
+//   suggestion: { name, brand, quantity, weightKg, category } | null }
+export const suggestProduct = async (code) => {
+  const body = await apiGet(`/api/products/barcodes/${encodeURIComponent(code)}/suggestion`);
+  return body.data;
+};
+
+export default {
+  lookupBarcode, listBarcodes, linkBarcode, removeBarcode, getAllBarcodes, recordScan, suggestProduct,
+};

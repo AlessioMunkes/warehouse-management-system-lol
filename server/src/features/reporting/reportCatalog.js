@@ -531,6 +531,20 @@ export const METRICS = {
     caveat: 'Flagged lines as a share of all lines that were worked.',
   },
 
+  // ══ Scanning ═══════════════════════════════════════════════
+  scan_catches: {
+    id: 'scan_catches', label: 'Wrong items caught by scanning', temporal: 'range',
+    description:
+      'How many times a barcode scan stopped the wrong product going onto a pallet ' +
+      'or being booked in against an order: the pack was scanned and it was not ' +
+      'what the pallet or order wanted.',
+    repoFn: 'scanCatches', unit: 'scans',
+    dimensions: ['none', 'month', 'week', 'product'],
+    filters: ['product_id'],
+    defaultChart: 'number',
+    caveat: 'Only scans made with signal are recorded, and only items that were scanned at all, so the real number is at least this.',
+  },
+
   // ══ Community requests ═════════════════════════════════════
   community_request_outcomes: {
     id: 'community_request_outcomes', label: 'Community requests', temporal: 'range',

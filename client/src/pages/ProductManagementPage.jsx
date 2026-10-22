@@ -13,6 +13,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }  from '../context/AuthContext';
 import ProductForm  from '../features/products/ProductForm';
 import ProductBarcodes from '../features/products/ProductBarcodes';
+import ProductBarcodeStart from '../features/products/ProductBarcodeStart';
+import { linkBarcode } from '../services/productBarcodeAPI';
 import productAPI   from '../services/productAPI';
 import ConfirmRemoveDialog from '../features/masterdata/ConfirmRemoveDialog';
 import useOpenFromQuery    from '../features/masterdata/useOpenFromQuery';
@@ -178,6 +180,16 @@ export default function ProductManagementPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // Add product, started from a barcode: what to pre-fill the form with
+  // (a new key remounts it), and the code to link once it is added.
+  const [seed, setSeed] = useState({ key: 0, values: null });
+  const [startCode, setStartCode] = useState(null);
+  const openCreate = () => {
+    setSelected(null);
+    setSeed({ key: 0, values: null });
+    setStartCode(null);
+    setMode('create');
+  };
   const [tab, setTab] = useState('all');
   const view = useTableView('products', COLUMNS);
   const current = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
@@ -241,9 +253,19 @@ export default function ProductManagementPage() {
     setBusy(true); setError(null);
     try {
       const created = await productAPI.createProduct(payload);
+      let linkProblem = null;
+      if (startCode) {
+        try {
+          await linkBarcode(created.id, { code: startCode });
+        } catch (err) {
+          linkProblem = `The product was added, but its barcode was not linked: ${err.message}`;
+        }
+      }
       setMode('list');
       await loadProducts();
       await open(created.id);
+      // After open(), which clears the banner.
+      if (linkProblem) setError(linkProblem);
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
 
@@ -299,7 +321,7 @@ export default function ProductManagementPage() {
         title="Products"
         description="Add and edit the products the warehouse stocks."
         actions={canManage ? (
-          <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
+          <Button type="button" onClick={openCreate}>
             <Plus />
             Add product
           </Button>
@@ -395,7 +417,14 @@ export default function ProductManagementPage() {
 
       {mode === 'create' ? (
         <DetailPanel open onClose={() => setMode('list')} title="Add a product">
-          <ProductForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
+          <ProductBarcodeStart
+            onCode={setStartCode}
+            onSeed={(values) => setSeed((s) => ({ key: s.key + 1, values }))}
+          />
+          <ProductForm
+            key={seed.key} seed={seed.values}
+            onSubmit={create} onCancel={() => setMode('list')} busy={busy}
+          />
         </DetailPanel>
       ) : null}
 

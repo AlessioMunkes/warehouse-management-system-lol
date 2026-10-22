@@ -347,6 +347,13 @@ export const OPERATIONAL_INSIGHTS = {
     related: [{ metric: 'picking_flag_rate', dimension: 'month' }, { metric: 'low_stock_items', dimension: 'product' }],
     actions: ['flagged_products', 'overdue_slips'],
   },
+  // More catches is not better or worse on its own: it is mistakes that
+  // did not leave the building. Read beside the flag rate.
+  scan_catches: {
+    area: 'picking', better: null,
+    related: [{ metric: 'scan_catches', dimension: 'product' }, { metric: 'picking_flag_rate', dimension: 'product' }],
+    actions: ['flagged_products'],
+  },
   community_request_outcomes: {
     area: 'community', better: null,
     related: [{ metric: 'community_request_outcomes', dimension: 'month' }],

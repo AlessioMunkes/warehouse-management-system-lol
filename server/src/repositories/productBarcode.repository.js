@@ -116,4 +116,30 @@ const remove = async ({ productId, barcodeId, actorId = null }) => {
   }
 };
 
-export default { findByCode, listForProduct, create, remove };
+// Every link, with its product, for a phone to keep a copy of: a scan
+// at a bay with no signal is answered from that copy. Only products
+// still in the catalogue; a code on one that left it is answered by
+// findByCode with the server's own word.
+const listAll = async () => {
+  const { rows } = await pool.query(
+    `SELECT pb.id, pb.product_id, pb.code, pb.units_per_scan,
+            p.name AS product_name, p.stock_keeping_unit AS sku,
+            p.default_unit, p.is_active, p.archived_at
+       FROM product_barcodes pb
+       JOIN products p ON p.id = pb.product_id
+      WHERE p.is_active = true AND p.archived_at IS NULL
+      ORDER BY pb.code`,
+  );
+  return rows;
+};
+
+// One scan's outcome (migration 053). Fire and forget from the floor.
+const recordScan = async ({ screen, outcome, productId = null, referenceId = null, userId = null }) => {
+  await pool.query(
+    `INSERT INTO barcode_scan_events (screen, outcome, product_id, reference_id, user_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [screen, outcome, productId, referenceId, userId],
+  );
+};
+
+export default { findByCode, listForProduct, listAll, create, remove, recordScan };

@@ -20,6 +20,7 @@
 import barcodeRepo from '../repositories/productBarcode.repository.js';
 import productRepo from '../repositories/product.repository.js';
 import { normaliseBarcode } from '../utils/barcode.js';
+import openFoodFacts from '../integrations/openFoodFacts.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -66,7 +67,13 @@ const lookup = async (raw) => {
   const parsed = normaliseBarcode(raw);
   if (!parsed) fail(400, NOT_A_BARCODE);
   const row = await barcodeRepo.findByCode(parsed.code);
-  return { code: parsed.code, format: parsed.format, match: row ? toMatch(row) : null };
+  return {
+    code: parsed.code,
+    format: parsed.format,
+    // A GS1 case label's use-by date and batch, when it carried them.
+    gs1: parsed.gs1 ?? null,
+    match: row ? toMatch(row) : null,
+  };
 };
 
 const listForProduct = async (productId) => {
@@ -116,4 +123,50 @@ const unlink = async (productId, barcodeId, actorId = null) => {
   return removed;
 };
 
-export default { lookup, listForProduct, link, unlink, MAX_UNITS_PER_SCAN };
+// Every link, for a phone's own copy (offline scanning).
+const listAll = async () => {
+  const rows = await barcodeRepo.listAll();
+  return rows.map((row) => ({ code: row.code, ...toMatch(row) }));
+};
+
+// ── Scan records (migration 053) ─────────────────────────────
+const SCREENS = ['receiving', 'donation', 'packing', 'stock_count'];
+const OUTCOMES = ['counted', 'not_on_list', 'already_done', 'unknown', 'linked', 'misread'];
+
+const optionalId = (raw, name) => (raw === undefined || raw === null || raw === '' ? null : validateId(raw, name));
+
+const recordScan = async (data = {}, userId = null) => {
+  if (!SCREENS.includes(data.screen)) fail(400, `Screen must be one of: ${SCREENS.join(', ')}.`);
+  if (!OUTCOMES.includes(data.outcome)) fail(400, `Outcome must be one of: ${OUTCOMES.join(', ')}.`);
+  try {
+    await barcodeRepo.recordScan({
+      screen: data.screen,
+      outcome: data.outcome,
+      productId: optionalId(data.productId, 'Product ID'),
+      referenceId: optionalId(data.referenceId, 'Reference ID'),
+      userId,
+    });
+  } catch (err) {
+    // A product that has since gone is not worth refusing a record for.
+    if (err.code === '23503') fail(400, 'That product does not exist.');
+    throw err;
+  }
+  return { recorded: true };
+};
+
+// ── A suggestion for a new product (Open Food Facts) ─────────
+// Already linked here: say so, and suggest nothing. Otherwise what the
+// public database says, or nothing.
+const suggest = async (raw) => {
+  const parsed = normaliseBarcode(raw);
+  if (!parsed) fail(400, NOT_A_BARCODE);
+  const existing = await barcodeRepo.findByCode(parsed.code);
+  if (existing) {
+    return { code: parsed.code, linkedTo: { productId: existing.product_id, productName: existing.product_name }, suggestion: null };
+  }
+  return { code: parsed.code, linkedTo: null, suggestion: await openFoodFacts.lookupProduct(parsed.code) };
+};
+
+export default {
+  lookup, listForProduct, listAll, link, unlink, recordScan, suggest, MAX_UNITS_PER_SCAN, SCREENS, OUTCOMES,
+};

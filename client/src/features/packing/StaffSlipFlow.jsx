@@ -364,7 +364,9 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       return { tone: 'warn', text: t('slip.scan.notOnPallet', { name: match.productName }) };
     }
     const item = forProduct.find((i) => i.status === 'pending');
-    if (!item) return { tone: 'warn', text: t('slip.scan.alreadyDone', { name: forProduct[0].product_name }) };
+    if (!item) {
+      return { tone: 'warn', outcome: 'already_done', text: t('slip.scan.alreadyDone', { name: forProduct[0].product_name }) };
+    }
 
     const count = Math.round(((scanCounts.current.get(item.id) ?? 0) + match.unitsPerScan) * 1000) / 1000;
     scanCounts.current.set(item.id, count);
@@ -515,7 +517,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       ) : null}
 
       {canEdit && !locked && pending > 0 ? (
-        <ProductScanBar onMatch={scanItem} linkChoices={scanChoices} />
+        <ProductScanBar onMatch={scanItem} linkChoices={scanChoices} screen="packing" referenceId={slip.id} />
       ) : null}
 
       {items.length === 0 ? (

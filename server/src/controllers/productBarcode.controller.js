@@ -55,4 +55,34 @@ const unlink = async (req, res) => {
   }
 };
 
-export default { lookup, list, link, unlink };
+// ── GET /api/products/barcodes ──────────────────────────────────
+const listAll = async (req, res) => {
+  try {
+    const data = await barcodeService.listAll();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'listAllBarcodes', 'Failed to retrieve barcodes.');
+  }
+};
+
+// ── POST /api/products/barcodes/events ──────────────────────────
+const recordScan = async (req, res) => {
+  try {
+    const data = await barcodeService.recordScan(req.body ?? {}, req.user?.id ?? null);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'recordScan', 'Failed to record the scan.');
+  }
+};
+
+// ── GET /api/products/barcodes/:code/suggestion ─────────────────
+const suggest = async (req, res) => {
+  try {
+    const data = await barcodeService.suggest(req.params.code);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'suggestProduct', 'Failed to look up the barcode.');
+  }
+};
+
+export default { lookup, list, link, unlink, listAll, recordScan, suggest };

@@ -12,13 +12,11 @@
 //                       field keeps focus after each code, so a scanner
 //                       can fire one box after another.
 //   the camera          PalletScanner in its product mode.
-//   either way          productCode.js normalises the code (a misread is
-//                       answered here), the server says which product it
-//                       is, and onMatch(match) applies it to the list.
-//
-// Reads are handled one at a time, in order. A camera can read two
-// boxes faster than the server answers the first, and dropping the
-// second would undercount.
+//   either way          useBarcodeReader.js: the code is normalised, the
+//                       product found (offline too, from the phone's copy
+//                       of every link), and onMatch(match, label) applies
+//                       it to the list. `label` carries a GS1 case
+//                       label's use-by date and batch.
 //
 // A CODE NOBODY HAS LINKED is the normal case for the first box of
 // anything. The bar asks which product it is (from `linkChoices`, the
@@ -30,22 +28,16 @@
 // not on this order). The bar's own words are in translations/
 // messages.js (barcode.*), because packing is read in three languages.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Camera, X } from 'lucide-react';
 import { Actions, Button, ChoiceList, Notice, NumberField, TextField } from '../staff/StepPrimitives';
 import { ProductMatchCombobox } from '../donation/ProductMatchComboBox';
-import { lookupBarcode, linkBarcode } from '../../services/productBarcodeAPI';
+import { linkBarcode } from '../../services/productBarcodeAPI';
 import PalletScanner from './PalletScanner';
-import { normaliseBarcode } from './productCode';
+import useBarcodeReader from './useBarcodeReader';
 import { useT } from '../../translations';
 
 const CAMERA_TROUBLE = ['denied', 'noCamera', 'failed'];
-
-const asMessage = (said) => {
-  if (!said) return null;
-  if (typeof said === 'string') return { tone: 'info', text: said };
-  return { tone: said.tone ?? 'info', text: said.text };
-};
 
 // ── Linking a code nobody knows yet ───────────────────────────
 export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
@@ -124,58 +116,17 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
 }
 
 // ── The bar ───────────────────────────────────────────────────
-export default function ProductScanBar({ onMatch, linkChoices, disabled = false }) {
+// `screen` and `referenceId` say where the scan was, for the record
+// useBarcodeReader keeps (receiving and an order id, packing and a
+// slip id...).
+export default function ProductScanBar({ onMatch, linkChoices, disabled = false, screen = null, referenceId = null }) {
   const t = useT();
   const fieldId = `stf-barcode-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [typed, setTyped] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraTrouble, setCameraTrouble] = useState(null);
-  const [message, setMessage] = useState(null);
-  const [looking, setLooking] = useState(false);
-  const [unknownCode, setUnknownCode] = useState(null);
   const inputRef = useRef(null);
-  // One read at a time, in the order they came.
-  const queue = useRef(Promise.resolve());
-  // Codes already answered on this screen. Only matches are kept: an
-  // unknown code may be linked a moment later.
-  const known = useRef(new Map());
-  // The latest handler, so a read queued before a re-render applies to
-  // the list as it is now, not as it was.
-  const latest = useRef({ onMatch });
-  useEffect(() => { latest.current = { onMatch }; });
-
-  const apply = (match) => setMessage(asMessage(latest.current.onMatch(match)));
-
-  const handle = async (raw) => {
-    const parsed = normaliseBarcode(raw);
-    if (!parsed) { setMessage({ tone: 'warn', text: t('barcode.notBarcode') }); return; }
-
-    const cached = known.current.get(parsed.code);
-    if (cached) { apply(cached); return; }
-
-    setLooking(true);
-    try {
-      const { code, match } = await lookupBarcode(parsed.code);
-      if (!match) {
-        setUnknownCode(code);
-        setMessage(null);
-      } else if (!match.available) {
-        setMessage({ tone: 'warn', text: t('barcode.gone', { name: match.productName }) });
-      } else {
-        known.current.set(code, match);
-        apply(match);
-      }
-    } catch (err) {
-      setMessage({ tone: 'warn', text: err.message });
-    } finally {
-      setLooking(false);
-    }
-  };
-
-  const read = (raw) => {
-    queue.current = queue.current.then(() => handle(raw)).catch(() => {});
-    return queue.current;
-  };
+  const { read, linked, message, looking, unknownCode, dismissUnknown } = useBarcodeReader({ onMatch, screen, referenceId });
 
   const submitTyped = (event) => {
     event.preventDefault();
@@ -183,12 +134,6 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false 
     setTyped('');
     inputRef.current?.focus();
     if (text.trim()) read(text);
-  };
-
-  const linked = (code, match) => {
-    known.current.set(code, match);
-    setUnknownCode(null);
-    apply(match);
   };
 
   return (
@@ -241,7 +186,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false 
           code={unknownCode}
           choices={linkChoices}
           onLinked={(match) => linked(unknownCode, match)}
-          onCancel={() => setUnknownCode(null)}
+          onCancel={dismissUnknown}
         />
       ) : null}
     </div>

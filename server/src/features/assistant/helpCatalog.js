@@ -820,6 +820,8 @@ export const TOPICS = [
       'Each scan adds the barcode’s units per scan. A box of 12 counts as 12.',
       'If the barcode is new, choose which product it is and how many one scan counts for. From then on it is known.',
       'Check the numbers before you finish. You can still type over any count.',
+      'A supplier’s case label often carries the use-by date too. Scanning it fills in an empty use-by date for you.',
+      'With no signal, a barcode this phone has scanned before still works. A new one needs signal to link.',
     ],
     followUp: {
       question: 'Would you like to know how to record a delivery?',
@@ -836,7 +838,9 @@ export const TOPICS = [
     body:
       'A product can have several barcodes, one per supplier or pack size, or none. Most ' +
       'are linked on the floor the first time a box is scanned. Open the product on ' +
-      'Products to see them, add one, or remove one that was linked to the wrong product.',
+      'Products to see them, add one, or remove one that was linked to the wrong product. ' +
+      'When adding a product, Start from a barcode looks the pack up in the public Open Food ' +
+      'Facts database and fills in what it knows, for you to check. Only the barcode is sent.',
     followUp: {
       question: 'Would you like to know what the other product fields do?',
       topic: 'product-fields',
@@ -1132,6 +1136,28 @@ export const TOPICS = [
 
   // ═══ Packing ══════════════════════════════════════════════
   {
+    id: 'decanting-bag-labels',
+    title: 'Labels for decanted bags',
+    roles: WORKERS_ONLY,
+    screens: ['decanting'],
+    asks: ['bag labels', 'print labels', 'label the bags', 'sticker for the bags', 'barcode for decanted bags'],
+    body:
+      'After you save a decanting run, Print bag labels opens a sheet with one sticker per bag: ' +
+      'the product, the bag size, today’s date, a line for the use-by date, and a barcode. ' +
+      'The barcode is set up for that product and bag size, so scanning a bag when packing ' +
+      'counts the right amount.',
+    steps: [
+      'Save the decanting run.',
+      'Press Print bag labels. The sheet fits a standard 21-label A4 sheet, or plain paper you cut up.',
+      'Write the use-by date on each label and stick one on each bag.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to record a decanting run?',
+      topic: 'decanting-record',
+    },
+    related: ['decanting-record', 'barcode-scanning'],
+  },
+  {
     id: 'packing-pallet',
     title: 'Packing a pallet',
     roles: WORKERS_ONLY,
@@ -1424,6 +1450,23 @@ export const TOPICS = [
       topic: 'stock-ledger',
     },
     related: ['inventory-columns', 'undo-a-mistake', 'expired-stock'],
+  },
+  {
+    id: 'stock-count-scanning',
+    title: 'Scanning during a stock count',
+    roles: MANAGERS_UP,
+    screens: ['inventory'],
+    asks: ['scan a stock count', 'stock take with a scanner', 'count by scanning', 'scan an area'],
+    body:
+      'When you count an area on the warehouse map, the Barcode box and the camera count by ' +
+      'scan. The first scan of a product replaces the figure it came in with, each scan after ' +
+      'adds the barcode’s units per scan, and a product not on the list is added. Items ' +
+      'without a barcode are typed in as before.',
+    followUp: {
+      question: 'Would you like to know how to correct stock after a count?',
+      topic: 'stock-adjustment',
+    },
+    related: ['stock-adjustment'],
   },
   {
     id: 'inventory-low-stock',

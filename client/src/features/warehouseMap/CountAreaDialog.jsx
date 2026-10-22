@@ -15,9 +15,18 @@
 // stock the area is meant for, then the products with the most stock
 // not yet placed (cold products for a cold room, dry ones elsewhere):
 // they are what a walk round the warehouse is placing.
+//
+// SCANNING. The Barcode box (a USB or Bluetooth scanner types into it)
+// and the camera count by scan, the same way Receiving does: the first
+// scan of a product replaces the figure it came in with, each one
+// after adds its units per scan, and a product not yet on the list is
+// added. A code nobody has linked is pointed at the name search, which
+// is how this count worked before.
 // ─────────────────────────────────────────────────────────────
-import { useMemo, useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Camera, Search, X } from 'lucide-react';
+import useBarcodeReader from '../scan/useBarcodeReader';
+import PalletScanner from '../scan/PalletScanner';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -62,8 +71,42 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
     setLines((ls) => [...ls, { productId: p.id, name: p.name, unit: p.unit, quantity: p.unplaced > 0 ? qtyInput(p.unplaced) : '' }]);
     setQuery('');
   };
-  const change = (productId, quantity) => setLines((ls) => ls.map((l) => (l.productId === productId ? { ...l, quantity } : l)));
-  const remove = (productId) => setLines((ls) => ls.filter((l) => l.productId !== productId));
+  // What each product has been scanned up to. A ref so two scans
+  // answered at once both count.
+  const scanned = useRef(new Map());
+  const [barcode, setBarcode] = useState('');
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraTrouble, setCameraTrouble] = useState(false);
+
+  const countScan = (match) => {
+    const count = Math.round(((scanned.current.get(match.productId) ?? 0) + match.unitsPerScan) * 1000) / 1000;
+    scanned.current.set(match.productId, count);
+    const unit = products.find((p) => p.id === match.productId)?.unit ?? match.defaultUnit ?? '';
+    setLines((ls) => (ls.some((l) => l.productId === match.productId)
+      ? ls.map((l) => (l.productId === match.productId ? { ...l, quantity: qtyInput(count) } : l))
+      : [...ls, { productId: match.productId, name: match.productName, unit, quantity: qtyInput(count) }]));
+    return `${match.productName}: ${count} counted.`;
+  };
+  const reader = useBarcodeReader({ onMatch: countScan, screen: 'stock_count', referenceId: area.id ?? null });
+
+  const scanTyped = (e) => {
+    // Enter is how a scanner ends a code; it must not save the count.
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const text = barcode;
+    setBarcode('');
+    if (text.trim()) reader.read(text);
+  };
+
+  const change = (productId, quantity) => {
+    // A typed correction is where the next scan adds from.
+    if (scanned.current.has(productId)) scanned.current.set(productId, Number(quantity) || 0);
+    setLines((ls) => ls.map((l) => (l.productId === productId ? { ...l, quantity } : l)));
+  };
+  const remove = (productId) => {
+    scanned.current.delete(productId);
+    setLines((ls) => ls.filter((l) => l.productId !== productId));
+  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -110,6 +153,37 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
               ))}
             </ul>
           )}
+
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                aria-label="Barcode" placeholder="Scan or type a barcode" autoComplete="off"
+                value={barcode} onChange={(e) => setBarcode(e.target.value)} onKeyDown={scanTyped}
+              />
+              <Button
+                type="button" variant="outline" aria-pressed={cameraOpen}
+                onClick={() => { setCameraOpen((o) => !o); setCameraTrouble(false); }}
+              >
+                <Camera />
+                {cameraOpen ? 'Close camera' : 'Camera'}
+              </Button>
+            </div>
+            {cameraOpen ? (
+              cameraTrouble
+                ? <p className="text-sm text-muted-foreground">The camera could not start. Type the numbers under the bars instead.</p>
+                : <PalletScanner kind="product" label="Camera for barcodes" onCode={reader.read} onUnavailable={() => setCameraTrouble(true)} />
+            ) : null}
+            {reader.looking ? <p role="status" className="text-sm text-muted-foreground">Looking it up</p> : null}
+            {reader.unknownCode ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                {reader.unknownCode} is not linked to a product yet. Add the product by name below.
+              </p>
+            ) : reader.message ? (
+              <p role="status" className={`text-sm ${reader.message.tone === 'warn' ? 'text-danger' : 'text-muted-foreground'}`}>
+                {reader.message.text}
+              </p>
+            ) : null}
+          </div>
 
           <div className="space-y-2">
             <div className="relative">

@@ -132,7 +132,8 @@ export const DonationItemsList = forwardRef(function DonationItemsList(
   const latestItems = useRef(items);
   useEffect(() => { latestItems.current = items; }, [items]);
 
-  const scanIntoItems = (match) => {
+  // A GS1 case label's use-by date fills a row's expiry when it is empty.
+  const scanIntoItems = (match, label) => {
     const all = latestItems.current;
     const name = match.productName;
     const existing = all.find((it) => it.productId != null && String(it.productId) === String(match.productId));
@@ -147,13 +148,15 @@ export const DonationItemsList = forwardRef(function DonationItemsList(
       unknownProduct: false,
       quantity: String(quantity),
       unit: target?.unit || match.defaultUnit || "",
+      expiryDate: target?.expiryDate || label?.useBy || "",
     };
     const next = target
       ? all.map((it) => (it.id === target.id ? filled : it))
       : [...all, filled];
     latestItems.current = next;
     onChange(next);
-    return `${name}: ${quantity}${filled.unit ? ` ${filled.unit}` : ""}.`;
+    const dated = label?.useBy && !target?.expiryDate;
+    return `${name}: ${quantity}${filled.unit ? ` ${filled.unit}` : ""}.${dated ? ` Use-by ${label.useBy} from the label.` : ""}`;
   };
 
   useImperativeHandle(ref, () => ({
@@ -167,7 +170,7 @@ export const DonationItemsList = forwardRef(function DonationItemsList(
     <div className="stf-step-body" ref={containerRef}>
       <div className="stf-field-label">Donation items</div>
       {/* Food is what has a product to match, so it is what can be scanned. */}
-      {isFood ? <ProductScanBar onMatch={scanIntoItems} /> : null}
+      {isFood ? <ProductScanBar onMatch={scanIntoItems} screen="donation" /> : null}
       <div className="stf-list">
         {items.map((item) => (
           <DonationItemRow

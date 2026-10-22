@@ -60,6 +60,18 @@ describe('donation items: scanning', () => {
     expect(latest[1]).toMatchObject({ productId: 8, quantity: '6', unit: 'each' });
   });
 
+  it('takes the use-by date off a GS1 case label into the row', async () => {
+    barcodeAPI.lookupBarcode.mockImplementation(async (code) => ({
+      code, format: 'gtin14', match: code === '10036000291459' ? MATCHES[RICE] : null,
+    }));
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await user.type(screen.getByLabelText('Barcode'), '(01)10036000291459(17)261231{Enter}');
+    expect(await screen.findByText('Rice 1kg: 1 kg. Use-by 2026-12-31 from the label.')).toBeInTheDocument();
+    expect(latest[0]).toMatchObject({ productId: 7, expiryDate: '2026-12-31' });
+  });
+
   it('has no scan bar on a non-food donation', () => {
     render(<Harness isFood={false} />);
     expect(screen.queryByLabelText('Barcode')).not.toBeInTheDocument();

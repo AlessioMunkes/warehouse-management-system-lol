@@ -54,6 +54,7 @@ const KEYWORDS = {
   stock_count_variance:       ['stock count', 'count variance', 'counted', 'shrinkage'],
   adjustment_reasons:         ['adjustment', 'adjusted', 'adjustments', 'reasons'],
   picking_flag_rate:          ['flag', 'flagged', 'flags', 'packers flag'],
+  scan_catches:               ['scanning', 'scanned', 'barcode', 'barcodes', 'wrong item', 'wrong items', 'caught by scanning'],
   picking_turnaround:         ['picking', 'picking time', 'turnaround', 'how long to pack', 'packing time', 'picking take', 'take to pack', 'take to pick'],
   slip_pipeline:              ['picking slips', 'slips', 'still to pack', 'packing this week', 'pallets to pack'],
   community_request_outcomes: ['community requests', 'walk-in', 'walk in', 'phone-in', 'requests'],

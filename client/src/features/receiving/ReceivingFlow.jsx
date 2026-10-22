@@ -365,15 +365,19 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // each adds to the last, not to the figure the screen last drew.
   const scanned = useRef(new Map());
 
-  const countScan = (match) => {
+  // A supplier's GS1 case label also carries its use-by date. It fills
+  // a fresh line's date when that is still empty; a date someone typed
+  // is theirs and is left alone.
+  const countScan = (match, label) => {
     const line = lines.find((l) => String(l.productId) === String(match.productId));
     if (!line) return { tone: 'warn', text: `${match.productName} is not on this order.` };
     const id = line.purchaseOrderItemId;
     const next = Math.round(((scanned.current.get(id) ?? 0) + match.unitsPerScan) * 1000) / 1000;
     scanned.current.set(id, next);
-    patchLine(id, { counted: String(next) });
+    const takeDate = Boolean(label?.useBy && line.fresh && !line.useBy);
+    patchLine(id, takeDate ? { counted: String(next), useBy: label.useBy } : { counted: String(next) });
     setFocusId(id);
-    return `${line.name}: ${next} counted of ${line.expected}.`;
+    return `${line.name}: ${next} counted of ${line.expected}.${takeDate ? ` Use-by ${label.useBy} from the label.` : ''}`;
   };
 
   // A typed correction on a scanned line is where the next scan adds from.
@@ -642,7 +646,10 @@ export default function ReceivingFlow({ onCrumbChange }) {
           }
         >
           {hasLines && phase === 'work' ? (
-            <ProductScanBar onMatch={countScan} linkChoices={scanChoices} disabled={saving} />
+            <ProductScanBar
+              onMatch={countScan} linkChoices={scanChoices} disabled={saving}
+              screen="receiving" referenceId={orderId ? Number(orderId) : null}
+            />
           ) : null}
           {hasLines ? (
             <WorkList
