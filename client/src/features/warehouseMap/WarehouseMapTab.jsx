@@ -17,6 +17,11 @@
 //
 // Under the map, Capacity: how full each area and the whole warehouse is.
 //
+// ABOVE IT, TODAY (DayStrip.jsx, mapActivity.js): collections, deliveries,
+// packing, people on site, donations and what needs attention. Trucks
+// stand at the dispatch and receiving gates for the day's collections
+// and expected deliveries; choosing a card or a gate opens it.
+//
 // FRESH WITHOUT A PUSH CHANNEL. The map is read again every minute
 // while the tab is in front and no count is being typed: the same
 // rhythm as the bell, and gentle on the free hosting and its few
@@ -36,12 +41,14 @@ import { cn } from '@/lib/utils';
 import { getWarehouseMap, recordAreaCount } from '../../services/warehouseMapAPI';
 import { matchesSearch } from '../inventory/inventoryViews';
 import WarehouseMap from './WarehouseMap';
+import DayStrip from './DayStrip';
+import { gateActivity, todayCards, withGates } from './mapActivity';
 import AreaPanel from './AreaPanel';
 import CountAreaDialog from './CountAreaDialog';
 import CapacitySummary from './CapacitySummary';
 import { holdsStock, isOpenable, isStaging } from './mapGeometry';
 import { OVERLAYS, TONES, areasMatching, legendFor, percent, programmeTones, toneFor } from './mapOverlays';
-import { BADGE_CLASS, PALLET_DUE, badgeFor } from './mapIndicators';
+import { BADGE_CLASS, PALLET_DUE, badgeFor, stockLines, stockMode } from './mapIndicators';
 
 const REFRESH_MS = 60_000;
 const UNPLACED = 'unplaced';
@@ -54,8 +61,13 @@ const areaNote = (area) => {
     return [n === 0 ? 'No pallets' : `${n} pallet${n === 1 ? '' : 's'}`, full].filter(Boolean).join(' · ');
   }
   if (!holdsStock(area)) return null;
-  const n = new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size;
-  return [n === 0 ? 'Empty' : `${n} product${n === 1 ? '' : 's'}`, full].filter(Boolean).join(' · ');
+  // One product: how much of it (500 each); more: how many. The fill
+  // only where it means something (stockMode 'fill').
+  const lines = stockLines(area);
+  const held = lines.length === 0 ? 'Empty'
+    : lines.length === 1 ? `${Math.round(lines[0].about).toLocaleString('en-ZA')} ${lines[0].unit ?? ''}`.trim()
+      : `${lines.length} products`;
+  return [held, stockMode(area) === 'fill' ? full : null].filter(Boolean).join(' · ');
 };
 
 // What the marks on the map mean, whatever it is coloured by.
@@ -84,7 +96,17 @@ function MarksLegend({ view, hasPallets }) {
           {p.label}
         </li>
       )) : null}
-      {view === '3d' ? <li>Solid block: stock against capacity. Red top: over capacity.</li> : <li>Bar: how full the area is.</li>}
+      <li className="inline-flex items-center gap-1.5">
+        <svg width="22" height="12" aria-hidden="true"><rect x="1" y="2" width="13" height="8" rx="1.5" className="fill-violet stroke-violet" /><rect x="15" y="3" width="6" height="7" rx="1.5" className="fill-surface stroke-ink-soft" /></svg>
+        At the dispatch gate, a bakkie for each centre here to collect, named; at the receiving gate, a truck for each delivery expected (amber: late)
+      </li>
+      <li className="inline-flex items-center gap-1.5">
+        <svg width="22" height="10" aria-hidden="true"><line x1="1" y1="5" x2="21" y2="5" className="stroke-info" strokeWidth="2.5" strokeDasharray="4 3" /></svg>
+        Goods on their way
+      </li>
+      {view === '3d'
+        ? <li>Solid block: stock against capacity. Red top: over capacity. Stacks: each product, where no capacity is set or a weight is missing.</li>
+        : <li>Bar: how full the area is. Squares: each product, where no capacity is set or a weight is missing.</li>}
     </ul>
   );
 }
@@ -144,7 +166,9 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
     return () => clearInterval(timer);
   }, [load, counting]);
 
-  const areas = useMemo(() => map?.areas ?? [], [map]);
+  // The day's trucks go on the first dispatch and receiving gate.
+  const activity = useMemo(() => gateActivity(map), [map]);
+  const areas = useMemo(() => withGates(map?.areas ?? [], activity, map?.day?.packing ?? 0), [map, activity]);
   const products = useMemo(() => map?.products ?? [], [map]);
   const productsById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const unplaced = useMemo(
@@ -173,6 +197,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
   }, [query, highlighted, products]);
 
   const openArea = openId && openId !== UNPLACED ? areas.find((a) => a.id === openId) ?? null : null;
+  const gateOf = (kind) => areas.find((a) => a.gate?.kind === kind) ?? null;
 
   const saveCount = async (lines) => {
     setSaving(true);
@@ -216,6 +241,18 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
     <div className="space-y-4">
       {loadError ? <ErrorBanner message={loadError} onRetry={load} /> : null}
 
+      <DayStrip
+        today={map.today}
+        closure={map.day?.closure ?? null}
+        cards={todayCards(map, activity, { needing: needing.size })}
+        onOpen={{
+          ...(gateOf('dispatch') ? { dispatch: () => setOpenId(gateOf('dispatch').id) } : {}),
+          ...(gateOf('receiving') ? { receiving: () => setOpenId(gateOf('receiving').id) } : {}),
+          ...(areas.find(isStaging) ? { packing: () => setOpenId(areas.find(isStaging).id) } : {}),
+          ...(needing.size ? { attention: () => { setAttentionOnly(true); setQuery(''); } } : {}),
+        }}
+      />
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-48 flex-1 sm:max-w-xs">
           <Search aria-hidden="true" className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -252,6 +289,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
       <div className="overflow-hidden rounded-xl border bg-card p-2">
         <WarehouseMap
           today={map.today}
+          matchProduct={query}
           grid={map.grid}
           areas={areas}
           view={view}
@@ -274,6 +312,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           unstagedPallets={map.unstagedPallets ?? []}
           productsById={productsById}
           today={map.today}
+          onFind={(name) => { setQuery(name); setAttentionOnly(false); }}
           onClose={() => setOpenId(null)}
         />
       ) : null}
@@ -288,6 +327,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           canAdjust={canAdjust}
           onCount={() => setCounting(true)}
           onAdjust={(productId) => onAdjust?.(productId)}
+          onFind={(name) => { setQuery(name); setAttentionOnly(false); }}
           onClose={() => setOpenId(null)}
         />
       ) : null}

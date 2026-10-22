@@ -76,7 +76,7 @@ export const countedWhen = (iso, now = new Date()) => {
   return `Counted ${days} days ago`;
 };
 
-const KIND_TONE = { dry: 'tan', cold: 'info', floor: 'sage', staging: 'violet', door: 'door' };
+const KIND_TONE = { dry: 'tan', cold: 'info', floor: 'sage', staging: 'violet', door: 'door', dispatch_gate: 'violet', receiving_gate: 'info' };
 
 /** The tone for how full something is: 0.5 is half. */
 export const fillTone = (fill) => {
@@ -91,6 +91,8 @@ export const percent = (fill) => (fill === null || fill === undefined ? '' : `${
 /** The tone name for an area under an overlay. */
 export const toneFor = (area, overlay, ctx = {}) => {
   if (area.kind === 'door') return 'door';
+  // A gate is always drawn as what it is, whatever the map is coloured by.
+  if (area.kind === 'dispatch_gate' || area.kind === 'receiving_gate') return KIND_TONE[area.kind];
   if (overlay === 'kind') return KIND_TONE[area.kind];
   if (overlay === 'fill') return fillTone(area.fill);
   // A staging area holds pallets, not counted stock.
@@ -116,7 +118,7 @@ export const toneFor = (area, overlay, ctx = {}) => {
 /** The legend for an overlay: [{ tone, label }]. */
 export const legendFor = (overlay, { products = [] } = {}) => {
   if (overlay === 'kind') {
-    return ['dry', 'cold', 'floor', 'staging', 'door'].map((k) => ({ tone: KIND_TONE[k], label: kindById(k).label }));
+    return ['dry', 'cold', 'floor', 'staging', 'door', 'dispatch_gate', 'receiving_gate'].map((k) => ({ tone: KIND_TONE[k], label: kindById(k).label }));
   }
   if (overlay === 'fill') {
     return [

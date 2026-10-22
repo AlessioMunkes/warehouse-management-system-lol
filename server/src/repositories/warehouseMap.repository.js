@@ -130,6 +130,113 @@ const readUnitSizes = async (db = pool) => {
   }
 };
 
+// ── The day, for the map's Today strip and its gates ──────────
+// Every figure is read from what the system records already; a query
+// that fails (a table a warehouse does not have yet) answers null and
+// the rest still arrive. `today` is the South African 'YYYY-MM-DD'.
+const SAST = 'Africa/Johannesburg';
+const COLLECTED = ['collected', 'late_collected'];
+// A purchase order still on its way: a truck is expected for it.
+const INBOUND = ['approved', 'in_transit'];
+// How far back an expected delivery still counts as "late" on the map.
+const LATE_WINDOW_DAYS = 14;
+
+const soft = (promise) => promise.then((r) => r.rows).catch((err) => {
+  console.error('[warehouseMap] day figure not read:', err.message);
+  return null;
+});
+
+const listDayActivity = async (today, db = pool) => {
+  const [slips, collected, inbound, received, onSite, donations, closure, benevolent, collections, next] = await Promise.all([
+    soft(db.query(
+      `SELECT COUNT(*) FILTER (WHERE status = 'in_progress')::int AS packing,
+              COUNT(*) FILTER (WHERE status = 'pending' AND dispatch_date = $1::date)::int AS to_pack_today,
+              COUNT(*) FILTER (WHERE status <> 'cancelled' AND dispatch_date = $1::date)::int AS due_today
+         FROM picking_slips`,
+      [today]
+    )),
+    soft(db.query(
+      `SELECT COUNT(*) FILTER (WHERE de.status = ANY($2::text[]) AND (de.collected_at AT TIME ZONE '${SAST}')::date = $1::date)::int AS collected_today,
+              COUNT(*) FILTER (WHERE de.status = 'not_collected' AND ps.dispatch_date = $1::date)::int AS not_collected_today
+         FROM dispatch_events de
+         JOIN picking_slips ps ON ps.id = de.picking_slip_id`,
+      [today, COLLECTED]
+    )),
+    soft(db.query(
+      `SELECT po.id, po.po_number, po.status, po.expected_delivery_date::text AS expected_on,
+              s.name AS supplier, COUNT(poi.id)::int AS lines
+         FROM purchase_orders po
+         JOIN suppliers s ON s.id = po.supplier_id
+         LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+        WHERE po.status = ANY($2::text[])
+          AND po.expected_delivery_date BETWEEN ($1::date - $3::int) AND $1::date
+        GROUP BY po.id, s.name
+        ORDER BY po.expected_delivery_date ASC, po.id ASC`,
+      [today, INBOUND, LATE_WINDOW_DAYS]
+    )),
+    soft(db.query(
+      `SELECT dn.id, s.name AS supplier, po.po_number, dn.status
+         FROM delivery_notes dn
+         JOIN suppliers s ON s.id = dn.supplier_id
+         JOIN purchase_orders po ON po.id = dn.purchase_order_id
+        WHERE dn.delivery_date = $1::date
+        ORDER BY dn.id ASC`,
+      [today]
+    )),
+    soft(db.query(
+      `SELECT COUNT(*)::int AS n FROM volunteers
+        WHERE (signed_in_at AT TIME ZONE '${SAST}')::date = $1::date AND signed_out_at IS NULL`,
+      [today]
+    )),
+    soft(db.query(
+      `SELECT COUNT(*)::int AS n FROM donations WHERE (received_at AT TIME ZONE '${SAST}')::date = $1::date`,
+      [today]
+    )),
+    soft(db.query(`SELECT label, kind FROM operating_closures WHERE closed_on = $1::date`, [today])),
+    soft(db.query(`SELECT COUNT(*)::int AS n FROM community_requests WHERE outcome = 'approved'`)),
+    // Today's collections: each slip due today is a centre coming to the
+    // dispatch gate. Its pallet's state and its collection's say where
+    // it is in the day.
+    soft(db.query(
+      `SELECT ps.id, COALESCE(NULLIF(ps.beneficiary_name, ''), e.name, 'Centre') AS name,
+              ps.cohort::text AS cohort, ps.status AS slip_status, ps.pallet_ref,
+              de.status AS dispatch_status, de.collected_at
+         FROM picking_slips ps
+         LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+         LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+        WHERE ps.dispatch_date = $1::date AND ps.status <> 'cancelled'
+        ORDER BY de.collected_at ASC NULLS LAST, name ASC`,
+      [today]
+    )),
+    soft(db.query(
+      `SELECT dispatch_date::text AS day, COUNT(*)::int AS centres, MIN(cohort::text) AS cohort
+         FROM picking_slips
+        WHERE dispatch_date > $1::date AND status <> 'cancelled'
+        GROUP BY dispatch_date ORDER BY dispatch_date ASC LIMIT 1`,
+      [today]
+    )),
+  ]);
+
+  return {
+    packing: slips?.[0]?.packing ?? null,
+    toPackToday: slips?.[0]?.to_pack_today ?? null,
+    dueToday: slips?.[0]?.due_today ?? null,
+    collectedToday: collected?.[0]?.collected_today ?? null,
+    notCollectedToday: collected?.[0]?.not_collected_today ?? null,
+    inbound: inbound ?? [],
+    receivedToday: received ?? [],
+    volunteersOnSite: onSite?.[0]?.n ?? null,
+    donationsToday: donations?.[0]?.n ?? null,
+    closure: closure?.[0] ?? null,
+    benevolentWaiting: benevolent?.[0]?.n ?? null,
+    collections: (collections ?? []).map((c) => ({
+      id: c.id, name: c.name, cohort: c.cohort, palletRef: c.pallet_ref ?? null,
+      slipStatus: c.slip_status, dispatchStatus: c.dispatch_status ?? null, collectedAt: c.collected_at ?? null,
+    })),
+    nextCollection: next?.[0] ?? null,
+  };
+};
+
 /** What a count needs about each product: its name, balance and unit. */
 const productsForCount = async (productIds, db = pool) => {
   const { rows } = await db.query(
@@ -223,6 +330,6 @@ const insertCounts = async (client, { areaId, lines, countedBy }) => {
 };
 
 export default {
-  listAreas, getArea, listLatestCounts, listMapProducts, listPackedPallets, readUnitSizes, productsForCount, saveLayout,
+  listAreas, getArea, listLatestCounts, listMapProducts, listPackedPallets, listDayActivity, readUnitSizes, productsForCount, saveLayout,
   latestCountsForArea, insertCounts,
 };

@@ -6,16 +6,16 @@
     "lat": -33.817415,
     "lng": 18.540577,
     "precision": "exact",
-    "note": "OpenStreetMap way/911636975 \"Footsteps Educare\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap way/911636975 \"Footsteps Educare\"."
   },
   {
     "name": "Fountain of Love Educare",
     "address": "Nxala Street",
-    "suburb": "Endlovini",
+    "suburb": "Endlovini, Khayelitsha",
     "lat": -34.065422,
     "lng": 18.688,
     "precision": "exact",
-    "note": "OpenStreetMap node/9490108477 \"Fountain of Love\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9490108477 \"Fountain of Love\". The City list also has one at 1B Zola Mtsoni St, Kuyasa (about 2 km away). Check the pin."
   },
   {
     "name": "Green Pastures",
@@ -24,7 +24,7 @@
     "lat": -33.977292,
     "lng": 18.554505,
     "precision": "exact",
-    "note": "OpenStreetMap node/9485765332 \"Green Pastures Educare\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9485765332; WC Social Development ECD register \"Green Pastures\" is the same block."
   },
   {
     "name": "Inkwenkwezi",
@@ -33,7 +33,7 @@
     "lat": -33.992571,
     "lng": 18.581171,
     "precision": "exact",
-    "note": "OpenStreetMap node/9490024388 \"Inkwenkwezi Educare\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9490024388 \"Inkwenkwezi Educare\"."
   },
   {
     "name": "Ithemba",
@@ -42,7 +42,7 @@
     "lat": -34.058699,
     "lng": 18.677702,
     "precision": "exact",
-    "note": "OpenStreetMap node/9490187105 \"Ithemba Educare\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9490187105 \"Ithemba Educare\"."
   },
   {
     "name": "Khanya Educare",
@@ -51,16 +51,16 @@
     "lat": -33.990128,
     "lng": 18.579494,
     "precision": "exact",
-    "note": "OpenStreetMap node/9489980583 \"Khanya Educare Centre\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9489980583 \"Khanya Educare Centre\"."
   },
   {
     "name": "Little Penguins",
-    "address": "Market Street",
-    "suburb": "Klipkop",
-    "lat": -33.911723,
-    "lng": 18.598874,
-    "precision": "exact",
-    "note": "OpenStreetMap node/4477729949 \"Little Penguins Day Care Centre\""
+    "address": "417 Delft Main Road",
+    "suburb": "Delft South",
+    "lat": -33.98272,
+    "lng": 18.64334,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Little Penquins Educare\") and WC Social Development ECD register agree."
   },
   {
     "name": "Masonwabe",
@@ -69,7 +69,7 @@
     "lat": -33.977363,
     "lng": 18.58033,
     "precision": "exact",
-    "note": "OpenStreetMap node/9489601119 \"Masonwabe Educare center\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9489601119 \"Masonwabe Educare center\"."
   },
   {
     "name": "Melokuhle Educare",
@@ -78,25 +78,25 @@
     "lat": -34.066376,
     "lng": 18.668155,
     "precision": "exact",
-    "note": "OpenStreetMap node/9490308281 \"Melokuhle educare\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9490308281 \"Melokuhle educare\"."
   },
   {
     "name": "Onethemba Daycare",
     "address": "Nqico Walk",
-    "suburb": null,
+    "suburb": "Gugulethu",
     "lat": -33.965384,
     "lng": 18.567127,
     "precision": "exact",
-    "note": "OpenStreetMap node/9489070193 \"Onethemba\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9489070193 \"Onethemba\"; WC Social Development ECD register agrees."
   },
   {
     "name": "Takalani Educare",
-    "address": "Groenall A Walk",
-    "suburb": "Hanover Park",
-    "lat": -33.998099,
-    "lng": 18.529919,
-    "precision": "exact",
-    "note": "OpenStreetMap node/9473799234 \"Takalani\""
+    "address": "73 Thandabantu Road",
+    "suburb": "Dunoon",
+    "lat": -33.81925,
+    "lng": 18.53915,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Takalani Educare\"); Daily Maverick (26 Feb 2025) places it in Dunoon."
   },
   {
     "name": "Toddlers Corner",
@@ -105,7 +105,7 @@
     "lat": -33.998243,
     "lng": 18.554101,
     "precision": "exact",
-    "note": "OpenStreetMap node/9486049107 \"Toddlers corner educare\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9486049107 \"Toddlers corner educare\"."
   },
   {
     "name": "UPC Sunshine Corner Educare",
@@ -114,7 +114,7 @@
     "lat": -33.991735,
     "lng": 18.551253,
     "precision": "exact",
-    "note": "OpenStreetMap node/9486011079 \"UPC Sunshine Corner\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9486011079 \"UPC Sunshine Corner\"."
   },
   {
     "name": "Victory Educare",
@@ -123,7 +123,7 @@
     "lat": -34.061817,
     "lng": 18.667888,
     "precision": "exact",
-    "note": "OpenStreetMap node/9490318183 \"Victory Educare\""
+    "note": "Research sheet, Oct 2026. OpenStreetMap node/9490318183 \"Victory Educare\"."
   },
   {
     "name": "Blooming Stars Educare",
@@ -132,7 +132,7 @@
     "lat": -33.992662,
     "lng": 18.669585,
     "precision": "street",
-    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Blooming Stars Educare Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Blooming Stars Educare Centre\"). The DSD register also lists Blooming Stars 1 and 2 on T Tokwana St, Mfuleni. Check the pin."
   },
   {
     "name": "Imbasa Educare",
@@ -141,52 +141,43 @@
     "lat": -34.039438,
     "lng": 18.696831,
     "precision": "street",
-    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Imbasa Educare Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) and WC Social Development ECD register agree."
   },
   {
     "name": "Nantes Educare Centre",
-    "address": "2 Excelsior Street",
-    "suburb": "Highbury, Kuils River",
-    "lat": -33.948863,
-    "lng": 18.678427,
+    "address": "21 Lilac Street",
+    "suburb": "Kewtown, Athlone",
+    "lat": -33.957435,
+    "lng": 18.522542,
     "precision": "street",
-    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Nantes Ecd Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Nantes Ecd Centre\") and Cape Town Magazine agree."
   },
   {
     "name": "Nomonde Pre-School",
-    "address": "63A Victoria Road",
-    "suburb": "Camps Bay",
-    "lat": -33.946163,
-    "lng": 18.378738,
+    "address": "35A Zone 23 Road",
+    "suburb": "Langa",
+    "lat": -33.942267,
+    "lng": 18.542744,
     "precision": "street",
-    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Nomonde Pre-school\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) and WC Social Development ECD register agree."
   },
   {
     "name": "Nosizwe Educare",
-    "address": "17 Gordon Road",
-    "suburb": "Heathfield",
-    "lat": -34.047259,
-    "lng": 18.467762,
+    "address": "1 Qubaka Crescent",
+    "suburb": "Eyethu, Khayelitsha",
+    "lat": -34.03596,
+    "lng": 18.678041,
     "precision": "street",
-    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Nosizwe Educare Centre\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
-  },
-  {
-    "name": "Qhamani Educare",
-    "address": "48A Solomon Tshuku Avenue",
-    "suburb": "Mxolisi Phetani, Khayelitsha",
-    "lat": -34.013212,
-    "lng": 18.645934,
-    "precision": "street",
-    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Qhamani Ecd\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Nosizwe Educare Centre\") and WC Social Development ECD register agree."
   },
   {
     "name": "Wings of Hope",
-    "address": "37 Siyabonga Street",
+    "address": "Siyabonga Street",
     "suburb": "Dunoon",
-    "lat": -33.81731,
-    "lng": 18.538424,
-    "precision": "suburb",
-    "note": "City of Cape Town list of ECDs on City land, Jan 2026 (\"Wings of Hope\"): https://www.capetown.gov.za/media/atcfz4ix/list-of-regularisation-ecds-on-city-land.pdf"
+    "lat": -33.818937,
+    "lng": 18.540889,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Wings of Hope Educare\")."
   },
   {
     "name": "Baphumelela",
@@ -195,16 +186,16 @@
     "lat": -34.041646,
     "lng": 18.708175,
     "precision": "suburb",
-    "note": "Address of Baphumelele Children's Home, Western Cape Government facility directory; the educare runs on the same site."
+    "note": "Research sheet, Oct 2026. Baphumelele Children's Home (WCG facility directory); the educare runs on the same site."
   },
   {
     "name": "Blackheath ECD",
-    "address": null,
-    "suburb": "Blackheath, Kuils River",
-    "lat": -33.958333,
-    "lng": 18.702778,
+    "address": "97 Meadow Way",
+    "suburb": "Gaylee, Blackheath",
+    "lat": -33.977665,
+    "lng": 18.698519,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. Western Cape Government facility page \"Blackheath Educare\"."
   },
   {
     "name": "Delft Little Star",
@@ -213,7 +204,7 @@
     "lat": -33.994078,
     "lng": 18.635835,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. Suburb taken from the centre's name."
   },
   {
     "name": "Delft Pooh Bear",
@@ -222,7 +213,7 @@
     "lat": -33.994078,
     "lng": 18.635835,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. Suburb taken from the centre's name."
   },
   {
     "name": "Harare Kids",
@@ -231,7 +222,7 @@
     "lat": -34.057685,
     "lng": 18.673492,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. Suburb taken from the centre's name."
   },
   {
     "name": "Harare Little Flower",
@@ -240,7 +231,7 @@
     "lat": -34.057685,
     "lng": 18.673492,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. Suburb taken from the centre's name."
   },
   {
     "name": "Manenberg Kiddies Academy",
@@ -249,7 +240,7 @@
     "lat": -33.989722,
     "lng": 18.554444,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. Suburb taken from the centre's name."
   },
   {
     "name": "Sunflower Educare (Langa)",
@@ -258,24 +249,663 @@
     "lat": -33.945556,
     "lng": 18.53,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. Suburb taken from the centre's name."
   },
   {
     "name": "Twinkle Star - Lavender Hill",
-    "address": null,
+    "address": "Witsenberg Street",
     "suburb": "Lavender Hill",
-    "lat": -34.073611,
-    "lng": 18.483333,
-    "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "lat": -34.079587,
+    "lng": 18.494834,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Twinklestar Educare\")."
   },
   {
     "name": "Little Angels( Hout Bay Assembly)",
-    "address": null,
+    "address": "38 Karbonkel Road",
     "suburb": "Hout Bay",
-    "lat": -34.015847,
-    "lng": 18.382607,
+    "lat": -34.05473,
+    "lng": 18.342934,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Little Angels Educare\")."
+  },
+  {
+    "name": "Andi's Educare and Aftercare",
+    "address": "41 Gothenburg Crescent",
+    "suburb": "Avondale, Atlantis",
+    "lat": -33.568172,
+    "lng": 18.48627,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Andi's educare\")."
+  },
+  {
+    "name": "Angels Only",
+    "address": "5 Peter Mokaba Street",
+    "suburb": "Fisantekraal",
+    "lat": -33.781815,
+    "lng": 18.71591,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Angels Only Creche\")."
+  },
+  {
+    "name": "Annie's Ark Preschool",
+    "address": null,
+    "suburb": "Grassy Park",
+    "lat": -34.04686,
+    "lng": 18.50119,
     "precision": "suburb",
-    "note": "Suburb taken from the centre's name."
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Annies Ark\", suburb only)."
+  },
+  {
+    "name": "Babes Educare",
+    "address": "Cosmos Street",
+    "suburb": "Dunoon",
+    "lat": -33.815478,
+    "lng": 18.541095,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Babes Educare\")."
+  },
+  {
+    "name": "Bashee Educare",
+    "address": null,
+    "suburb": "Portland, Mitchells Plain",
+    "lat": -34.04987,
+    "lng": 18.61442,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Bashee Educare\", suburb only)."
+  },
+  {
+    "name": "Bollie Kabouter 1 & 2",
+    "address": null,
+    "suburb": "Fisantekraal",
+    "lat": -33.78389,
+    "lng": 18.71659,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Bollie Kabouter Durbanville\", suburb only). Two sites."
+  },
+  {
+    "name": "Cuddles and Care",
+    "address": "22 Cilicia Crescent",
+    "suburb": "Avondale, Atlantis",
+    "lat": -33.57305,
+    "lng": 18.482635,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Cuddles & Care Educare Centre\")."
+  },
+  {
+    "name": "Ekhaya Kids 1 & 2",
+    "address": "5 Grandiflora Street",
+    "suburb": "Dunoon",
+    "lat": -33.8225,
+    "lng": 18.54046,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Ekhaya kids Educare\"). Second site unknown."
+  },
+  {
+    "name": "Honey Bee Educare",
+    "address": "14 Nyamakazi Street",
+    "suburb": "Dunoon",
+    "lat": -33.817947,
+    "lng": 18.537907,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Honey bee Educare\") and Good Things Guy agree."
+  },
+  {
+    "name": "Ikwezi Lokusa Educare",
+    "address": "128 Oliver Tambo Avenue",
+    "suburb": "Manenberg",
+    "lat": -33.981698,
+    "lng": 18.559068,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Ikwezi Lokusa Educare\")."
+  },
+  {
+    "name": "Inga ECD",
+    "address": "30 Seven Street",
+    "suburb": "Langa",
+    "lat": -33.946136,
+    "lng": 18.531945,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Inga Educare Centre\")."
+  },
+  {
+    "name": "Kwanda Educare",
+    "address": "Magubudela Street",
+    "suburb": "Bloekombos, Kraaifontein",
+    "lat": -33.845152,
+    "lng": 18.746987,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Kwanda Educare\")."
+  },
+  {
+    "name": "Lerato",
+    "address": null,
+    "suburb": "Dunoon",
+    "lat": -33.81643,
+    "lng": 18.54099,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Lerato Educare\", suburb only)."
+  },
+  {
+    "name": "Lingomso Educare",
+    "address": "Mtamvuna Road",
+    "suburb": "Mfuleni",
+    "lat": -33.994478,
+    "lng": 18.672659,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"LINGOMSO\")."
+  },
+  {
+    "name": "Little Feet Educare",
+    "address": null,
+    "suburb": "Mitchells Plain",
+    "lat": -34.05123,
+    "lng": 18.62076,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Little Feet Educare\", suburb only)."
+  },
+  {
+    "name": "Little Lambs Academy",
+    "address": "Van Hoogstraten St",
+    "suburb": "Penzance Estate",
+    "lat": -34.033547,
+    "lng": 18.360775,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"LITTLE LAMBS\"). Common name; check the pin."
+  },
+  {
+    "name": "Little Treasures",
+    "address": "Daniell Street",
+    "suburb": "Sanddrift, Milnerton",
+    "lat": -33.88216,
+    "lng": 18.508255,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Little Treasures\")."
+  },
+  {
+    "name": "Lofland",
+    "address": "11 Alabama Street",
+    "suburb": "Weltevreden, Strand",
+    "lat": -34.125723,
+    "lng": 18.844853,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Lofland Educare\")."
+  },
+  {
+    "name": "Love and Care",
+    "address": "Guinea Fowl Avenue",
+    "suburb": "Imhofs Gift",
+    "lat": -34.131934,
+    "lng": 18.376377,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Love and Care\"), the only match; far from the other centres. Check the pin."
+  },
+  {
+    "name": "Luberon Educare",
+    "address": "Clearwater Way",
+    "suburb": "Sherwood, Atlantis",
+    "lat": -33.55948,
+    "lng": 18.497756,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Luberon Educare Centre\") and WC Social Development ECD register agree."
+  },
+  {
+    "name": "Metropolitan Educare",
+    "address": "71 Metropolitan Street",
+    "suburb": "Beacon Valley, Mitchells Plain",
+    "lat": -34.043782,
+    "lng": 18.628759,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Metropolitan Educare Centre\")."
+  },
+  {
+    "name": "Milas Angels",
+    "address": "826 Mataung Street",
+    "suburb": "Sir Lowry's Pass",
+    "lat": -34.12041,
+    "lng": 18.909,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Mila's Angels\", Sun City, Sir Lowry's Pass)."
+  },
+  {
+    "name": "Nolukhanyo ECD",
+    "address": "54 Bhunga Avenue",
+    "suburb": "Langa",
+    "lat": -33.945351,
+    "lng": 18.521704,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Nolukhanyo Educare Centre\")."
+  },
+  {
+    "name": "RooiKappie",
+    "address": "1 Edward Avenue",
+    "suburb": "Lotus River",
+    "lat": -34.028685,
+    "lng": 18.515776,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Rooikappie Pre-School\") and WC Social Development ECD register agree."
+  },
+  {
+    "name": "Siphamandla",
+    "address": "32 Stulo Road",
+    "suburb": "Crossroads",
+    "lat": -33.993835,
+    "lng": 18.595142,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) and the DSD register agree. OpenStreetMap also has a Siphamandla Educare on Jingi St, Harare. Check the pin."
+  },
+  {
+    "name": "Siyakhanyisa ECD",
+    "address": "Washington Street",
+    "suburb": "Langa",
+    "lat": -33.943892,
+    "lng": 18.52328,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Siyakhanyisa Educare Centre\")."
+  },
+  {
+    "name": "Sticky Fingers",
+    "address": null,
+    "suburb": "Bridgewater, Somerset West",
+    "lat": -34.08917,
+    "lng": 18.85356,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Sticky Fingers\", suburb only)."
+  },
+  {
+    "name": "The Ark ECD",
+    "address": null,
+    "suburb": "Khayelitsha",
+    "lat": -34.01972,
+    "lng": 18.67328,
+    "precision": "suburb",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"The Ark\"). Only the area is listed, so the pin is its middle. Common name; check the pin."
+  },
+  {
+    "name": "The Learning Tree",
+    "address": "61 Mydrecht Street",
+    "suburb": "Bothasig, Milnerton",
+    "lat": -33.858149,
+    "lng": 18.549104,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"The Learning Tree Educare & Aftercare Centre\")."
+  },
+  {
+    "name": "Ukhanyo ECD",
+    "address": null,
+    "suburb": "Khayelitsha",
+    "lat": -34.01972,
+    "lng": 18.67328,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Athlone News (Oct 2025) names Ukhanyo Child Development, Khayelitsha; WC Social Development ECD register agrees."
+  },
+  {
+    "name": "Where Rainbows Meet",
+    "address": "72 Vrygrond Avenue",
+    "suburb": "Vrygrond",
+    "lat": -34.083964,
+    "lng": 18.486808,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Where Rainbows Meet (Selwyn Educare)\"). The DSD register has it at 90 Siljeur Close, Lotus River. Check the pin."
+  },
+  {
+    "name": "Young Eagles Educare",
+    "address": "56 Knysna Road",
+    "suburb": "Sherwood, Atlantis",
+    "lat": -33.550111,
+    "lng": 18.499419,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Young eagles educare\")."
+  },
+  {
+    "name": "Zama Educare",
+    "address": "Phezukomkhono Rd",
+    "suburb": "Philippi East",
+    "lat": -34.009567,
+    "lng": 18.619177,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"Zama-Zama Educare\")."
+  },
+  {
+    "name": "Zamat Educare",
+    "address": null,
+    "suburb": "Portland, Mitchells Plain",
+    "lat": -34.04987,
+    "lng": 18.61442,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Zamat Educare\", suburb only)."
+  },
+  {
+    "name": "Zamuxolo ECD",
+    "address": null,
+    "suburb": "Khayelitsha",
+    "lat": -34.01972,
+    "lng": 18.67328,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Zamuxolo\", suburb only)."
+  },
+  {
+    "name": "Zusakhe",
+    "address": "2 Waxberry Close",
+    "suburb": "Dunoon",
+    "lat": -33.814372,
+    "lng": 18.539889,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Zusakhe Educare\") and WC Social Development ECD register agree."
+  },
+  {
+    "name": "Anne's Toddlers",
+    "address": null,
+    "suburb": "Lotus River",
+    "lat": -34.043056,
+    "lng": 18.521389,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Athlone News, 7 Oct 2025 (Ladles of Love storybook delivery), names Anne's Toddlers in Lotus River."
+  },
+  {
+    "name": "Masikhululeka",
+    "address": "60 Imfeni Court",
+    "suburb": "Joe Slovo Park",
+    "lat": -33.873595,
+    "lng": 18.510497,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Masikhululeke Educare\"). The DSD register has one at 1 South Rd, Plumstead. Check the pin."
+  },
+  {
+    "name": "Proverbs1",
+    "address": "27 Glenside Road",
+    "suburb": "Morgans Village, Mitchells Plain",
+    "lat": -34.04129,
+    "lng": 18.591057,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Proverbs 1. Educare\")."
+  },
+  {
+    "name": "LA Tiny Tots",
+    "address": "14 Lincoln Crescent",
+    "suburb": "Beacon Valley",
+    "lat": -34.041994,
+    "lng": 18.631723,
+    "precision": "street",
+    "note": "Western Cape DSD ECD facilities register, matched by name (\"L.A Tiny Tots Educare\")."
+  },
+  {
+    "name": "Hope of Africa College",
+    "address": "70 Cork Tree Road",
+    "suburb": "Delft South",
+    "lat": -33.981572,
+    "lng": 18.635882,
+    "precision": "exact",
+    "note": "Research sheet, Oct 2026. OpenStreetMap way/1175277568 \"Hope of Africa Junior Christian College\"; City of Cape Town ECDs-on-City-land list (Jan 2026) agrees."
+  },
+  {
+    "name": "Hlumelo Educare 1",
+    "address": null,
+    "suburb": "Crossroads",
+    "lat": -33.994444,
+    "lng": 18.598889,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. CHOSA profile: Hlumelo Educare Centre serves children living in Crossroads (no street given)."
+  },
+  {
+    "name": "Hlumelo Educare 2",
+    "address": null,
+    "suburb": "Crossroads",
+    "lat": -33.994444,
+    "lng": 18.598889,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. CHOSA profile: Hlumelo Educare Centre serves children living in Crossroads (no street given). Second site unknown."
+  },
+  {
+    "name": "Uyanda Academy",
+    "address": null,
+    "suburb": "Sir Lowry's Pass",
+    "lat": -34.11768,
+    "lng": 18.910297,
+    "precision": "suburb",
+    "note": "Bolander, Aug 2024: Uyanda Academy and Daycare Centre, Rastakamp, Sir Lowry's Pass Village."
+  },
+  {
+    "name": "Alfa Educare",
+    "address": "Hanover Park Avenue",
+    "suburb": "Hanover Park",
+    "lat": -33.990403,
+    "lng": 18.52321,
+    "precision": "street",
+    "note": "Web search: \"Alpha Educare Centre\", Hanover Park Avenue (at Morgenson Primary). Spelling differs; check the pin."
+  },
+  {
+    "name": "Drie Beertjies",
+    "address": "60 Marike de Klerk Street",
+    "suburb": "Fisantekraal",
+    "lat": -33.783831,
+    "lng": 18.713565,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Drie Beertjie Creche Durbanville\") and Ladles of Love Heroes of Hope awards agree."
+  },
+  {
+    "name": "Emmanuel Day Care",
+    "address": "Nottingham Road & Sherwood Road",
+    "suburb": "Sherwood, Atlantis",
+    "lat": -33.55502,
+    "lng": 18.49513,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Emmanuel day care\") and Ladles of Love Heroes of Hope awards agree."
+  },
+  {
+    "name": "Angels Daycare",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Ladles of Love Heroes of Hope awards (Sep 2026) name Angels Day Care, Delft."
+  },
+  {
+    "name": "Christ - Educare",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Atlantic Sun (Jul 2026, Ladles of Love coverage) names Christ Educare, Delft."
+  },
+  {
+    "name": "Gege ECD",
+    "address": "60 Zone 3 Street",
+    "suburb": "Langa",
+    "lat": -33.946795,
+    "lng": 18.530588,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Gege's Creche\")."
+  },
+  {
+    "name": "Happy Feet Community Outreach",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Athlone News (Oct 2025, Ladles of Love coverage) names Happy Feet Educare, Delft."
+  },
+  {
+    "name": "Hout Bay Educare",
+    "address": "56C Atlantic Skipper Street",
+    "suburb": "Hout Bay",
+    "lat": -34.057994,
+    "lng": 18.345922,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026)."
+  },
+  {
+    "name": "Khula",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Athlone News (Oct 2025, Ladles of Love coverage) names Khula Educare, Delft."
+  },
+  {
+    "name": "Kids Ministry - Bulelwa",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Ladles of Love Heroes of Hope awards (Sep 2026) name Kids Ministry Educare, Delft."
+  },
+  {
+    "name": "Lelothando ECD",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Ladles of Love Heroes of Hope awards (Sep 2026) name Lelothando Educare, Delft."
+  },
+  {
+    "name": "Little Conquerors",
+    "address": null,
+    "suburb": "Joe Slovo Park, Milnerton",
+    "lat": -33.873595,
+    "lng": 18.510497,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Ladles of Love Heroes of Hope awards (Sep 2026) name Little Conquerors, Joe Slovo, Milnerton."
+  },
+  {
+    "name": "Twinkle Little Star",
+    "address": "65 Saartjie Baartman Street",
+    "suburb": "Fisantekraal",
+    "lat": -33.785141,
+    "lng": 18.713531,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Twinkle Little Star Educare\")."
+  },
+  {
+    "name": "Vukani Educare",
+    "address": "157 Mqha Street",
+    "suburb": "Kuyasa, Khayelitsha",
+    "lat": -34.056785,
+    "lng": 18.693714,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Vukani\")."
+  },
+  {
+    "name": "We Care",
+    "address": null,
+    "suburb": "Bonteheuwel",
+    "lat": -33.949167,
+    "lng": 18.553056,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Athlone News (Oct 2025, Ladles of Love coverage) names We Care Educare, Bonteheuwel."
+  },
+  {
+    "name": "Childrens House",
+    "address": "1 St Andrew Road",
+    "suburb": "Lavender Hill",
+    "lat": -34.069204,
+    "lng": 18.490119,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Children's House of Lavender Hill\"), the only close name. Check the pin."
+  },
+  {
+    "name": "Hope for Destiny",
+    "address": null,
+    "suburb": "Delft",
+    "lat": -33.994078,
+    "lng": 18.635835,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. Black Sash partner \"Hope 4 Destiny\" works in Delft (an NGO, not listed as an ECD). Check the pin."
+  },
+  {
+    "name": "Jack & Jill Educare",
+    "address": "15 Kanarie Street",
+    "suburb": "Morningstar, Durbanville",
+    "lat": -33.825909,
+    "lng": 18.657235,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Jack & Jill Educare\"). There is also a Jack and Jill in Atlantis. Check the pin."
+  },
+  {
+    "name": "Kids Haven Educare",
+    "address": "8 Robert Street",
+    "suburb": "Saxonsea, Atlantis",
+    "lat": -33.548772,
+    "lng": 18.492884,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Havens Educare\"), the closest name. Check the pin."
+  },
+  {
+    "name": "Lathi-Tha",
+    "address": "826 Mataung Street",
+    "suburb": "Sir Lowry's Pass",
+    "lat": -34.120386,
+    "lng": 18.908899,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Lathi -Tha Daycare\"), same address as Mila's Angels; also listed at Platinum St, Chrisnissen Village. Check the pin."
+  },
+  {
+    "name": "Mitch Care Bears",
+    "address": null,
+    "suburb": "Rocklands, Mitchells Plain",
+    "lat": -34.06382,
+    "lng": 18.60845,
+    "precision": "suburb",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Care Bears Pre-School\", Rocklands); \"Mitch\" read as Mitchells Plain. Check the pin."
+  },
+  {
+    "name": "Sonwabile ECD",
+    "address": "2 Mvuba Crescent",
+    "suburb": "Witsand, Atlantis",
+    "lat": -33.582605,
+    "lng": 18.50643,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. City of Cape Town ECDs-on-City-land list (Jan 2026) (\"Sonwabile Ecd\"). Others: Jingi St, Harare; 45 Kunene Cres, Leiden, Delft. Check the pin."
+  },
+  {
+    "name": "Sunshine Educare",
+    "address": "Siyabonga Street",
+    "suburb": "Dunoon",
+    "lat": -33.818937,
+    "lng": 18.540889,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Sunshine Educare\", Dunoon); several other Sunshines outside the metro core. Check the pin."
+  },
+  {
+    "name": "Sunshine Kiddies",
+    "address": "13 Bridgewater Street",
+    "suburb": "Longdown Estate, Somerset West",
+    "lat": -34.090761,
+    "lng": 18.852787,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register lists two in Somerset West: 13 Bridgewater St and 203 Lourensford Rd. Check the pin."
+  },
+  {
+    "name": "Telletubies",
+    "address": "67 Samson Crescent",
+    "suburb": "Belhar",
+    "lat": -33.945751,
+    "lng": 18.650366,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Teletubbies\", Belhar 20). Two Teletubbies on the list; this pairing is a guess. Check the pin."
+  },
+  {
+    "name": "Telletubies Educare Centre",
+    "address": "9 Njalaboom Road",
+    "suburb": "Delft South",
+    "lat": -33.98665,
+    "lng": 18.642977,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. WC Social Development ECD register (\"Teletubbies Educare\"). Two Teletubbies on the list; this pairing is a guess. Check the pin."
+  },
+  {
+    "name": "Uthando Creche",
+    "address": "6 Geelkleur Road",
+    "suburb": "Delft South",
+    "lat": -33.995269,
+    "lng": 18.634672,
+    "precision": "street",
+    "note": "Research sheet, Oct 2026. Athlone News (Oct 2025) names Uthando Daycare, Delft; the DSD register \"Luthando Educare\" here is the only Delft match. Check the pin."
   }
 ]

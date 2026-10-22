@@ -59,15 +59,15 @@ const getMap = async () => {
 const buildMap = async () => {
   const areas = await mapModel.listAreas();
   if (areas === null) return { ready: false, grid: GRID, areas: [], products: [] };
-  const [counts, products, pallets, sizes, shelf] = await Promise.all([
+  const today = todayInSAST();
+  const [counts, products, pallets, sizes, shelf, day] = await Promise.all([
     mapModel.listLatestCounts(),
     mapModel.listMapProducts(),
     mapModel.listPackedPallets(),
     mapModel.readUnitSizes(),
     loadShelfLots(),
+    mapModel.listDayActivity(today),
   ]);
-
-  const today = todayInSAST();
   const placed = placeStock({
     areas: areas.map((a) => ({
       id: a.id, name: a.name, kind: a.kind,
@@ -94,7 +94,10 @@ const buildMap = async () => {
     sizes,
   });
 
-  return { ready: true, grid: GRID, today, ...placed };
+  // day: what is happening today, for the Today strip, the gates and
+  // their trucks (listDayActivity). Packed pallets are in `areas` and
+  // `unstagedPallets` already.
+  return { ready: true, grid: GRID, today, day, ...placed };
 };
 
 // ── Saving the plan (admin) ───────────────────────────────────

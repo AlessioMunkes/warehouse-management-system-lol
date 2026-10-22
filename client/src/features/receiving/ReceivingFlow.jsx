@@ -30,6 +30,14 @@
 // second delivery note and put the stock up twice. A key generated
 // inside finish() would be new on every tap and would protect nothing.
 //
+// SCANNING
+// The barcode bar above the list is a second way to count, beside
+// typing. A scan finds the order line for that product, opens it, and
+// counts up from zero by the barcode's units per scan: the first scan
+// of a line replaces the pre-filled ordered figure, because someone
+// scanning is counting what is actually there. A product that is not
+// on the order says so and changes nothing.
+//
 // There is no "save and finish later": nothing in this app persists a
 // delivery that has not been submitted. What IS kept is a local draft
 // of the numbers, so a tablet that sleeps does not lose the count —
@@ -58,6 +66,7 @@ import receivingAPI from '../../services/receivingAPI';
 import { newIdempotencyKey } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import DeliveryNotePDF from './DeliveryNotePDF';
+import ProductScanBar from '../scan/ProductScanBar';
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import { SignInPanel, LineDetail } from './ReceivingParts';
@@ -278,6 +287,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setError(null);
     // A different order is a different job; nothing on it is ticked.
     resetConfirmed();
+    scanned.current.clear();
     try {
       const items = await receivingAPI.getPurchaseOrderItems(poId);
       // Numbers only. The order's own lines always come from the
@@ -349,6 +359,41 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setLines((all) => all.map((line) => (
       line.purchaseOrderItemId === itemId ? { ...line, ...patch } : line
     )));
+
+  // What each line has been scanned up to, by line id. A ref rather
+  // than state so two scans answered in the same moment both count:
+  // each adds to the last, not to the figure the screen last drew.
+  const scanned = useRef(new Map());
+
+  // A supplier's GS1 case label also carries its use-by date. It fills
+  // a fresh line's date when that is still empty; a date someone typed
+  // is theirs and is left alone.
+  const countScan = (match, label) => {
+    const line = lines.find((l) => String(l.productId) === String(match.productId));
+    if (!line) return { tone: 'warn', text: `${match.productName} is not on this order.` };
+    const id = line.purchaseOrderItemId;
+    const next = Math.round(((scanned.current.get(id) ?? 0) + match.unitsPerScan) * 1000) / 1000;
+    scanned.current.set(id, next);
+    const takeDate = Boolean(label?.useBy && line.fresh && !line.useBy);
+    patchLine(id, takeDate ? { counted: String(next), useBy: label.useBy } : { counted: String(next) });
+    setFocusId(id);
+    return `${line.name}: ${next} counted of ${line.expected}.${takeDate ? ` Use-by ${label.useBy} from the label.` : ''}`;
+  };
+
+  // A typed correction on a scanned line is where the next scan adds from.
+  const typeCount = (id, value) => {
+    if (scanned.current.has(id)) scanned.current.set(id, Number(value) || 0);
+    patchLine(id, { counted: value });
+  };
+
+  // The order's own products, for linking a barcode nobody knows yet.
+  const scanChoices = useMemo(() => {
+    const byProduct = new Map();
+    for (const l of lines) {
+      if (!byProduct.has(l.productId)) byProduct.set(l.productId, { productId: l.productId, label: l.name, meta: l.sku });
+    }
+    return [...byProduct.values()];
+  }, [lines]);
 
   // Fills what is blank AND ticks every line — see the same note in
   // PalletCheck.jsx. "Everything as ordered" is the confirmation.
@@ -453,6 +498,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
   };
 
   const restart = () => {
+    scanned.current.clear();
     setPhase('which');
     setLines([]);
     setOrderId('');
@@ -599,6 +645,12 @@ export default function ReceivingFlow({ onCrumbChange }) {
             />
           }
         >
+          {hasLines && phase === 'work' ? (
+            <ProductScanBar
+              onMatch={countScan} linkChoices={scanChoices} disabled={saving}
+              screen="receiving" referenceId={orderId ? Number(orderId) : null}
+            />
+          ) : null}
           {hasLines ? (
             <WorkList
               lines={lines.map((line) => ({
@@ -620,7 +672,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
               // each line, or the date the finish button asks for has
               // nowhere visible to go.
               expandAll={mode !== 'guided'}
-              onChange={(id, value) => patchLine(id, { counted: value })}
+              onChange={typeCount}
               onAcceptAll={acceptAllAsOrdered}
               acceptAllLabel="Everything as ordered"
               confirmed={confirmedIds}

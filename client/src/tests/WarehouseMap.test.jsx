@@ -11,10 +11,12 @@ import { render, screen, within, waitFor, fireEvent } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import {
   DEFAULT_CAMERA, boxFaces, camera, drawOrder, freeSpot, keepOnGrid, nextName, overlapping, palletBoxes,
+  gateOutward, productStacks, truckBoxes,
 } from '../features/warehouseMap/mapGeometry';
 import { areasMatching, countedWhen, fillTone, legendFor, toneFor } from '../features/warehouseMap/mapOverlays';
-import { alertsFor, badgeFor, figureOf, palletDue } from '../features/warehouseMap/mapIndicators';
+import { alertsFor, badgeFor, figureOf, heldText, palletDue, stockMode } from '../features/warehouseMap/mapIndicators';
 import { zoomAbout, zoomedBox } from '../features/warehouseMap/useMapZoom';
+import { gateActivity, todayCards, withGates } from '../features/warehouseMap/mapActivity';
 
 vi.mock('../services/warehouseMapAPI', () => ({
   getWarehouseMap: vi.fn(),
@@ -334,7 +336,10 @@ describe('mapIndicators', () => {
 
   it('labels an area with how full it is, or what it holds', () => {
     expect(figureOf({ kind: 'dry', fill: 0.456, items: [] })).toBe('46%');
-    expect(figureOf({ kind: 'cold', fill: null, items: [{ productId: 1, about: 2 }, { productId: 1, about: 1 }] })).toBe('1 product');
+    expect(figureOf({ kind: 'cold', fill: null, items: [{ productId: 1, about: 2, unit: 'each' }, { productId: 1, about: 1, unit: 'each' }] })).toBe('3 each');
+    expect(figureOf({ kind: 'cold', fill: null, items: [{ productId: 1, about: 2 }, { productId: 2, about: 1 }] })).toBe('2 products');
+    // A capacity is no use for stock with no weight: say what it holds instead.
+    expect(figureOf({ kind: 'dry', fill: 0, unweighed: 1, items: [{ productId: 1, about: 500, unit: 'each', kg: null }] })).toBe('500 each');
     expect(figureOf({ kind: 'door' })).toBeNull();
   });
 });
@@ -349,7 +354,7 @@ describe('the 3D marks', () => {
     const store = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
     expect(store.querySelectorAll('polygon.fill-danger').length).toBeGreaterThan(0);
     expect(store.getAttribute('aria-label')).toMatch(/Over capacity: 140% full/);
-    expect(screen.getByText('Solid block: stock against capacity. Red top: over capacity.')).toBeInTheDocument();
+    expect(screen.getByText(/Solid block: stock against capacity. Red top: over capacity. Stacks: each product/)).toBeInTheDocument();
   });
 
   it('lights up the areas that need attention', async () => {
@@ -423,5 +428,194 @@ describe('the area panel marks', () => {
     expect(within(rows[1]).getByText('Collected today')).toBeInTheDocument();
     expect(panel.getByText('1 pallet past the collection day')).toBeInTheDocument();
     expect(panel.getByText('1 pallet to be collected today')).toBeInTheDocument();
+  });
+});
+
+// ── Stock with no weight or no capacity still shows ───────────
+describe('stock with no weight or capacity', () => {
+  const beans = { productId: 1265, name: 'Baked Beans', sku: 'BB', unit: 'each', about: 500, kg: null, source: 'counted', counted: 500, scaled: false, countedAt: '2026-10-18T08:00:00Z' };
+  const store = { ...MAP.areas[0], name: 'Dry store 1', capacityKg: null, fill: null, heldKg: 0, unweighed: 1, items: [beans] };
+
+  it('says what an area holds in its own units, never 0 kg', () => {
+    expect(heldText(store)).toBe('500 each');
+    expect(heldText({ items: [{ ...beans, productId: 2, unit: 'kg', about: 120, kg: 120 }, beans] })).toBe('About 120 kg and 500 each');
+    expect(stockMode(store)).toBe('stacks');
+    expect(stockMode({ ...store, fill: 0.4, unweighed: 0 })).toBe('fill');
+    expect(stockMode({ ...store, items: [] })).toBe('none');
+  });
+
+  it('lays out a stack per product, taller for more', () => {
+    const stacks = productStacks({ id: 1, kind: 'dry', x: 0, y: 0, w: 10, h: 4, levels: 2 }, [
+      { productId: 1, about: 5 }, { productId: 2, about: 5000 }, { productId: 1, about: 3 },
+    ]);
+    expect(stacks).toHaveLength(2);
+    expect(stacks[0].item).toMatchObject({ productId: 2 });
+    expect(stacks[0].z1).toBeGreaterThan(stacks[1].z1);
+    expect(stacks[1].item.about).toBe(8);
+  });
+
+  it('draws the beans as a stack in 3D, names them on hover and lights them on search', async () => {
+    const user = userEvent.setup();
+    getWarehouseMap.mockResolvedValue({ ...MAP, areas: [store, ...MAP.areas.slice(1)] });
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const area = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
+    const title = [...area.querySelectorAll('title')].map((t) => t.textContent);
+    expect(title).toContain('Baked Beans: 500 each');
+    expect(area.getAttribute('aria-label')).toMatch(/500 each/);
+    await user.type(screen.getByRole('searchbox', { name: /Find a product/ }), 'beans');
+    expect(area.querySelector('polygon.fill-info')).not.toBeNull();
+  });
+
+  it('shows the beans in the capacity summary, and asks for a capacity', async () => {
+    getWarehouseMap.mockResolvedValue({
+      ...MAP,
+      areas: [store, ...MAP.areas.slice(1)].map((a) => ({ ...a, capacityKg: null, palletSpaces: null, fill: null })),
+      totals: { ...MAP.totals, storage: { heldKg: 0, heldInSizedKg: 0, capacityKg: null, unweighed: 1 } },
+    });
+    render(<WarehouseMapTab />);
+    const meter = await screen.findByRole('meter', { name: 'Dry store 1' });
+    expect(meter.closest('button')).toHaveTextContent('500 each');
+    expect(meter).toHaveAttribute('title', 'No capacity set');
+    expect(screen.getByText(/Dashed bars have no capacity set/)).toBeInTheDocument();
+    expect(screen.getByText(/shown in its own units/)).toBeInTheDocument();
+  });
+});
+
+describe('finding a product from its area', () => {
+  it('lights up where a product is when its name is chosen in the panel', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    await user.click(panel.getByRole('button', { name: 'Rice' }));
+    // Behind the panel, which is modal on a narrow screen.
+    expect(screen.getByRole('searchbox', { name: /Find a product/, hidden: true })).toHaveValue('Rice');
+    expect(screen.getByRole('button', { name: /^Cold room 1, Cold room/, hidden: true })).toHaveAttribute('opacity', '0.3');
+  });
+});
+
+// ── The day: gates, trucks and the Today strip ────────────────
+describe('the day at the gates', () => {
+  const dispatchGate = { id: 20, name: 'Dispatch gate', kind: 'dispatch_gate', x: 30, y: 23, w: 4, h: 1, levels: 1 };
+  const receivingGate = { id: 21, name: 'Receiving gate', kind: 'receiving_gate', x: 0, y: 10, w: 1, h: 4, levels: 1 };
+  const day = {
+    packing: 3, toPackToday: 2, collectedToday: 5, notCollectedToday: 1,
+    inbound: [
+      { id: 176, po_number: 'PO-2026-0176', status: 'approved', expected_on: '2026-10-11', supplier: "Mambo's", lines: 2 },
+      { id: 180, po_number: 'PO-2026-0180', status: 'approved', expected_on: '2026-10-18', supplier: 'Fampak', lines: 1 },
+      { id: 181, po_number: 'PO-2026-0181', status: 'in_transit', expected_on: '2026-10-18', supplier: 'Pelican', lines: 3 },
+    ],
+    receivedToday: [{ id: 9, supplier: 'Pelican', po_number: 'PO-2026-0181', status: 'recorded' }],
+    volunteersOnSite: 4, donationsToday: 2, closure: null, benevolentWaiting: 1,
+    collections: [
+      { id: 1, name: 'Alfa Educare', slipStatus: 'complete', dispatchStatus: null, palletRef: 'P-1' },
+      { id: 2, name: 'Baphumelela', slipStatus: 'complete', dispatchStatus: 'awaiting', palletRef: 'P-2' },
+      { id: 3, name: 'Delft Pooh Bear', slipStatus: 'dispatched', dispatchStatus: 'collected', collectedAt: '2026-10-18T08:10:00Z', palletRef: 'P-3' },
+      { id: 4, name: 'Harare Kids', slipStatus: 'in_progress', dispatchStatus: null },
+      { id: 5, name: 'Langa Sunflower', slipStatus: 'pending', dispatchStatus: null },
+      { id: 6, name: 'Zama Educare', slipStatus: 'complete', dispatchStatus: 'not_collected', palletRef: 'P-6' },
+    ],
+    nextCollection: { day: '2026-10-20', centres: 98, cohort: 'tuesday' },
+  };
+  const DAY_MAP = { ...MAP, day, areas: [...MAP.areas, dispatchGate, receivingGate] };
+
+  it('queues each centre whose pallet is packed at the dispatch gate, and counts down as they collect', () => {
+    const activity = gateActivity(DAY_MAP);
+    expect(activity.dispatch).toMatchObject({ total: 6, remaining: 4, trucks: 2, truckCount: 2, tone: 'bad' });
+    expect(activity.dispatch.vehicles.map((v) => v.name)).toEqual(['Alfa Educare', 'Baphumelela']);
+    expect(activity.dispatch.collected.map((c) => c.name)).toEqual(['Delft Pooh Bear']);
+    expect(activity.dispatch.missed.map((c) => c.name)).toEqual(['Zama Educare']);
+    // Alfa collects: one bakkie fewer, one more collected.
+    const later = gateActivity({ ...DAY_MAP, day: { ...day, collections: day.collections.map((c) => (c.id === 1 ? { ...c, dispatchStatus: 'collected' } : c)) } });
+    expect(later.dispatch).toMatchObject({ trucks: 1, remaining: 3 });
+    expect(later.dispatch.collected).toHaveLength(2);
+    expect(activity.receiving.expected.map((po) => po.id)).toEqual([180]);
+    expect(activity.receiving.late.map((po) => po.id)).toEqual([176]);
+    expect(activity.receiving).toMatchObject({ trucks: 2, tone: 'warn' });
+    const withPallets = gateActivity({ ...DAY_MAP, areas: DAY_MAP.areas.map((a) => (a.id === 4 ? { ...a, pallets: [{ id: 1, dispatchDate: '2026-10-17' }, { id: 2, dispatchDate: '2026-10-18' }, { id: 3, dispatchDate: '2026-10-30' }] } : a)) });
+    // Pallets missed on an earlier day are an alert, never a vehicle.
+    expect(withPallets.dispatch).toMatchObject({ trucks: 2, tone: 'bad', later: 1 });
+    expect(withPallets.dispatch.overdue).toHaveLength(1);
+    expect(gateActivity({ ...DAY_MAP, day: { ...day, collections: [] } }).dispatch).toMatchObject({ total: 0, trucks: 0 });
+  });
+
+  it('puts the day on the first gate of each kind, and the packing on the staging area', () => {
+    const areas = withGates(DAY_MAP.areas, gateActivity(DAY_MAP), 3);
+    expect(areas.find((a) => a.id === 21).gate).toMatchObject({ kind: 'receiving', truckCount: 2 });
+    expect(areas.find((a) => a.id === 4).packingNow).toBe(3);
+    expect(figureOf(areas.find((a) => a.id === 21))).toBe('2 expected');
+  });
+
+  it('backs a truck up to the outside of its gate', () => {
+    const plan = [{ id: 1, kind: 'dry', x: 5, y: 5, w: 10, h: 10 }, dispatchGate];
+    const boxes = truckBoxes(dispatchGate, plan, 1);
+    const trailer = boxes.find((b) => b.part === 'trailer');
+    // The gate is below the plan, so the truck stands further below it.
+    expect(trailer.y).toBeGreaterThanOrEqual(dispatchGate.y + dispatchGate.h);
+    expect(boxes.filter((b) => b.part === 'wheel')).toHaveLength(6);
+    expect(gateOutward(receivingGate, [{ id: 1, kind: 'dry', x: 5, y: 5, w: 10, h: 10 }])).toEqual({ axis: 'x', sign: -1 });
+  });
+
+  it('writes the Today strip, leaving out what could not be read', () => {
+    const cards = todayCards(DAY_MAP, gateActivity(DAY_MAP), { needing: 2 });
+    expect(cards[0].detail).toBe('2 centres at the gate · 2 still packing · 1 not collected');
+    expect(cards.map((c) => [c.label, c.value])).toEqual([
+      ['Collections', '1 of 6 collected'], ['Deliveries', '1 received'], ['Packing now', '3 pallets'],
+      ['On site', '4 volunteers'], ['Donations', '2 today'], ['Needs attention', '2 areas'],
+    ]);
+    expect(cards[1].detail).toBe('1 delivery expected · 1 late');
+    expect(todayCards({ ...DAY_MAP, day: { ...day, volunteersOnSite: null } }, gateActivity(DAY_MAP)).map((c) => c.id)).not.toContain('people');
+    const quiet = { ...DAY_MAP, day: { ...day, collections: [] } };
+    expect(todayCards(quiet, gateActivity(quiet))[0]).toMatchObject({ value: 'None today', detail: 'Next: Tuesday, 20 Oct, 98 centres' });
+  });
+
+  it('shows the day above the map, a truck at the receiving gate, and opens it', async () => {
+    const user = userEvent.setup();
+    getWarehouseMap.mockResolvedValue(DAY_MAP);
+    render(<WarehouseMapTab />);
+    const strip = within(await screen.findByRole('list', { name: 'Today in the warehouse' }));
+    expect(strip.getByText('1 of 6 collected')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /3D/ }));
+    const svg = screen.getByRole('group', { name: /3D view/ });
+    expect(svg.querySelectorAll('polygon.fill-warn').length).toBeGreaterThan(0);
+    // Each centre at the gate in its bakkie, named.
+    expect(within(svg).getByText('Alfa Educare')).toBeInTheDocument();
+    expect(within(svg).getByText('Baphumelela')).toBeInTheDocument();
+    await user.click(strip.getByRole('button', { name: /Deliveries/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.getByText("Mambo's")).toBeInTheDocument();
+    expect(panel.getByText('7 days late')).toBeInTheDocument();
+    expect(panel.getByText('Received today')).toBeInTheDocument();
+  });
+
+  it('says when the warehouse is closed today', async () => {
+    getWarehouseMap.mockResolvedValue({ ...DAY_MAP, day: { ...day, closure: { label: 'Heritage Day', kind: 'public_holiday' } } });
+    render(<WarehouseMapTab />);
+    expect(await screen.findByText('The warehouse is closed today: Heritage Day.')).toBeInTheDocument();
+  });
+});
+
+describe('the dispatch gate panel', () => {
+  it('lists today by where each centre is, with how many have collected', async () => {
+    const user = userEvent.setup();
+    const day = {
+      collections: [
+        { id: 1, name: 'Alfa Educare', slipStatus: 'complete', dispatchStatus: null, palletRef: 'P-1' },
+        { id: 3, name: 'Delft Pooh Bear', slipStatus: 'dispatched', dispatchStatus: 'collected', collectedAt: '2026-10-18T08:10:00Z', palletRef: 'P-3' },
+        { id: 6, name: 'Zama Educare', slipStatus: 'complete', dispatchStatus: 'not_collected', palletRef: 'P-6' },
+      ],
+      inbound: [], receivedToday: [],
+    };
+    const gate = { id: 20, name: 'Dispatch gate', kind: 'dispatch_gate', x: 30, y: 23, w: 4, h: 1, levels: 1, items: [] };
+    getWarehouseMap.mockResolvedValue({ ...MAP, day, areas: [...MAP.areas, gate] });
+    render(<WarehouseMapTab />);
+    await user.click(within(await screen.findByRole('list', { name: 'Today in the warehouse' })).getByRole('button', { name: /Collections/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.getByText('1 of 3 centres collected')).toBeInTheDocument();
+    expect(within(panel.getByRole('region', { name: 'At the gate' })).getByText('Alfa Educare')).toBeInTheDocument();
+    expect(within(panel.getByRole('region', { name: 'Not collected' })).getByText('Zama Educare')).toBeInTheDocument();
+    expect(within(panel.getByRole('region', { name: 'Collected' })).getByText('Delft Pooh Bear')).toBeInTheDocument();
+    expect(panel.getByText('1 centre did not collect today')).toBeInTheDocument();
   });
 });

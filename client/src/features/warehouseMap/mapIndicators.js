@@ -25,7 +25,7 @@ import { holdsStock, isStaging } from './mapGeometry';
 const RANK = { bad: 0, warn: 1, info: 2, muted: 3 };
 const DAY_MS = 86_400_000;
 const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
 
 /** When a pallet is collected, against today: overdue, today, tomorrow or later. */
 export const palletDue = (pallet, today) => {
@@ -47,6 +47,20 @@ export const palletLook = (due) => PALLET_DUE.find((p) => p.id === due) ?? PALLE
 /** Every alert on an area, most urgent first: [{ level, glyph, text }]. */
 export const alertsFor = (area, { today, now } = {}) => {
   const out = [];
+  // A gate: the day's trucks (mapActivity.js puts them on area.gate).
+  if (area.gate?.kind === 'dispatch') {
+    const g = area.gate;
+    if (g.missed?.length) out.push({ level: 'bad', glyph: String(g.missed.length), text: `${plural(g.missed.length, 'centre')} did not collect today` });
+    if (g.overdue.length) out.push({ level: 'bad', glyph: String(g.overdue.length), text: `${plural(g.overdue.length, 'pallet')} missed on an earlier day` });
+    if (g.waiting?.length) out.push({ level: 'info', glyph: String(g.waiting.length), text: `${plural(g.waiting.length, 'centre')} at the gate to collect` });
+    return out;
+  }
+  if (area.gate?.kind === 'receiving') {
+    const g = area.gate;
+    if (g.late.length) out.push({ level: 'warn', glyph: String(g.late.length), text: `${plural(g.late.length, 'delivery', 'deliveries')} late` });
+    if (g.expected.length) out.push({ level: 'info', glyph: String(g.expected.length), text: `${plural(g.expected.length, 'delivery', 'deliveries')} expected today` });
+    return out;
+  }
   if (isStaging(area)) {
     const pallets = area.pallets ?? [];
     const overdue = pallets.filter((p) => palletDue(p, today) === 'overdue').length;
@@ -84,14 +98,23 @@ export const badgeFor = (area, ctx) => {
 
 /** The figure on an area's label: how full, how many pallets, or how many products. */
 export const figureOf = (area) => {
+  if (area.gate?.kind === 'dispatch') {
+    const g = area.gate;
+    if (!g.total) return 'No collections today';
+    return g.remaining ? `${g.remaining} of ${g.total} to collect` : 'All collected';
+  }
+  if (area.gate?.kind === 'receiving') return area.gate.truckCount ? `${area.gate.truckCount} expected` : (area.gate.receivedToday.length ? `${area.gate.receivedToday.length} received` : 'Quiet');
   if (isStaging(area)) {
     const n = area.pallets?.length ?? 0;
-    return area.palletSpaces ? `${n}/${area.palletSpaces}` : plural(n, 'pallet');
+    const packed = area.palletSpaces ? `${n}/${area.palletSpaces}` : plural(n, 'pallet');
+    return area.packingNow ? `${packed} · ${area.packingNow} packing` : packed;
   }
   if (!holdsStock(area) || !Array.isArray(area.items)) return null;
-  if (area.fill !== null && area.fill !== undefined) return percent(area.fill);
-  const n = new Set(area.items.filter((i) => i.about > 0).map((i) => i.productId)).size;
-  return n ? plural(n, 'product') : 'Empty';
+  if (area.fill !== null && area.fill !== undefined && !(area.unweighed > 0)) return percent(area.fill);
+  const lines = stockLines(area);
+  if (lines.length === 0) return 'Empty';
+  // One product: how much of it. More: how many.
+  return lines.length === 1 ? `${Math.round(lines[0].about).toLocaleString('en-ZA')} ${lines[0].unit ?? ''}`.trim() : plural(lines.length, 'product');
 };
 
 export const BADGE_CLASS = {
@@ -99,4 +122,51 @@ export const BADGE_CLASS = {
   warn:  { fill: 'fill-warn', text: 'fill-white' },
   info:  { fill: 'fill-info', text: 'fill-white' },
   muted: { fill: 'fill-ink-soft', text: 'fill-white' },
+};
+
+// ── What an area holds, in words ──────────────────────────────
+const fmt = (n) => Math.round(Number(n) || 0).toLocaleString('en-ZA');
+
+/** The products an area holds, one line each, counted and expected together, most first. */
+export const stockLines = (area) => {
+  if (!Array.isArray(area.items)) return [];
+  const byProduct = new Map();
+  for (const i of area.items.filter((x) => x.about > 0)) {
+    const m = byProduct.get(i.productId);
+    byProduct.set(i.productId, m ? { ...m, about: m.about + i.about, expected: m.expected || i.source === 'expected' } : { ...i, expected: i.source === 'expected' });
+  }
+  return [...byProduct.values()].sort((a, b) => b.about - a.about);
+};
+
+/**
+ * "About 900 kg", "500 each", "About 120 kg and 500 each": the weight
+ * where it is known, and the rest in its own units, so stock with no
+ * weight on record never reads as nothing. '' for an empty area.
+ */
+export const heldText = (area) => {
+  const lines = stockLines(area);
+  if (lines.length === 0) return '';
+  const kg = lines.reduce((s, l) => s + (l.kg ?? 0), 0);
+  const other = new Map();
+  for (const l of lines.filter((x) => x.kg === null || x.kg === undefined)) {
+    other.set(l.unit || 'units', (other.get(l.unit || 'units') ?? 0) + l.about);
+  }
+  const parts = [];
+  if (kg > 0) parts.push(`About ${fmt(kg)} kg`);
+  for (const [unit, n] of other) parts.push(`${fmt(n)} ${unit}`);
+  return parts.join(' and ');
+};
+
+/**
+ * How an area's stock is drawn in 3D:
+ *   'fill'    a capacity, and every product's weight known: one block,
+ *             as high as the area is full
+ *   'stacks'  otherwise, when it holds anything: a stack per product
+ *   'none'    nothing in it (or no stock figures, as in the builder)
+ */
+export const stockMode = (area) => {
+  if (!holdsStock(area) || !Array.isArray(area.items)) return 'none';
+  const stocked = area.items.some((i) => i.about > 0);
+  if (area.fill !== null && area.fill !== undefined && !(area.unweighed > 0)) return 'fill';
+  return stocked ? 'stacks' : 'none';
 };

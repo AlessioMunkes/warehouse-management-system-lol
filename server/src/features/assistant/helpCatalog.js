@@ -798,7 +798,54 @@ export const TOPICS = [
       topic: 'receiving-discrepancy',
     },
     rules: ['BR-05', 'BR-07', 'BR-08'],
-    related: ['receiving-discrepancy', 'receiving-partial', 'receiving-expiry'],
+    related: ['receiving-discrepancy', 'receiving-partial', 'receiving-expiry', 'barcode-scanning'],
+  },
+  {
+    id: 'barcode-scanning',
+    title: 'Scanning barcodes',
+    roles: WORKERS_ONLY,
+    screens: ['receiving', 'donation', 'packing'],
+    asks: [
+      'scan a barcode', 'barcode scanner', 'scan the box', 'scan items', 'use the camera to count',
+      'barcode not found', 'new barcode', 'link a barcode', 'scan instead of typing',
+      'scan when packing', 'check the right item',
+    ],
+    body:
+      'On Receiving, on food donations and when packing a pallet you can scan the barcode ' +
+      'on a pack instead of finding the item by name. Use the camera, or a USB or Bluetooth ' +
+      'scanner in the Barcode box. Typing and ticking still work the same way.',
+    steps: [
+      'Scan the barcode. On Receiving it opens that line and counts one scan at a time; on a donation it fills the item.',
+      'When packing, a scan opens that item with the count scanned, and you press Save. A product that is not on the pallet is pointed out.',
+      'Each scan adds the barcode’s units per scan. A box of 12 counts as 12.',
+      'If the barcode is new, choose which product it is and how many one scan counts for. From then on it is known.',
+      'Check the numbers before you finish. You can still type over any count.',
+      'A supplier’s case label often carries the use-by date too. Scanning it fills in an empty use-by date for you.',
+      'With no signal, a barcode this phone has scanned before still works. A new one needs signal to link.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to record a delivery?',
+      topic: 'receiving-record',
+    },
+    related: ['receiving-record'],
+  },
+  {
+    id: 'product-barcodes-admin',
+    title: 'Barcodes on a product',
+    roles: ADMIN_ONLY,
+    screens: ['products'],
+    asks: ['add a barcode', 'remove a barcode', 'wrong barcode', 'product barcodes', 'ean code'],
+    body:
+      'A product can have several barcodes, one per supplier or pack size, or none. Most ' +
+      'are linked on the floor the first time a box is scanned. Open the product on ' +
+      'Products to see them, add one, or remove one that was linked to the wrong product. ' +
+      'When adding a product, Start from a barcode looks the pack up in the public Open Food ' +
+      'Facts database and fills in what it knows, for you to check. Only the barcode is sent.',
+    followUp: {
+      question: 'Would you like to know what the other product fields do?',
+      topic: 'product-fields',
+    },
+    related: ['product-fields'],
   },
   {
     id: 'receiving-discrepancy',
@@ -1088,6 +1135,28 @@ export const TOPICS = [
   },
 
   // ═══ Packing ══════════════════════════════════════════════
+  {
+    id: 'decanting-bag-labels',
+    title: 'Labels for decanted bags',
+    roles: WORKERS_ONLY,
+    screens: ['decanting'],
+    asks: ['bag labels', 'print labels', 'label the bags', 'sticker for the bags', 'barcode for decanted bags'],
+    body:
+      'After you save a decanting run, Print bag labels opens a sheet with one sticker per bag: ' +
+      'the product, the bag size, today’s date, a line for the use-by date, and a barcode. ' +
+      'The barcode is set up for that product and bag size, so scanning a bag when packing ' +
+      'counts the right amount.',
+    steps: [
+      'Save the decanting run.',
+      'Press Print bag labels. The sheet fits a standard 21-label A4 sheet, or plain paper you cut up.',
+      'Write the use-by date on each label and stick one on each bag.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to record a decanting run?',
+      topic: 'decanting-record',
+    },
+    related: ['decanting-record', 'barcode-scanning'],
+  },
   {
     id: 'packing-pallet',
     title: 'Packing a pallet',
@@ -1381,6 +1450,23 @@ export const TOPICS = [
       topic: 'stock-ledger',
     },
     related: ['inventory-columns', 'undo-a-mistake', 'expired-stock'],
+  },
+  {
+    id: 'stock-count-scanning',
+    title: 'Scanning during a stock count',
+    roles: MANAGERS_UP,
+    screens: ['inventory'],
+    asks: ['scan a stock count', 'stock take with a scanner', 'count by scanning', 'scan an area'],
+    body:
+      'When you count an area on the warehouse map, the Barcode box and the camera count by ' +
+      'scan. The first scan of a product replaces the figure it came in with, each scan after ' +
+      'adds the barcode’s units per scan, and a product not on the list is added. Items ' +
+      'without a barcode are typed in as before.',
+    followUp: {
+      question: 'Would you like to know how to correct stock after a count?',
+      topic: 'stock-adjustment',
+    },
+    related: ['stock-adjustment'],
   },
   {
     id: 'inventory-low-stock',

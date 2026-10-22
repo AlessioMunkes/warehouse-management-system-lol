@@ -37,8 +37,9 @@
 //
 // WEIGHT, for capacity. Kilograms, grams and the sized units (crate,
 // bag, box, punnet, Settings → Stock rules) convert; a litre is taken as
-// a kilogram; an item counted "each" uses the product's weight. Stock
-// whose weight is not known is counted in `unweighed` instead.
+// a kilogram; an item counted "each" uses the product's weight, or, with
+// none on record, a size in its name ("Baked Beans 410g", "Oil 2L").
+// Stock whose weight is still not known is counted in `unweighed`.
 //
 // No SQL and no clock here.
 // ─────────────────────────────────────────────────────────────
@@ -58,8 +59,16 @@ export const weightKg = (product, quantity, sizes = {}) => {
   const kg = convertQuantity(q, unit, 'kg', sizes);
   if (kg !== null) return kg;
   if (LITRES[unit]) return q * LITRES[unit];
-  const each = num(product.weightKg);
+  const each = num(product.weightKg) > 0 ? num(product.weightKg) : sizeInName(product.name);
   return each > 0 ? q * each : null;
+};
+
+// "410g", "2 kg", "750ml", "5L" in a product's name, as kilograms; null for none.
+const SIZE = /(\d+(?:[.,]\d+)?)\s?(kg|g|ml|l)\b/i;
+const SIZE_KG = { kg: 1, g: 0.001, l: 1, ml: 0.001 };
+export const sizeInName = (name) => {
+  const m = String(name ?? '').match(SIZE);
+  return m ? Number(m[1].replace(',', '.')) * SIZE_KG[m[2].toLowerCase()] : null;
 };
 
 const lower = (s) => String(s ?? '').trim().toLowerCase();
@@ -243,4 +252,4 @@ export const placeStock = ({ areas = [], counts = [], products = [], pallets = [
   return { areas: placedAreas, products: placedProducts, unstagedPallets, totals };
 };
 
-export default { placeStock, weightKg };
+export default { placeStock, weightKg, sizeInName };

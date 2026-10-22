@@ -22,7 +22,8 @@
 //               the job: "12 lines counted", "2 short". warn marks one
 //               that needs a second look, with words as well as colour.
 //   action      { label, onClick }       a second thing to do, e.g.
-//                                        "View delivery note"
+//                                        "View delivery note", or a
+//                                        list of them
 //   closeLabel  the main button          "Done"
 //
 // Asked for by the floor: "more interactive, with some imagery, and says
@@ -104,9 +105,9 @@ export default function SuccessDialog({
         ) : null}
 
         <DialogFooter>
-          {action ? (
-            <button type="button" className="stf-btn stf-btn-secondary" onClick={action.onClick}>{action.label}</button>
-          ) : null}
+          {[].concat(action ?? []).filter(Boolean).map((a) => (
+            <button key={a.label} type="button" className="stf-btn stf-btn-secondary" onClick={a.onClick} disabled={a.disabled}>{a.label}</button>
+          ))}
           <button type="button" className="stf-btn stf-btn-primary" onClick={onClose}>{closeLabel}</button>
         </DialogFooter>
       </DialogContent>

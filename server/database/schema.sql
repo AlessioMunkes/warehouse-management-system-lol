@@ -1743,3 +1743,113 @@ ALTER TABLE ecd_centres DROP CONSTRAINT IF EXISTS ecd_centres_location_source_ch
 ALTER TABLE ecd_centres ADD CONSTRAINT ecd_centres_location_source_check CHECK (
   location_source IS NULL OR location_source IN ('manual', 'geocoded', 'imported')
 );
+
+
+-- from 051_warehouse_gates
+-- ─────────────────────────────────────────────────────────────
+-- 051_warehouse_gates.sql
+--
+-- Two more kinds of area for the warehouse map (migrations 048, 049):
+--
+--   dispatch_gate    where pallets leave. A truck stands at it on the map
+--                    while packed pallets wait to be collected today.
+--   receiving_gate   where deliveries come in. A truck stands at it while
+--                    a purchase order is expected today, or is late.
+--
+-- They hold no stock and take no capacity, like a door. What happens at
+-- them is read from what the system already records (packed slips,
+-- purchase orders, delivery notes); nothing new is stored.
+--
+-- Additive only: one widened check.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE warehouse_areas DROP CONSTRAINT IF EXISTS warehouse_areas_kind_check;
+ALTER TABLE warehouse_areas
+  ADD CONSTRAINT warehouse_areas_kind_check
+  CHECK (kind IN ('dry', 'cold', 'floor', 'staging', 'door', 'dispatch_gate', 'receiving_gate'));
+
+
+-- from 052_create_product_barcodes
+-- ─────────────────────────────────────────────────────────────
+-- 052_create_product_barcodes.sql
+--
+-- The barcodes printed on stock, each pointing at one product, so a
+-- scan can stand in for picking the product by name.
+--
+-- A table and not a column on products, because:
+--   - the same product (1 kg rice) arrives from different suppliers
+--     under different barcodes, so one product can have many
+--   - most donated stock has none, so a product can have zero
+--   - a case and the single item inside it carry different barcodes:
+--     units_per_scan says how many of the product's own unit one scan
+--     of this code means (1 for the bag, 12 for the box of 12)
+--
+--   code            digits as printed (EAN-13, EAN-8, UPC-A, UPC-E,
+--                   GTIN-14) or a supplier's own Code 128 text. Stored
+--                   normalised by the server (productCode.js), so a
+--                   12-digit UPC and the same code read as EAN-13 are
+--                   one row. Unique: one code, one product.
+--   supplier_id     whose packaging it came on, when known
+--   created_by      who linked it (a worker linking a code at the bay,
+--                   or an admin on the product)
+--
+-- Nothing else reads it: every existing query names its tables, so no
+-- screen, report or pallet changes until it is used.
+--
+-- Additive only: one new table and an index.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS product_barcodes (
+  id              SERIAL PRIMARY KEY,
+  product_id      INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  code            VARCHAR(64) NOT NULL UNIQUE,
+  units_per_scan  NUMERIC(12, 3) NOT NULL DEFAULT 1 CHECK (units_per_scan > 0),
+  supplier_id     INTEGER REFERENCES suppliers(id),
+  created_by      INTEGER REFERENCES users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS product_barcodes_product_id_idx ON product_barcodes (product_id);
+
+
+-- from 053_create_barcode_scan_events
+-- ─────────────────────────────────────────────────────────────
+-- 053_create_barcode_scan_events.sql
+--
+-- What each barcode scan on the floor turned out to be, so reporting
+-- can say what scanning catches ("wrong items caught by scanning").
+--
+--   screen        where it was scanned:
+--                   receiving, donation, packing, stock_count
+--   outcome       what the scan was:
+--                   counted        matched a line and counted
+--                   not_on_list    a real product, but not one this
+--                                  order, pallet or list wants: the
+--                                  wrong item, caught
+--                   already_done   that line was already packed
+--                   unknown        a code no product has yet
+--                   linked         an unknown code linked on the spot
+--                   misread        not a barcode that can be read
+--   product_id    the product the code named, when it named one
+--   reference_id  the order, pallet or area it was scanned against,
+--                 read with `screen` (a purchase order on receiving, a
+--                 picking slip on packing, a warehouse area on a count)
+--
+-- A record of a scan, never of stock: nothing here changes a balance,
+-- and a scan made without signal is not recorded at all (the client
+-- drops it rather than queueing it), so the counts are a floor, not a
+-- census.
+--
+-- Additive only: one new table and an index.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS barcode_scan_events (
+  id            SERIAL PRIMARY KEY,
+  scanned_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  screen        VARCHAR(20) NOT NULL
+                CHECK (screen IN ('receiving', 'donation', 'packing', 'stock_count')),
+  outcome       VARCHAR(20) NOT NULL
+                CHECK (outcome IN ('counted', 'not_on_list', 'already_done', 'unknown', 'linked', 'misread')),
+  product_id    INTEGER REFERENCES products(id),
+  reference_id  INTEGER,
+  user_id       INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS barcode_scan_events_scanned_at_idx ON barcode_scan_events (scanned_at);
