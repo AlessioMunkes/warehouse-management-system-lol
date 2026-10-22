@@ -21,6 +21,7 @@ import barcodeRepo from '../repositories/productBarcode.repository.js';
 import productRepo from '../repositories/product.repository.js';
 import { normaliseBarcode } from '../utils/barcode.js';
 import openFoodFacts from '../integrations/openFoodFacts.js';
+import { matchProducts } from '../features/barcodeMatch/matchProducts.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -83,6 +84,14 @@ const listForProduct = async (productId) => {
   return barcodeRepo.listForProduct(id);
 };
 
+// What Open Food Facts says a newly linked code is, kept on the link
+// (migration 056) so the next brand of the same food can be matched to
+// this stock item. Best effort: any failure leaves the columns empty.
+export const rememberFoodFacts = (barcodeId, code) => Promise.resolve()
+  .then(() => openFoodFacts.lookupProduct(code))
+  .then((food) => barcodeRepo.saveFoodFacts(barcodeId, food ?? null))
+  .catch((err) => console.error('[productBarcode] food facts not kept:', err.message));
+
 const link = async (productId, data = {}, actorId = null) => {
   const id = validateId(productId, 'Product ID');
   const parsed = normaliseBarcode(data.code);
@@ -99,9 +108,13 @@ const link = async (productId, data = {}, actorId = null) => {
   }
 
   try {
-    return await barcodeRepo.create({
+    const created = await barcodeRepo.create({
       productId: id, code: parsed.code, unitsPerScan, supplierId, createdBy: actorId,
     });
+    // Not waited for: the link is made whatever the outside service
+    // says, and the person at the bay is not kept waiting on it.
+    rememberFoodFacts(created.id, parsed.code);
+    return created;
   } catch (err) {
     if (err.code === '23505') {
       // The same link made twice (two workers, or a retried tap) is not
@@ -157,16 +170,66 @@ const recordScan = async (data = {}, userId = null) => {
 // ── A suggestion for a new product (Open Food Facts) ─────────
 // Already linked here: say so, and suggest nothing. Otherwise what the
 // public database says, or nothing.
+// The stock items a pack looks like (features/barcodeMatch), from what
+// Open Food Facts says about it. Nothing to compare = no matches.
+const matchesFor = async (food) => {
+  if (!food) return [];
+  const rows = await barcodeRepo.listMatchCandidates();
+  return matchProducts(food, (rows ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    sku: r.sku,
+    weightKg: r.weight_kg === null || r.weight_kg === undefined ? null : Number(r.weight_kg),
+    barcodes: (r.barcodes ?? []).map((b) => ({
+      ...b, foodWeightKg: b.foodWeightKg === null || b.foodWeightKg === undefined ? null : Number(b.foodWeightKg),
+    })),
+  })));
+};
+
+// For the admin's Add product: what the code is, and any stock item it
+// already looks like, so a second brand of beans is linked to the beans
+// rather than made into a new product.
 const suggest = async (raw) => {
   const parsed = normaliseBarcode(raw);
   if (!parsed) fail(400, NOT_A_BARCODE);
   const existing = await barcodeRepo.findByCode(parsed.code);
   if (existing) {
-    return { code: parsed.code, linkedTo: { productId: existing.product_id, productName: existing.product_name }, suggestion: null };
+    return {
+      code: parsed.code,
+      linkedTo: { productId: existing.product_id, productName: existing.product_name },
+      suggestion: null,
+      matches: [],
+    };
   }
-  return { code: parsed.code, linkedTo: null, suggestion: await openFoodFacts.lookupProduct(parsed.code) };
+  const suggestion = await openFoodFacts.lookupProduct(parsed.code);
+  return { code: parsed.code, linkedTo: null, suggestion, matches: await matchesFor(suggestion) };
+};
+
+// For the floor, when a scanned code is not linked yet: what it is and
+// which stock item it most likely belongs to. A person confirms.
+//   { code, linkedTo, food: { name, quantity } | null, matches: [...] }
+const matches = async (raw) => {
+  const parsed = normaliseBarcode(raw);
+  if (!parsed) fail(400, NOT_A_BARCODE);
+  const existing = await barcodeRepo.findByCode(parsed.code);
+  if (existing) {
+    return {
+      code: parsed.code,
+      linkedTo: { productId: existing.product_id, productName: existing.product_name },
+      food: null,
+      matches: [],
+    };
+  }
+  const food = await openFoodFacts.lookupProduct(parsed.code);
+  return {
+    code: parsed.code,
+    linkedTo: null,
+    food: food ? { name: food.name, quantity: food.quantity } : null,
+    matches: await matchesFor(food),
+  };
 };
 
 export default {
-  lookup, listForProduct, listAll, link, unlink, recordScan, suggest, MAX_UNITS_PER_SCAN, SCREENS, OUTCOMES,
+  lookup, listForProduct, listAll, link, unlink, recordScan, suggest, matches,
+  MAX_UNITS_PER_SCAN, SCREENS, OUTCOMES,
 };

@@ -22,8 +22,9 @@ describe('Open Food Facts lookup', () => {
     });
     setFetch(fetch);
     expect(await lookupProduct('6001059920014')).toEqual({
-      name: 'Koo Baked beans in tomato sauce 410 g', brand: 'Koo', quantity: '410 g',
-      weightKg: 0.41, category: 'Canned beans',
+      name: 'Koo Baked beans in tomato sauce 410 g', productName: 'Baked beans in tomato sauce',
+      brand: 'Koo', quantity: '410 g', weightKg: 0.41, category: 'Canned beans',
+      categories: ['foods', 'canned-beans'],
     });
     const [url, options] = fetch.mock.calls[0];
     expect(url).toMatch(/^https:\/\/world\.openfoodfacts\.org\/api\/v2\/product\/6001059920014\.json\?fields=/);

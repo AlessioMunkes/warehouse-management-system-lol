@@ -45,7 +45,11 @@ const weightKgOf = (amount, unit) => {
   return null;
 };
 
-// { name, brand, quantity, weightKg, category } | null
+// { name, productName, brand, quantity, weightKg, category, categories } | null
+//   name         brand + product name + pack size, for showing
+//   productName  the product name alone, for matching
+//   categories   every category tag, most general first, without the
+//                language prefix ('en:canned-foods' → 'canned-foods')
 export const lookupProduct = async (code) => {
   if (!isEnabled() || !/^\d{8,14}$/.test(String(code))) return null;
   const controller = new AbortController();
@@ -66,12 +70,15 @@ export const lookupProduct = async (code) => {
     // name already starts with it, then the pack size.
     const base = brand && !p.product_name.toLowerCase().startsWith(brand.toLowerCase())
       ? `${brand} ${p.product_name}` : p.product_name;
+    const tags = (p.categories_tags ?? []).map((tag) => String(tag).replace(/^[a-z]{2}:/, '')).filter(Boolean);
     return {
       name: [base, quantity].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim(),
+      productName: String(p.product_name).trim(),
       brand: brand || null,
       quantity: quantity || null,
       weightKg: weightKgOf(p.product_quantity, p.product_quantity_unit),
-      category: categoryLabel((p.categories_tags ?? []).at(-1)) || null,
+      category: categoryLabel(tags.at(-1)) || null,
+      categories: tags,
     };
   } catch (err) {
     console.error('[openFoodFacts] no suggestion:', err.name === 'AbortError' ? 'timed out' : err.message);

@@ -28,11 +28,11 @@
 // not on this order). The bar's own words are in translations/
 // messages.js (barcode.*), because packing is read in three languages.
 // ─────────────────────────────────────────────────────────────
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Camera, X } from 'lucide-react';
 import { Actions, Button, ChoiceList, Notice, NumberField, TextField } from '../staff/StepPrimitives';
 import { ProductMatchCombobox } from '../donation/ProductMatchComboBox';
-import { linkBarcode } from '../../services/productBarcodeAPI';
+import { linkBarcode, matchBarcode } from '../../services/productBarcodeAPI';
 import PalletScanner from './PalletScanner';
 import useBarcodeReader from './useBarcodeReader';
 import { useT } from '../../translations';
@@ -40,6 +40,13 @@ import { useT } from '../../translations';
 const CAMERA_TROUBLE = ['denied', 'noCamera', 'failed'];
 
 // ── Linking a code nobody knows yet ───────────────────────────
+// The closest stock item is looked for first (matchBarcode: what Open
+// Food Facts says the pack is, against the catalogue). When there is
+// one, it is chosen, with the reasons, for the person to check: Brand
+// B's beans go on the stock item that already has Brand A's. When
+// there is none, or no signal, the panel is exactly as it was. On a
+// screen with its own short list (`choices`: the order's or the
+// pallet's lines), only a match on that list is offered.
 export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
   const t = useT();
   const fieldId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -48,6 +55,34 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
   const [units, setUnits] = useState('1');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [checking, setChecking] = useState(true);
+  const [suggested, setSuggested] = useState(null);   // { food, matches }
+
+  // The list the panel opened with: a match is looked for once per code.
+  const openingChoices = useRef(choices);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve()
+      .then(() => matchBarcode(code))
+      .then((result) => {
+        if (cancelled || !result?.matches?.length) return;
+        const list = openingChoices.current;
+        const usable = list
+          ? result.matches.filter((m) => list.some((c) => String(c.productId) === String(m.productId)))
+          : result.matches;
+        if (!usable.length) return;
+        setSuggested({ food: result.food, matches: usable });
+        setProductId((current) => current ?? usable[0].productId);
+        setProductName((current) => current || usable[0].productName);
+      })
+      .catch(() => { /* no signal or no answer: the panel as it always was */ })
+      .finally(() => { if (!cancelled) setChecking(false); });
+    return () => { cancelled = true; };
+  }, [code]);
+
+  const why = (m) => m.reasons.map((r) => t(`barcode.match.reason.${r}`)).join(', ');
+  const best = suggested?.matches[0] ?? null;
+  const pickMatch = (m) => { setProductId(m.productId); setProductName(m.productName); };
 
   const chosen = choices?.find((c) => String(c.productId) === String(productId));
   const unitsValid = Number(units) > 0;
@@ -75,6 +110,20 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
     <section className="stf-scan" aria-labelledby={`${fieldId}-title`}>
       <h3 className="stf-scan-title" id={`${fieldId}-title`}>{t('barcode.new.title')}</h3>
       <p className="stf-scan-hint">{t('barcode.new.body', { code })}</p>
+
+      {checking ? <p className="stf-scan-hint" role="status">{t('barcode.match.checking')}</p> : null}
+      {best ? (
+        <Notice
+          actions={!choices && suggested.matches.length > 1 ? suggested.matches.slice(1).map((m) => (
+            <Button key={m.productId} variant="secondary" onClick={() => pickMatch(m)}>
+              {t('barcode.match.orThis', { item: m.productName })}
+            </Button>
+          )) : null}
+        >
+          {suggested.food?.name ? `${t('barcode.match.looksLike', { name: suggested.food.name })} ` : ''}
+          {t(choices ? 'barcode.match.closest' : 'barcode.match.closestPick', { item: best.productName, why: why(best) })}
+        </Notice>
+      ) : null}
 
       {choices ? (
         <ChoiceList

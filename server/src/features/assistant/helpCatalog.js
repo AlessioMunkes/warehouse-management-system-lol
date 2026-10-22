@@ -818,7 +818,7 @@ export const TOPICS = [
       'Scan the barcode. On Receiving it opens that line and counts one scan at a time; on a donation it fills the item.',
       'When packing, a scan opens that item with the count scanned, and you press Save. A product that is not on the pallet is pointed out.',
       'Each scan adds the barcode’s units per scan. A box of 12 counts as 12.',
-      'If the barcode is new, choose which product it is and how many one scan counts for. From then on it is known.',
+      'If the barcode is new, the system looks it up and suggests the closest stock item, such as another brand of the same beans in the same size. Check it, or choose another, and say how many one scan counts for. From then on it is known.',
       'Check the numbers before you finish. You can still type over any count.',
       'A supplier’s case label often carries the use-by date too. Scanning it fills in an empty use-by date for you.',
       'With no signal, a barcode this phone has scanned before still works. A new one needs signal to link.',

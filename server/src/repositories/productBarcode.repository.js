@@ -142,4 +142,48 @@ const recordScan = async ({ screen, outcome, productId = null, referenceId = nul
   );
 };
 
-export default { findByCode, listForProduct, listAll, create, remove, recordScan };
+// Every stock item a new barcode could belong to, with what Open Food
+// Facts said about the barcodes already on it (migration 056), for
+// features/barcodeMatch. Placeholders made for unrecognised donations
+// (inactive, PENDING- codes) and products out of the catalogue are
+// never a suggestion.
+const listMatchCandidates = async () => {
+  const { rows } = await pool.query(
+    `SELECT p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg,
+            COALESCE(
+              json_agg(json_build_object(
+                'foodName', pb.food_name, 'foodBrand', pb.food_brand,
+                'foodWeightKg', pb.food_weight_kg, 'foodCategories', pb.food_categories
+              )) FILTER (WHERE pb.id IS NOT NULL),
+              '[]'::json
+            ) AS barcodes
+       FROM products p
+       LEFT JOIN product_barcodes pb ON pb.product_id = p.id
+      WHERE p.is_active = true
+        AND p.archived_at IS NULL
+        AND p.stock_keeping_unit NOT ILIKE 'PENDING-%'
+      GROUP BY p.id
+      ORDER BY p.name`,
+  );
+  return rows;
+};
+
+// What Open Food Facts said about one linked code, or that it said
+// nothing (food = null): either way it is not asked again.
+const saveFoodFacts = async (barcodeId, food) => {
+  await pool.query(
+    `UPDATE product_barcodes
+        SET food_name = $2, food_brand = $3, food_quantity = $4,
+            food_weight_kg = $5, food_categories = $6, food_checked_at = now()
+      WHERE id = $1`,
+    [
+      barcodeId,
+      food?.productName ?? null, food?.brand ?? null, food?.quantity ?? null,
+      food?.weightKg ?? null, food?.categories?.length ? food.categories : null,
+    ],
+  );
+};
+
+export default {
+  findByCode, listForProduct, listAll, create, remove, recordScan, listMatchCandidates, saveFoodFacts,
+};

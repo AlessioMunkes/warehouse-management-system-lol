@@ -13,6 +13,8 @@ const barcodeRepoMock = {
   findByCode: vi.fn(),
   listAll: vi.fn(),
   recordScan: vi.fn(),
+  listMatchCandidates: vi.fn(),
+  saveFoodFacts: vi.fn(),
   listForProduct: vi.fn(),
   create: vi.fn(),
   remove: vi.fn(),
@@ -168,8 +170,54 @@ describe('suggest', () => {
   it('asks Open Food Facts about a code nobody has linked', async () => {
     barcodeRepoMock.findByCode.mockResolvedValue(null);
     offMock.lookupProduct.mockResolvedValue({ name: 'Koo Baked beans 410 g', weightKg: 0.41 });
+    barcodeRepoMock.listMatchCandidates.mockResolvedValue([]);
     const result = await service.suggest('4006381333931');
     expect(offMock.lookupProduct).toHaveBeenCalledWith('4006381333931');
     expect(result).toMatchObject({ linkedTo: null, suggestion: { name: 'Koo Baked beans 410 g' } });
+  });
+});
+
+const BRAND_B = {
+  name: 'Brand B Baked beans in tomato sauce 410 g', productName: 'Baked beans in tomato sauce',
+  brand: 'Brand B', quantity: '410 g', weightKg: 0.41, categories: ['canned-foods', 'baked-beans'],
+};
+
+describe('matches', () => {
+  it('suggests the stock item that holds another brand of the same food', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(null);
+    offMock.lookupProduct.mockResolvedValue(BRAND_B);
+    barcodeRepoMock.listMatchCandidates.mockResolvedValue([
+      { id: 1, name: 'Baked Beans 410g', sku: 'BEANS-410', weight_kg: '0.410',
+        barcodes: [{ foodName: 'Baked beans', foodBrand: 'Brand A', foodWeightKg: '0.410', foodCategories: ['canned-foods', 'baked-beans'] }] },
+      { id: 2, name: 'Rice 1kg', sku: 'RICE', weight_kg: '1.000', barcodes: [] },
+    ]);
+    const result = await service.matches('4006381333931');
+    expect(result.food).toEqual({ name: BRAND_B.name, quantity: '410 g' });
+    expect(result.matches).toEqual([expect.objectContaining({ productId: 1, reasons: ['size', 'name', 'kind'] })]);
+  });
+
+  it('suggests nothing when Open Food Facts does not know the code', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(null);
+    offMock.lookupProduct.mockResolvedValue(null);
+    const result = await service.matches('4006381333931');
+    expect(result).toEqual({ code: '4006381333931', linkedTo: null, food: null, matches: [] });
+    expect(barcodeRepoMock.listMatchCandidates).not.toHaveBeenCalled();
+  });
+
+  it('says which product already has a linked code', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(linkedRow());
+    const result = await service.matches('036000291452');
+    expect(result.linkedTo).toEqual({ productId: 7, productName: 'Rice 1kg' });
+    expect(offMock.lookupProduct).not.toHaveBeenCalled();
+  });
+});
+
+describe('remembering what a linked code is', () => {
+  it('keeps what Open Food Facts says about a code once it is linked, without holding up the link', async () => {
+    productRepoMock.getProductById.mockResolvedValue(RICE);
+    barcodeRepoMock.create.mockResolvedValue({ id: 40 });
+    offMock.lookupProduct.mockResolvedValue(BRAND_B);
+    await service.link(7, { code: '4006381333931' }, 1);
+    await vi.waitFor(() => expect(barcodeRepoMock.saveFoodFacts).toHaveBeenCalledWith(40, BRAND_B));
   });
 });

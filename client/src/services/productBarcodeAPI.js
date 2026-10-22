@@ -74,6 +74,15 @@ export const suggestProduct = async (code) => {
   return body.data;
 };
 
+// Which stock item an unlinked code most likely is (features/barcodeMatch
+// on the server), from what Open Food Facts says about the pack.
+// { code, linkedTo, food: { name, quantity } | null,
+//   matches: [{ productId, productName, sku, score, reasons }] }
+export const matchBarcode = async (code) => {
+  const body = await apiGet(`/api/products/barcodes/${encodeURIComponent(code)}/matches`);
+  return body.data;
+};
+
 export default {
-  lookupBarcode, listBarcodes, linkBarcode, removeBarcode, getAllBarcodes, recordScan, suggestProduct,
+  lookupBarcode, listBarcodes, linkBarcode, removeBarcode, getAllBarcodes, recordScan, suggestProduct, matchBarcode,
 };

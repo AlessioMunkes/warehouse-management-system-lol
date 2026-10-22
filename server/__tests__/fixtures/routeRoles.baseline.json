@@ -184,6 +184,7 @@
   "product.routes.js DELETE /:id": "admin",
   "productBarcode.routes.js GET /barcodes": "admin,manager,warehouse_worker",
   "productBarcode.routes.js POST /barcodes/events": "admin,manager,warehouse_worker",
+  "productBarcode.routes.js GET /barcodes/:code/matches": "admin,manager,warehouse_worker",
   "productBarcode.routes.js GET /barcodes/:code/suggestion": "admin",
   "productBarcode.routes.js GET /barcodes/:code": "admin,manager,warehouse_worker",
   "productBarcode.routes.js GET /:id/barcodes": "admin,manager,warehouse_worker",

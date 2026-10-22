@@ -20,6 +20,8 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { suggestProduct } from '@/services/productBarcodeAPI';
 import { normaliseBarcode } from '@/features/scan/productCode';
 
+const REASON = { size: 'same pack size', name: 'same name', kind: 'same kind of food' };
+
 // What the form can take from a suggestion. Counted packs default to
 // "each": a tin of beans is counted, not weighed.
 const toSeed = (s) => ({
@@ -41,10 +43,18 @@ export default function ProductBarcodeStart({ onSeed, onCode }) {
     if (!parsed) { setError('Not a barcode the system can read. Check the numbers.'); return; }
     setBusy(true); setError(null); setNote(null);
     try {
-      const { code: stored, linkedTo, suggestion } = await suggestProduct(parsed.code);
+      const { code: stored, linkedTo, suggestion, matches } = await suggestProduct(parsed.code);
       if (linkedTo) {
         onCode(null);
         setError(`This barcode is already on ${linkedTo.productName}.`);
+      } else if (matches?.length) {
+        // Another brand of something already stocked: one stock item
+        // with two barcodes, not two products with one each.
+        onCode(stored);
+        if (suggestion) onSeed(toSeed(suggestion));
+        const best = matches[0];
+        setNote(`This looks like ${best.productName}, already in the catalogue (${best.reasons.map((r) => REASON[r]).join(', ')}). `
+          + 'If it is the same item, add this barcode to it from its panel instead of adding a new product.');
       } else {
         onCode(stored);
         if (suggestion) {

@@ -20,6 +20,9 @@
 //                  "caught by scanning" report; changes no stock.
 //   suggestion     ADMIN_ONLY, from the Add product form: what Open Food
 //                  Facts says the code is (integrations/openFoodFacts.js).
+//   matches        ALL_STAFF, from the floor's New barcode panel: which
+//                  stock item an unlinked code most likely belongs to
+//                  (features/barcodeMatch). It suggests; the person links.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
@@ -37,6 +40,9 @@ router.get('/barcodes',
 
 router.post('/barcodes/events',
   auth, requireRole(...ALL_STAFF), barcodeController.recordScan);
+
+router.get('/barcodes/:code/matches',
+  auth, requireRole(...ALL_STAFF), barcodeController.matches);
 
 router.get('/barcodes/:code/suggestion',
   auth, requireRole(...ADMIN_ONLY), barcodeController.suggest);

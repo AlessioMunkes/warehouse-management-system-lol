@@ -85,4 +85,14 @@ const suggest = async (req, res) => {
   }
 };
 
-export default { lookup, list, link, unlink, listAll, recordScan, suggest };
+// ── GET /api/products/barcodes/:code/matches ────────────────────
+const matches = async (req, res) => {
+  try {
+    const data = await barcodeService.matches(req.params.code);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'matchBarcode', 'Failed to look for a matching product.');
+  }
+};
+
+export default { lookup, list, link, unlink, listAll, recordScan, suggest, matches };
