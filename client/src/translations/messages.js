@@ -39,6 +39,18 @@ const en = {
   'home.evening': 'Good evening',
   'home.question': 'What would you like to work on today?',
   'home.menuHint': 'Dismiss hint: everything else is in the menu',
+
+  // ── First use (features/onboarding) ──
+  'welcome.title': 'Welcome, {name}',
+  'welcome.titleNoName': 'Welcome',
+  'welcome.intro': 'Four things worth knowing before you start.',
+  'welcome.worker.tasks': 'Your jobs are the tiles on the home page. Tap one to start it.',
+  'welcome.worker.views': 'Each job can be done step by step (Guided) or on one page (Form). Switch at the top of the job.',
+  'welcome.worker.offline': 'Lost signal? Keep working. What you save stays on this device and is sent when the signal is back.',
+  'welcome.help': 'Stuck? Tap the round Help button at the bottom right for the steps on the screen you are on.',
+  'welcome.done': 'Got it',
+  'help.hint': 'Need a hand? Tap here for the steps on this screen.',
+  'help.hintClose': 'Close this tip',
   'task.receiving': 'Receiving',
   'task.receiving.meta': 'Record deliveries',
   'task.donation': 'Donation intake',
@@ -398,6 +410,19 @@ const af = {
   'home.evening': 'Goeienaand',
   'home.question': 'Waaraan wil jy vandag werk?',
   'home.menuHint': 'Maak wenk toe: alles anders is in die kieslys',
+
+  // ── First use ──
+  // DRAFT: not yet checked by a fluent speaker.
+  'welcome.title': 'Welkom, {name}',
+  'welcome.titleNoName': 'Welkom',
+  'welcome.intro': 'Vier dinge wat goed is om te weet voor jy begin.',
+  'welcome.worker.tasks': 'Jou take is die teëls op die tuisblad. Tik op een om dit te begin.',
+  'welcome.worker.views': 'Elke taak kan stap vir stap (Begelei) of op een blad (Vorm) gedoen word. Wissel bo-aan die taak.',
+  'welcome.worker.offline': 'Sein verloor? Werk voort. Wat jy stoor, bly op hierdie toestel en word gestuur wanneer die sein terug is.',
+  'welcome.help': 'Vasgeval? Tik op die ronde Hulp-knoppie regs onder vir die stappe op die skerm waarop jy is.',
+  'welcome.done': 'Reg so',
+  'help.hint': 'Hulp nodig? Tik hier vir die stappe op hierdie skerm.',
+  'help.hintClose': 'Maak hierdie wenk toe',
   'task.receiving': 'Ontvangs',
   'task.receiving.meta': 'Teken aflewerings aan',
   'task.donation': 'Skenkings',
@@ -758,6 +783,19 @@ const xh = {
   'home.evening': 'Molo',
   'home.question': 'Ungathanda ukusebenza entwenini namhlanje?',
   'home.menuHint': 'Vala icebiso: yonke enye into ikwimenyu',
+
+  // ── First use ──
+  // DRAFT: not yet checked by a fluent speaker.
+  'welcome.title': 'Wamkelekile, {name}',
+  'welcome.titleNoName': 'Wamkelekile',
+  'welcome.intro': 'Izinto ezine ekufanele uzazi phambi kokuba uqale.',
+  'welcome.worker.tasks': 'Imisebenzi yakho ziithayile ezikwiphepha lasekhaya. Cofa enye ukuze uyiqale.',
+  'welcome.worker.views': 'Umsebenzi ngamnye ungenziwa inyathelo ngenyathelo (Ngokukhokelwa) okanye kwiphepha elinye (Ifomu). Tshintsha phezulu emsebenzini.',
+  'welcome.worker.offline': 'Ulahlekelwe yisiginali? Qhubeka usebenza. Oko ukugcinayo kuhlala kwesi sixhobo kwaye kuthunyelwa xa isiginali ibuyile.',
+  'welcome.help': 'Ubambekile? Cofa iqhosha elingqukuva loNcedo ezantsi ekunene ukuze ubone amanyathelo kwiskrini okuso.',
+  'welcome.done': 'Ndiyaqonda',
+  'help.hint': 'Ufuna uncedo? Cofa apha ukuze ubone amanyathelo kwesi skrini.',
+  'help.hintClose': 'Vala eli cebiso',
   'task.receiving': 'Ukwamkela',
   'task.receiving.meta': 'Bhala izinto ezifikileyo',
   'task.donation': 'Iminikelo',

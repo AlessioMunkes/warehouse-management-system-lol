@@ -37,21 +37,40 @@
 //     have steady hands, and it is the control they reach for when
 //     something has already gone wrong.
 // ─────────────────────────────────────────────────────────────
-import { useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 import { matchScreen } from './screenPaths';
 import AssistantPanel from './AssistantPanel';
+import useCoachmark from '../staff/useCoachmark';
+import { useT } from '../../translations';
+
+// ── The first-use tip ───────────────────────────────────────
+// The button is a round icon with no word on it, so someone new does
+// not know it is help. Once per browser, a tip above it says so. It
+// waits while anything else is being said (`hintReady`: the welcome
+// card), goes when the button is tapped or the tip is closed, and
+// clears itself after HINT_MS so it is never in the way for long.
+const HINT_MS = 12000;
 
 
 const GAP   = 16;  // between the button and whatever is under it
 const SIZE  = 56;  // the button itself — 3.5rem, past the ACC-06 minimum
 const CLEAR = 12;  // between the button and whatever is above it
 
-export default function AssistantLauncher({ role } = {}) {
+export default function AssistantLauncher({ role, hintReady = true } = {}) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const screen = matchScreen(pathname);
+  const t = useT();
+  const hint = useCoachmark('help-button');
+  const showHint = hint.show && hintReady && !open;
+
+  useEffect(() => {
+    if (!showHint) return undefined;
+    const timer = setTimeout(hint.dismiss, HINT_MS);
+    return () => clearTimeout(timer);
+  }, [showHint, hint.dismiss]);
 
   // Measured per route — the staff flows have a tab bar, the manager
   // and admin screens do not, and the same button serves both.
@@ -78,9 +97,27 @@ export default function AssistantLauncher({ role } = {}) {
 
   return (
     <>
+      {showHint ? (
+        <div
+          role="status"
+          className="fixed right-4 z-40 flex max-w-[16rem] items-start gap-2 rounded-lg border bg-popover px-3 py-2.5 text-sm text-popover-foreground shadow-lg"
+          style={{ bottom: `calc(var(--wms-launcher-bottom, 1rem) + ${SIZE + 10}px)` }}
+        >
+          <span className="flex-1">{t('help.hint')}</span>
+          <button
+            type="button" onClick={hint.dismiss} aria-label={t('help.hintClose')}
+            className="-mr-1 -mt-0.5 rounded p-0.5 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+          {/* Points down at the button. */}
+          <span aria-hidden="true" className="absolute -bottom-1.5 right-6 size-3 rotate-45 border-b border-r bg-popover" />
+        </div>
+      ) : null}
+
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { hint.dismiss(); setOpen((v) => !v); }}
         // One stable name, state carried by aria-expanded — not a
         // label that flips to "Close help", which is also the name
         // of the button inside the panel. Two controls with one name
