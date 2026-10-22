@@ -37,11 +37,31 @@ const publicKey = () => (isConfigured() ? process.env.VAPID_PUBLIC_KEY : null);
 const MAX_FIELD = 2048;
 const isText = (v) => typeof v === 'string' && v.length > 0 && v.length <= MAX_FIELD;
 
+// Sending a notification is the server making a POST to the endpoint
+// the phone gave it. Any https URL would let a caller point the server
+// at itself or at the internal network, so only the browsers' own push
+// services are accepted: Chrome and Android (FCM), Firefox (Mozilla),
+// Safari (Apple) and Edge (Windows). Default port only, no credentials.
+const PUSH_HOSTS = ['fcm.googleapis.com', 'updates.push.services.mozilla.com'];
+const PUSH_HOST_SUFFIXES = ['.push.apple.com', '.notify.windows.com'];
+
+export const isPushServiceEndpoint = (value) => {
+  if (!isText(value)) return false;
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (url.protocol !== 'https:' || url.port || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_HOSTS.includes(host) || PUSH_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+};
+
+// A push service that does not answer must not hold the request open.
+const SEND_TIMEOUT_MS = 10_000;
+
 const subscribe = async (user, subscription, userAgent) => {
   if (!isConfigured()) throw fail(503, 'Phone notifications are not set up on this server.');
   const endpoint = subscription?.endpoint;
   const keys = subscription?.keys ?? {};
-  if (!isText(endpoint) || !/^https:\/\//.test(endpoint) || !isText(keys.p256dh) || !isText(keys.auth)) {
+  if (!isPushServiceEndpoint(endpoint) || !isText(keys.p256dh) || !isText(keys.auth)) {
     throw fail(400, 'That is not a valid push subscription.');
   }
   await repo.save({
@@ -72,11 +92,16 @@ const sendToRoles = async (roles, payload) => {
   }
   const body = JSON.stringify(payload);
   const results = await Promise.allSettled(targets.map(async (t) => {
+    // Saved before the endpoint check existed: never sent to, and dropped.
+    if (!isPushServiceEndpoint(t.endpoint)) {
+      await repo.removeByEndpoint(t.endpoint).catch(() => {});
+      return false;
+    }
     try {
       await webpush.sendNotification(
         { endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } },
         body,
-        { TTL: TTL_SECONDS, urgency: 'high', topic: payload.tag?.slice(0, 32) }
+        { TTL: TTL_SECONDS, urgency: 'high', topic: payload.tag?.slice(0, 32), timeout: SEND_TIMEOUT_MS }
       );
       await repo.markSuccess(t.endpoint).catch(() => {});
       return true;

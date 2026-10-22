@@ -163,11 +163,25 @@ const write = async (row) => {
   }
 };
 
+// Builds before vite.config.js left /api images out of the image cache
+// kept warehouse photos there. They belong to whoever was signed in.
+const purgeCachedApiImages = async () => {
+  if (typeof caches === 'undefined') return;
+  const cache = await caches.open('wms-images');
+  const requests = await cache.keys();
+  await Promise.all(requests
+    .filter((request) => new URL(request.url).pathname.startsWith('/api/'))
+    .map((request) => cache.delete(request)));
+};
+
 export const clearReadCache = async () => {
   setServed(null);
   try {
     await run('readwrite', (store) => store.clear());
   } catch { /* no storage */ }
+  try {
+    await purgeCachedApiImages();
+  } catch { /* no Cache Storage */ }
 };
 
 // ── Which requests this touches ───────────────────────────────

@@ -21,14 +21,12 @@ const sendEmail = async ({ to, subject, text, html, attachments = [] }, userId =
         userId
     );
 
-    console.log("EMAIL RESULT:", result);
-
     return result;
 
 } catch (err) {
-    console.error("EMAIL ERROR");
-    console.error(err);
-    console.error(err.stack);
+    // Message only: a Google client error carries the request, and its
+    // Authorization header holds the account's access token.
+    console.error('[email] Gmail send failed:', err.message);
 
     return {
         sent: false,

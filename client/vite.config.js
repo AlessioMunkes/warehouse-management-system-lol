@@ -40,9 +40,15 @@ export default defineConfig({
         // make installing the app an 11 MB download. Instead each one
         // is kept the first time a screen shows it. The manifest icons
         // and the apple-touch-icon are still precached (includeAssets).
+        //
+        // /api images (warehouse photos) are left out. They need a
+        // session, and a CacheFirst hit never asks the server, so a
+        // cached photo would still show after logout or to whoever
+        // signs in next on a shared tablet.
         runtimeCaching: [
           {
-            urlPattern: ({ request, sameOrigin }) => sameOrigin && request.destination === 'image',
+            urlPattern: ({ request, sameOrigin, url }) =>
+              sameOrigin && request.destination === 'image' && !url.pathname.startsWith('/api/'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'wms-images',

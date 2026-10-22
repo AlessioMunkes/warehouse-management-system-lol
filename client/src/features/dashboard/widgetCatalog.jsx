@@ -30,7 +30,7 @@
 // the Month / 3 months / Year menu.
 // ─────────────────────────────────────────────────────────────
 import {
-  Activity, ClipboardList, CookingPot, Gift, HandHeart, Hourglass, Package, PackageCheck, PackageX,
+  Activity, ClipboardList, CookingPot, Gift, HandHeart, Hourglass, KeyRound, Package, PackageCheck, PackageX,
   ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './StatTile';
@@ -66,6 +66,18 @@ export const WIDGETS = [
     description: 'Your latest notifications. Click one to open where it needs dealing with.',
     render: () => <NotificationsPanel />,
   },
+
+  // ═══ Both: the guest gate code ═══════════════════════════════
+  // Guests type it to sign in, so post it at the gate. Spaced, so it
+  // reads off a sign (and StatTile shows it as text, not a count-up).
+  tile({
+    id: 'gate-code', title: 'Guest gate code', roles: MANAGERS_AND_ADMINS, needs: ['gateCode'],
+    description: 'The code guests type to sign in today. It changes at midnight.',
+    render: ({ gateCode }) => (
+      <StatTile icon={KeyRound} label="Guest gate code, today"
+        value={gateCode?.code ? `${gateCode.code.slice(0, 3)} ${gateCode.code.slice(3)}` : '-'} />
+    ),
+  }),
 
   // ═══ Manager: number tiles ═══════════════════════════════════
   tile({
@@ -441,11 +453,11 @@ export const sizeOf = (w) => (w.kind === 'tile' ? 'small' : w.wide ? 'large' : '
 // What each dashboard starts with, and what Reset goes back to.
 export const DEFAULT_LAYOUT = {
   [MANAGER]: [
-    'low-stock', 'open-pos', 'dispatches-today', 'deliveries-today', 'benevolent', 'donations-to-review',
+    'gate-code', 'low-stock', 'open-pos', 'dispatches-today', 'deliveries-today', 'benevolent', 'donations-to-review',
     'top-products', 'product-health', 'by-beneficiary', 'dispatch-trend',
   ],
   [ADMIN_ROLE]: [
-    'users', 'donation-queue', 'certificates-to-issue', 'email-status', 'catalogue-gaps',
+    'gate-code', 'users', 'donation-queue', 'certificates-to-issue', 'email-status', 'catalogue-gaps',
     'admin-shortcuts', 's18a-pipeline', 'users-by-role', 'donation-trend',
   ],
 };

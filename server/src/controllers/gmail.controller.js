@@ -60,9 +60,8 @@ const callback = async (req, res) => {
 
     return res.redirect(302, buildEmailIntegrationRedirect('connected'));
   } catch (err) {
-    console.error("===== CALLBACK FAILED =====");
-    console.error(err);
-    console.error(err.stack);
+    // Message only: a Google client error carries the OAuth request.
+    console.error('[gmail] OAuth callback failed:', err.message);
     return res.redirect(302, buildEmailIntegrationRedirect('error'));
   }
 };

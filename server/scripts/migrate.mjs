@@ -40,6 +40,7 @@ import {
   listMigrationFiles, readManifest, unsafeMigrationReason, pendingMigrations,
   appliedMigrations, publicTableCount, applyMigration, initialiseDatabase, recordMigration,
 } from './lib/migrator.js';
+import { dbSslConfig } from '../src/config/dbSsl.js';
 
 const here      = path.dirname(fileURLToPath(import.meta.url));
 const DB_DIR    = path.resolve(here, '..', 'database');
@@ -48,7 +49,7 @@ const BASELINE  = path.join(DB_DIR, 'baseline.sql');
 const SEED      = path.join(DB_DIR, 'seed.sql');
 const MANIFEST  = path.join(DB_DIR, 'baseline-migrations.txt');
 
-const ssl = process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false };
+const ssl = dbSslConfig();
 
 const fail = (msg) => { console.error(`\n✗ ${msg}`); process.exit(1); };
 

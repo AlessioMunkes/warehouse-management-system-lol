@@ -143,7 +143,8 @@ const getDonationValueTotal = async ({ from = null, to = null } = {}) => {
   return result.rows[0]?.total ?? '0';
 };
 
-const createReportAccessLink = async ({ tokenHash, createdBy }) => {
+// `days`: how long the link opens for (migration 054).
+const createReportAccessLink = async ({ tokenHash, createdBy, days }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -157,10 +158,10 @@ const createReportAccessLink = async ({ tokenHash, createdBy }) => {
     );
 
     const { rows } = await client.query(
-      `INSERT INTO finance_report_access_links (token_hash, created_by)
-       VALUES ($1, $2)
-       RETURNING id, created_by, created_at, revoked_at`,
-      [tokenHash, createdBy ?? null],
+      `INSERT INTO finance_report_access_links (token_hash, created_by, expires_at)
+       VALUES ($1, $2, NOW() + make_interval(days => $3))
+       RETURNING id, created_by, created_at, revoked_at, expires_at`,
+      [tokenHash, createdBy ?? null, days],
     );
 
     await client.query('COMMIT');
@@ -185,13 +186,17 @@ const revokeReportAccessLinks = async ({ revokedBy }) => {
   return { revokedCount: rows.length };
 };
 
+// The link for this hash if it still opens, counting this open. A
+// revoked or expired link matches nothing and is not counted.
 const getActiveReportAccessLinkByHash = async (tokenHash) => {
   const { rows } = await pool.query(
-    `SELECT id, created_at
-       FROM finance_report_access_links
+    `UPDATE finance_report_access_links
+        SET last_opened_at = NOW(),
+            open_count = open_count + 1
       WHERE token_hash = $1
         AND revoked_at IS NULL
-      LIMIT 1`,
+        AND expires_at > NOW()
+      RETURNING id, created_at, expires_at`,
     [tokenHash],
   );
   return rows[0] ?? null;

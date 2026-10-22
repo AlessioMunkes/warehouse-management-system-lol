@@ -93,13 +93,14 @@ describe('financeRepository report links', () => {
     const release = vi.fn();
     poolMock.connect = vi.fn().mockResolvedValue({ query, release });
 
-    await financeRepository.createReportAccessLink({ tokenHash: 'abc123', createdBy: 9 });
+    await financeRepository.createReportAccessLink({ tokenHash: 'abc123', createdBy: 9, days: 30 });
 
     expect(query.mock.calls[0][0]).toBe('BEGIN');
     expect(query.mock.calls[1][0]).toMatch(/UPDATE finance_report_access_links/);
     expect(query.mock.calls[1][1]).toEqual([9]);
     expect(query.mock.calls[2][0]).toMatch(/INSERT INTO finance_report_access_links/);
-    expect(query.mock.calls[2][1]).toEqual(['abc123', 9]);
+    expect(query.mock.calls[2][0]).toMatch(/make_interval\(days => \$3\)/);
+    expect(query.mock.calls[2][1]).toEqual(['abc123', 9, 30]);
     expect(query.mock.calls[3][0]).toBe('COMMIT');
     expect(release).toHaveBeenCalled();
   });
@@ -124,6 +125,8 @@ describe('financeRepository report links', () => {
     const [sql, params] = poolMock.query.mock.calls[0];
     expect(sql).toMatch(/WHERE token_hash = \$1/);
     expect(sql).toMatch(/revoked_at IS NULL/);
+    expect(sql).toMatch(/expires_at > NOW\(\)/);
+    expect(sql).toMatch(/open_count = open_count \+ 1/);
     expect(params).toEqual(['hash-only']);
   });
 });

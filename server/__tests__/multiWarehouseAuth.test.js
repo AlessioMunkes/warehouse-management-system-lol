@@ -122,8 +122,8 @@ describe('multi-warehouse login', () => {
     ]);
     const claims = jwt.decode(cookieFrom(res).slice('wms_token='.length));
     expect(claims.warehouses).toEqual({
-      cpt: { id: 4, role: 'admin' },
-      gauteng: { id: 21, role: 'warehouse_worker' },
+      cpt: { id: 4, role: 'admin', sv: 0 },
+      gauteng: { id: 21, role: 'warehouse_worker', sv: 0 },
     });
     expect(claims).not.toHaveProperty('role');
   });

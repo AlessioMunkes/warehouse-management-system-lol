@@ -40,7 +40,7 @@ import gmailAPI from '../../services/gmailAPI';
 import { getUsers } from '../../services/userAPI';
 import { getProducts } from '../../services/productAPI';
 import { getSuppliers } from '../../services/supplierAPI';
-import { getGuestLog } from '../../services/volunteerAPI';
+import { getGuestLog, getGateCode } from '../../services/volunteerAPI';
 import { getRecipes } from '../../services/recipeAPI';
 import { PERIODS, periodById } from './chartTheme';
 import { getWidget, widgetsForRole, sizeOf } from './widgetCatalog';
@@ -63,6 +63,7 @@ const SOURCES = {
   products:  () => getProducts(),
   suppliers: () => getSuppliers(),
   visits:    () => getGuestLog(),
+  gateCode:  () => getGateCode(),
 };
 
 /** Fetch each shared source the board needs, once. */

@@ -224,6 +224,7 @@ const archiveUser = async (id, before, actorId) => {
     const { rows } = await client.query(
       `UPDATE users
           SET is_active   = false,
+              session_version = session_version + 1,
               archived_at = COALESCE(archived_at, now()),
               archived_by = COALESCE(archived_by, $2)
         WHERE id = $1
@@ -258,7 +259,9 @@ const setUserActive = async (id, isActive, before, actorId) => {
     await client.query('BEGIN');
 
     const { rows } = await client.query(
-      `UPDATE users SET is_active = $2
+      // Deactivating ends the person's sessions (055).
+      `UPDATE users SET is_active = $2,
+              session_version = session_version + CASE WHEN $2 THEN 0 ELSE 1 END
         WHERE id = $1
         RETURNING ${USER_COLUMNS.replace(/u\./g, '')}`,
       [id, isActive]

@@ -13,6 +13,7 @@ CREATE TABLE public.users (
   archived_at timestamp with time zone,
   archived_by integer,
   email text,
+  session_version integer NOT NULL DEFAULT 0,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES public.users(id)
 );
@@ -1013,6 +1014,9 @@ CREATE TABLE public.finance_report_access_links (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   revoked_at timestamp with time zone,
   revoked_by integer,
+  expires_at timestamp with time zone NOT NULL,
+  last_opened_at timestamp with time zone,
+  open_count integer NOT NULL DEFAULT 0,
   CONSTRAINT finance_report_access_links_pkey PRIMARY KEY (id),
   CONSTRAINT finance_report_access_links_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
   CONSTRAINT finance_report_access_links_revoked_by_fkey FOREIGN KEY (revoked_by) REFERENCES public.users(id)

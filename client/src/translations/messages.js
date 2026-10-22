@@ -309,7 +309,7 @@ const en = {
   // Sign in
   'guest.login.back': '← Back to start',
   'guest.login.title': 'Volunteer sign in',
-  'guest.login.subtitle': 'Enter your name to start.',
+  'guest.login.subtitle': 'Enter your name and today\'s gate code to start.',
   'guest.login.nameLabel': 'Your name',
   'guest.login.namePlaceholder': 'e.g. Thabo Mokoena',
   'guest.login.warehouse': 'Warehouse',
@@ -320,6 +320,10 @@ const en = {
   'guest.login.nameRequired': 'Enter your name.',
   'guest.login.siteRequired': 'Choose the warehouse you are at.',
   'guest.login.failed': 'Could not sign you in. Try again.',
+  'guest.login.codeLabel': 'Gate code',
+  'guest.login.codeHint': 'It is posted at the gate. Ask a staff member if you cannot see it.',
+  'guest.login.codeRequired': 'Enter the 6-digit gate code.',
+  'guest.login.codeWrong': 'That gate code is not right. Ask a staff member for today\'s code.',
   // Home
   'guest.home.welcome': 'Hi {name}, welcome!',
   'guest.home.ledeHeld': 'Pick up where you left off.',
@@ -709,7 +713,7 @@ const af = {
   // Sign in
   'guest.login.back': '← Terug na begin',
   'guest.login.title': 'Vrywilliger-aanmelding',
-  'guest.login.subtitle': 'Tik jou naam in om te begin.',
+  'guest.login.subtitle': 'Tik jou naam en vandag se hekkode in om te begin.',
   'guest.login.nameLabel': 'Jou naam',
   'guest.login.namePlaceholder': 'bv. Thabo Mokoena',
   'guest.login.warehouse': 'Pakhuis',
@@ -720,6 +724,10 @@ const af = {
   'guest.login.nameRequired': 'Tik jou naam in.',
   'guest.login.siteRequired': 'Kies die pakhuis waar jy is.',
   'guest.login.failed': 'Ons kon jou nie inteken nie. Probeer weer.',
+  'guest.login.codeLabel': 'Hekkode',
+  'guest.login.codeHint': 'Dit is by die hek opgeplak. Vra ’n personeellid as jy dit nie kan sien nie.',
+  'guest.login.codeRequired': 'Tik die 6-syfer-hekkode in.',
+  'guest.login.codeWrong': 'Daardie hekkode is nie reg nie. Vra ’n personeellid vir vandag se kode.',
   // Home
   'guest.home.welcome': 'Hallo {name}, welkom!',
   'guest.home.ledeHeld': 'Gaan voort waar jy opgehou het.',
@@ -1110,7 +1118,7 @@ const xh = {
   // Sign in
   'guest.login.back': '← Buyela ekuqaleni',
   'guest.login.title': 'Ngena njengevolontiya',
-  'guest.login.subtitle': 'Bhala igama lakho ukuze uqale.',
+  'guest.login.subtitle': 'Bhala igama lakho nekhowudi yesango yanamhlanje ukuze uqale.',
   'guest.login.nameLabel': 'Igama lakho',
   'guest.login.namePlaceholder': 'umz. Thabo Mokoena',
   'guest.login.warehouse': 'Indawo yokugcina impahla',
@@ -1121,6 +1129,10 @@ const xh = {
   'guest.login.nameRequired': 'Bhala igama lakho.',
   'guest.login.siteRequired': 'Khetha indawo yokugcina impahla okuyo.',
   'guest.login.failed': 'Asikwazanga ukukungenisa. Zama kwakhona.',
+  'guest.login.codeLabel': 'Ikhowudi yesango',
+  'guest.login.codeHint': 'Ibhalwe esangweni. Buza umsebenzi ukuba awuyiboni.',
+  'guest.login.codeRequired': 'Bhala ikhowudi yesango enamanani ama-6.',
+  'guest.login.codeWrong': 'Loo khowudi yesango ayichanekanga. Buza umsebenzi ikhowudi yanamhlanje.',
   // Home
   'guest.home.welcome': 'Molo {name}, wamkelekile!',
   'guest.home.ledeHeld': 'Qhubeka apho ubuyeke khona.',

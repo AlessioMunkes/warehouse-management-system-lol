@@ -39,6 +39,7 @@ const GuestLoginPage = () => {
   const t = useT();
 
   const [name, setName] = useState('');
+  const [gateCode, setGateCode] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,6 +86,11 @@ const GuestLoginPage = () => {
       setError(t('guest.login.nameRequired'));
       return;
     }
+    const code = gateCode.replace(/[\s-]/g, '');
+    if (!/^\d{6}$/.test(code)) {
+      setError(t('guest.login.codeRequired'));
+      return;
+    }
     if (mustChooseSite && !warehouse) {
       setError(t('guest.login.siteRequired'));
       return;
@@ -98,11 +104,11 @@ const GuestLoginPage = () => {
     // is no cookie and no volunteer row, so continuing to /guest-home
     // would strand someone on a screen where every request 401s.
     try {
-      await loginAsGuest(name.trim(), warehouse || null);
+      await loginAsGuest(name.trim(), warehouse || null, code);
       navigate('/guest-home', { replace: true });
     } catch (err) {
       console.error('Guest sign-in failed:', err);
-      setError(err?.message || t('guest.login.failed'));
+      setError(err?.code === 'GATE_CODE' ? t('guest.login.codeWrong') : (err?.message || t('guest.login.failed')));
       setIsSubmitting(false);
     }
   };
@@ -159,7 +165,7 @@ const GuestLoginPage = () => {
 
             <form onSubmit={handleSubmit} className="login-form">
 
-              {/* Full name field — the only field on this page */}
+              {/* Full name */}
               <div className="login-field">
                 <Label htmlFor="name" className="login-label">{t('guest.login.nameLabel')}</Label>
                 <Input
@@ -173,6 +179,27 @@ const GuestLoginPage = () => {
                   placeholder={t('guest.login.namePlaceholder')}
                   className="login-input"
                 />
+              </div>
+
+              {/* The day's gate code, posted at the gate */}
+              <div className="login-field">
+                <Label htmlFor="gate-code" className="login-label">{t('guest.login.codeLabel')}</Label>
+                <Input
+                  id="gate-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={7}
+                  value={gateCode}
+                  onChange={(e) => {
+                    setGateCode(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="123 456"
+                  aria-describedby="gate-code-hint"
+                  className="login-input"
+                />
+                <p id="gate-code-hint" className="text-xs text-muted-foreground">{t('guest.login.codeHint')}</p>
               </div>
 
               {/* Multi-warehouse only: which site the volunteer is at */}

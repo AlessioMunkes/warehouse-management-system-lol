@@ -10,6 +10,7 @@
 // any drift in sameSite/secure/path meant clearCookie silently did
 // nothing and the stale session survived a logout.
 // ─────────────────────────────────────────────────────────────
+import jwt from 'jsonwebtoken';
 
 export const AUTH_COOKIE = 'wms_token';
 
@@ -28,3 +29,17 @@ export const authCookieOptions = () => ({
 // maxAge is only used when SETTING the cookie — clearCookie must not
 // receive it, so it is kept separate from the options above.
 export const sessionMaxAge = (hours) => hours * 60 * 60 * 1000;
+// ── A staff session ───────────────────────────────────────────
+// Signed at login, and again when someone changes their own password
+// (that ends every other session, but not the one they are using).
+// The token is the cookie's whole content; JavaScript on the page
+// (including any XSS attack) cannot read it.
+export const STAFF_SESSION_HOURS = 8;
+
+export const setStaffSessionCookie = (res, claims) => {
+  const token = jwt.sign(claims, process.env.JWT_SECRET, { expiresIn: `${STAFF_SESSION_HOURS}h` });
+  res.cookie(AUTH_COOKIE, token, {
+    ...authCookieOptions(),
+    maxAge: sessionMaxAge(STAFF_SESSION_HOURS), // matches the token's own expiry
+  });
+};

@@ -17,8 +17,21 @@ import { MANAGERS_UP, GUEST_ONLY } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import volunteerRepo                from '../repositories/volunteer.repository.js';
 import slipAccessRepo               from '../repositories/slipAccess.repository.js';
+import { isTodayGateCode, todayGateCode } from '../services/gateCode.service.js';
 
 const router = express.Router();
+
+// ── GET /api/volunteers/gate-code ─────────────────────────────
+// Today's gate code, for the manager to post at the gate. Managers
+// and admins, the same people who read the guest log.
+router.get('/gate-code', auth, requireRole(...MANAGERS_UP), (_req, res) => {
+  try {
+    return res.status(200).json({ success: true, data: todayGateCode() });
+  } catch (error) {
+    console.error('[volunteers:gate-code]', error.message);
+    return res.status(500).json({ success: false, message: 'Could not work out today\'s gate code.' });
+  }
+});
 
 // Manager and admin. A warehouse worker has no reason to read a list
 // of who else was in the building, and 'guest' is emphatically not on
@@ -36,13 +49,22 @@ const SESSION_HOURS = 12;
 
 router.post('/sign-in', async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, gateCode } = req.body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: 'Name is required.' });
     }
     if (name.trim().length > 200) {
       return res.status(400).json({ message: 'Name is too long.' });
+    }
+    // The day's gate code shows the person is at the warehouse (see
+    // gateCode.service.js). A wrong one is a failed attempt to the
+    // rate limiter in front of this router.
+    if (!isTodayGateCode(gateCode)) {
+      return res.status(403).json({
+        code: 'GATE_CODE',
+        message: 'That gate code is not right. Ask a staff member for today\'s code.',
+      });
     }
 
     // signed_in_at comes from the DB default — never from the client

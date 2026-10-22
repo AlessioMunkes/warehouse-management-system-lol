@@ -25,7 +25,8 @@ import express from 'express';
 import auth, { authIdentity } from '../middleware/auth.middleware.js';
 import accountRepository from '../repositories/account.repository.js';
 import volunteerRepository from '../repositories/volunteer.repository.js';
-import { AUTH_COOKIE, authCookieOptions } from '../config/cookie.js';
+import sessionRepository from '../repositories/session.repository.js';
+import { AUTH_COOKIE, authCookieOptions, setStaffSessionCookie } from '../config/cookie.js';
 import { warehouseName, isMultiWarehouse } from '../config/warehouses.js';
 import { accountChangeRateLimiter } from '../middleware/rateLimiter.middleware.js';
 import accountService from '../services/account.service.js';
@@ -111,12 +112,13 @@ router.patch('/language', auth, async (req, res) => {
 // A staff member changing their own sign-in details from Profile. Both
 // need the current password (account.service.js). Guests have no
 // account to change.
-const ownAccount = (change, label) => async (req, res) => {
+const ownAccount = (change, label, after = null) => async (req, res) => {
   if (req.user.role === 'guest') {
     return res.status(403).json({ success: false, message: 'Only a staff account can be changed.' });
   }
   try {
     const data = await change(req.user.id, req.body ?? {});
+    if (after) await after(req, res);
     return res.json({ success: true, data });
   } catch (error) {
     if (error.status) return res.status(error.status).json({ success: false, message: error.message });
@@ -125,7 +127,24 @@ const ownAccount = (change, label) => async (req, res) => {
   }
 };
 
-router.patch('/password', auth, accountChangeRateLimiter, ownAccount(accountService.changePassword, 'password'));
+// A new password ends every session signed in with the old one (the
+// account's session version goes up). The one making the change is
+// signed again with the new version, so it carries on.
+const keepThisSession = async (req, res) => {
+  const account = await sessionRepository.findStaffSession(req.user.id);
+  const sv = account?.session_version ?? 0;
+  const { iat: _iat, exp: _exp, ...claims } = req.sessionClaims;
+  if (claims.warehouses && req.user.warehouse) {
+    const site = req.user.warehouse;
+    claims.warehouses = { ...claims.warehouses, [site]: { ...claims.warehouses[site], sv } };
+  } else {
+    claims.sv = sv;
+  }
+  setStaffSessionCookie(res, claims);
+};
+
+router.patch('/password', auth, accountChangeRateLimiter,
+  ownAccount(accountService.changePassword, 'password', keepThisSession));
 router.patch('/email', auth, accountChangeRateLimiter, ownAccount(accountService.changeEmail, 'email'));
 
 router.get('/', auth, async (req, res) => {

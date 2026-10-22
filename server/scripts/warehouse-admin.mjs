@@ -33,9 +33,10 @@ import bcrypt from 'bcrypt';
 import pg     from 'pg';
 import { parseWarehouseUrls } from '../src/config/dbRouter.js';
 import { ROLE_VALUES } from '../src/utils/userAccountFields.js';
+import { dbSslConfig } from '../src/config/dbSsl.js';
 
 const BCRYPT_COST = 10; // same as user.service.js
-const ssl = process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false };
+const ssl = dbSslConfig();
 
 const fail = (msg) => { console.error(`\n✗ ${msg}`); process.exit(1); };
 
