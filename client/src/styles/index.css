@@ -6613,3 +6613,17 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-scan-title:focus { outline: none; }
 .stf-scan-hint { margin: 0; font-size: 13px; line-height: 1.55; color: var(--stf-text); }
 .stf-scan-code { display: flex; flex-direction: column; gap: 10px; }
+
+/* Product barcodes (ProductScanBar): a barcode is wide and short, so
+   its camera frame is wider than the pallet one. */
+.scan-view.is-product { max-width: 30rem; aspect-ratio: 4 / 3; }
+
+/* Above an item list: the field, Find and the camera button on one row,
+   wrapping under each other on a phone. */
+.stf-scanbar { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.stf-scanbar-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+.stf-scanbar-row .stf-field { flex: 1 1 14rem; min-width: 0; margin: 0; }
+.stf-scanbar-row > .stf-btn { margin-top: 26px; display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 480px) {
+  .stf-scanbar-row > .stf-btn { margin-top: 0; flex: 1 1 auto; justify-content: center; }
+}

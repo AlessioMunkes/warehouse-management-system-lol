@@ -306,7 +306,13 @@ const getManifest = async () => {
          <= COALESCE(sl.reorder_threshold, 0)
          AS is_low_stock,
        sl.updated_at,
-       lm.last_movement_at
+       lm.last_movement_at,
+       -- Linked barcodes (migration 052), so the inventory search finds
+       -- a product by the code on its pack.
+       COALESCE(
+         (SELECT array_agg(pb.code ORDER BY pb.code) FROM product_barcodes pb WHERE pb.product_id = p.id),
+         '{}'::varchar[]
+       ) AS barcodes
      FROM products p
      LEFT JOIN stock_levels sl ON sl.product_id = p.id
      LEFT JOIN (${committedStockSql()}) c ON c.product_id = p.id

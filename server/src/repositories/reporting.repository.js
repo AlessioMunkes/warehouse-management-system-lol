@@ -869,6 +869,41 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { lines: r.worked } }));
 };
 
+// ══ Scanning ═══════════════════════════════════════════════════
+// A wrong item caught is a scan of a real product that the pallet or
+// order being worked did not want (migration 053, outcome
+// 'not_on_list'), on packing or receiving. scanned_at is timestamptz.
+const scanCatches = async ({ dimension, filters, dateRange, limit }) => {
+  const d = sastDate('e.scanned_at');
+  const expr = {
+    none: `'Total'`, month: bucketMonth(d), week: bucketWeek(d), product: `p.name`,
+  }[dimension];
+  if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
+
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `${d} BETWEEN $1::date AND $2::date`,
+    `e.outcome = 'not_on_list'`,
+    `e.screen IN ('packing', 'receiving')`,
+  ];
+  if (filters.product_id) { params.push(filters.product_id); where.push(`e.product_id = $${params.length}`); }
+  const ranked = dimension === 'product';
+  if (ranked) params.push(limit ?? 10);
+
+  const { rows } = await pool.query(
+    `SELECT ${expr} AS label, COUNT(*)::int AS value,
+            COUNT(*) FILTER (WHERE e.screen = 'packing')::int AS at_packing
+       FROM barcode_scan_events e
+       LEFT JOIN products p ON p.id = e.product_id
+      WHERE ${where.join(' AND ')}
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
+      ORDER BY ${ranked ? '2 DESC, 1' : '1'}
+      ${ranked ? `LIMIT $${params.length}` : ''}`,
+    params
+  );
+  return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { atPacking: r.at_packing } }));
+};
+
 // ══ Community requests ═════════════════════════════════════════
 // requested_at is timestamptz. No caller_name or caller_contact
 // reachable here — same rule as donations.
@@ -953,7 +988,7 @@ export default {
   goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend, unitPriceTrend,
   donationValue, section18aPipeline,
   stockOnHand, lowStockItems, stockMovementVolume, stockCountVariance,
-  pickingFlagRate, communityRequestOutcomes, volunteerHours,
+  pickingFlagRate, scanCatches, communityRequestOutcomes, volunteerHours,
   countNonKgLines, countNonKgReceivedLines, getFactor,
   // Second-wave operational metrics, kept in their own file.
   ...opsRepo,

@@ -56,6 +56,9 @@ const toProduct = (row) => ({
   // The newest ledger row, for "No movement 60+ days". Not updatedAt,
   // which a reorder-threshold edit also bumps.
   lastMovementAt: row.last_movement_at ?? null,
+  // Linked barcodes, so the inventory search finds a product by the code
+  // on its pack (inventoryViews.js matchesSearch).
+  barcodes:    Array.isArray(row.barcodes) ? row.barcodes : [],
   // Soonest expiry still today or later among the deliveries estimated
   // to be on the shelf, as 'YYYY-MM-DD' — see getManifest.
   earliestExpiry: toDay(row.earliest_expiry),
