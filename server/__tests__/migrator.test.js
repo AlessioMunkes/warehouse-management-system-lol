@@ -94,6 +94,32 @@ describe('this repo', () => {
     }
   });
 
+  // schema.sql is the full schema in one file. A migration whose table or
+  // column never reached it (047 did this once) leaves a fresh database
+  // short of what the code expects.
+  it('every table and column a migration adds is also in schema.sql', () => {
+    const schema = stripSqlNoise(fs.readFileSync(inDb('schema.sql'), 'utf8'));
+    const named = (name) => new RegExp(`\\b${name}\\b`, 'i').test(schema);
+    for (const m of migrations) {
+      const sql = stripSqlNoise(fs.readFileSync(m.path, 'utf8'));
+      for (const [, name] of sql.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?(?:public\.)?(\w+)/gi)) {
+        expect([m.file, name, named(name)]).toEqual([m.file, name, true]);
+      }
+      for (const [, name] of sql.matchAll(/ADD COLUMN (?:IF NOT EXISTS )?(\w+)/gi)) {
+        expect([m.file, name, named(name)]).toEqual([m.file, name, true]);
+      }
+    }
+  });
+
+  // Supabase's API roles were shut out of the schema in 057. The app
+  // never uses them, so no migration should let them back in.
+  it('no migration grants anything to the Supabase API roles', () => {
+    for (const m of [...migrations, { file: 'schema.sql', path: inDb('schema.sql') }]) {
+      const sql = stripSqlNoise(fs.readFileSync(m.path, 'utf8'));
+      expect([m.file, /\bGRANT\b[^;]*\bTO\s+(anon|authenticated|public)\b/i.test(sql)]).toEqual([m.file, false]);
+    }
+  });
+
   it.skipIf(!has('baseline-migrations.txt'))('every id in baseline-migrations.txt is a real migration file', () => {
     const ids = new Set(migrations.map((m) => m.id));
     for (const id of manifest) expect([id, ids.has(id)]).toEqual([id, true]);

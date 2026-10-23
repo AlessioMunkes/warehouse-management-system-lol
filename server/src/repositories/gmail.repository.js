@@ -3,64 +3,10 @@
 //
 // Data access only for Gmail OAuth connection credentials.
 // No OAuth flow logic belongs here.
+//
+// The gmail_connections table is created by migration 058, not here.
 // -------------------------------------------------------------
 import pool from '../config/db.js';
-
-const getUsersIdSqlType = async (client = pool) => {
-  const { rows } = await client.query(
-    `SELECT udt_name
-     FROM information_schema.columns
-     WHERE table_schema = 'public'
-       AND table_name = 'users'
-       AND column_name = 'id'`
-  );
-
-  const udtName = rows[0]?.udt_name;
-  if (udtName === 'uuid') return 'UUID';
-  if (udtName === 'int4') return 'INTEGER';
-  if (udtName === 'int8') return 'BIGINT';
-
-  const err = new Error('Unsupported users.id type for Gmail connection storage.');
-  err.status = 500;
-  throw err;
-};
-
-const ensureGmailConnectionsTable = async (client = pool) => {
-  const userIdType = await getUsersIdSqlType(client);
-
-  await client.query(
-    `CREATE TABLE IF NOT EXISTS gmail_connections (
-       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-       gmail_email VARCHAR(255),
-       display_name VARCHAR(255),
-       token_type VARCHAR(32) NOT NULL,
-       scope TEXT NOT NULL,
-       access_token_encrypted TEXT NOT NULL,
-       refresh_token_encrypted TEXT NOT NULL,
-       access_token_expires_at TIMESTAMPTZ,
-       refresh_token_expires_at TIMESTAMPTZ,
-       connected_by_user_id ${userIdType} REFERENCES users(id),
-       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-     )`
-  );
-  // display_name: added after the original table creation. Existing
-  // deployments get the column here; new tables get it in the DDL above.
-  await client.query(
-    `ALTER TABLE gmail_connections ADD COLUMN IF NOT EXISTS display_name VARCHAR(255)`
-  );
-
-
-  await client.query(
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_gmail_connections_connected_by_user_id
-     ON gmail_connections(connected_by_user_id)`
-  );
-
-  await client.query(
-    `CREATE INDEX IF NOT EXISTS idx_gmail_connections_updated_at
-     ON gmail_connections(updated_at)`
-  );
-};
 
 const upsertConnection = async (
   {
@@ -76,8 +22,6 @@ const upsertConnection = async (
   },
   client = pool
 ) => {
-  await ensureGmailConnectionsTable(client);
-
   const { rows } = await client.query(
     `INSERT INTO gmail_connections (
        gmail_email,
@@ -136,7 +80,6 @@ const findConnectionByUserId = async (userId, client = pool) => {
 // not by a specific admin, so they resolve the organisation's account
 // as the most recently updated connection.
 const findLatestConnection = async (client = pool) => {
-  await ensureGmailConnectionsTable(client);
   const { rows } = await client.query(
     `SELECT id, gmail_email, display_name, token_type, scope, access_token_encrypted,
             refresh_token_encrypted, access_token_expires_at, refresh_token_expires_at,
@@ -159,7 +102,6 @@ const deleteConnectionByUserId = async (userId, client = pool) => {
 };
 
 const updateDisplayNameByUserId = async (userId, displayName, client = pool) => {
-  await ensureGmailConnectionsTable(client);
   const { rows } = await client.query(
     `UPDATE gmail_connections
      SET display_name = $2, updated_at = NOW()
@@ -172,7 +114,6 @@ const updateDisplayNameByUserId = async (userId, displayName, client = pool) => 
 };
 
 export default {
-  ensureGmailConnectionsTable,
   upsertConnection,
   findConnectionByUserId,
   findLatestConnection,

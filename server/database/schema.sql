@@ -1602,6 +1602,32 @@ UPDATE products
    AND is_decantable = false;
 
 
+-- from 047_create_expiry_warning_dismissals
+-- ─────────────────────────────────────────────────────────────
+-- 047_create_expiry_warning_dismissals.sql
+--
+-- A manager dismissing an expiry warning that the stock estimate got wrong
+-- (the estimate assumes oldest-received stock goes out first). One row per
+-- dismissal of a delivery line; a restore is recorded on the same row so
+-- the history stays. Additive only: one new table and one index.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS expiry_warning_dismissals (
+  id                    SERIAL PRIMARY KEY,
+  delivery_note_item_id INTEGER     NOT NULL REFERENCES delivery_note_items(id),
+  reason                TEXT        NOT NULL CHECK (length(btrim(reason)) > 0),
+  dismissed_by          INTEGER     NOT NULL REFERENCES users(id),
+  dismissed_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  restored_by           INTEGER     REFERENCES users(id),
+  restored_at           TIMESTAMPTZ,
+  CONSTRAINT expiry_dismissal_restore_pair
+    CHECK ((restored_by IS NULL) = (restored_at IS NULL))
+);
+
+-- At most one active dismissal per delivery line.
+CREATE UNIQUE INDEX IF NOT EXISTS expiry_warning_dismissals_one_active
+  ON expiry_warning_dismissals (delivery_note_item_id)
+  WHERE restored_at IS NULL;
+
 -- from 048_create_warehouse_map
 -- ─────────────────────────────────────────────────────────────
 -- 048_create_warehouse_map.sql
@@ -1892,3 +1918,311 @@ ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_quantity TEXT;
 ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_weight_kg NUMERIC(10, 3);
 ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_categories TEXT[];
 ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_checked_at TIMESTAMPTZ;
+
+
+-- from 057_lock_down_data_api
+-- ─────────────────────────────────────────────────────────────
+-- 057_lock_down_data_api.sql
+--
+-- Closes Supabase's public Data API to this schema.
+--
+-- Supabase gives its API roles, anon and authenticated, full rights on
+-- every new table in public, and leaves row-level security off. With
+-- the Data API on, anyone holding the project URL and the anon key
+-- (which is designed to be public) could read, change or empty those
+-- tables. The app never uses that API: it connects straight to
+-- Postgres as the database owner, which bypasses row-level security,
+-- so none of this changes what the app can do.
+--
+--   1. Row-level security on for every table in public. No policies are
+--      added, so the API roles see no rows even if a grant comes back.
+--   2. The API roles lose every right on tables, views, sequences and
+--      functions in public.
+--   3. Tables, sequences and functions made later by this role no longer
+--      hand those rights out automatically.
+--
+-- A plain Postgres without Supabase has no anon or authenticated role;
+-- steps 2 and 3 are skipped there.
+-- ─────────────────────────────────────────────────────────────
+DO $$
+DECLARE
+  t record;
+BEGIN
+  FOR t IN
+    SELECT c.relname
+      FROM pg_class c
+     WHERE c.relnamespace = 'public'::regnamespace
+       AND c.relkind IN ('r', 'p')
+       AND NOT c.relrowsecurity
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.relname);
+  END LOOP;
+END
+$$;
+
+DO $$
+DECLARE
+  api_role text;
+BEGIN
+  FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
+      EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM %I', api_role);
+      EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM %I', api_role);
+      EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM %I', api_role);
+      EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public REVOKE ALL ON TABLES FROM %I', current_user, api_role);
+      EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public REVOKE ALL ON SEQUENCES FROM %I', current_user, api_role);
+      EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM %I', current_user, api_role);
+    END IF;
+  END LOOP;
+END
+$$;
+
+
+-- from 058_runtime_schema_to_migration
+-- ─────────────────────────────────────────────────────────────
+-- 058_runtime_schema_to_migration.sql
+--
+-- Schema the app used to create for itself while running, moved here.
+--
+-- donation.repository.js ran ALTER TABLE donations ... ADD COLUMN IF
+-- NOT EXISTS on every Section 18A link save, open and submit, and
+-- gmail.repository.js ran CREATE TABLE / ALTER TABLE / CREATE INDEX on
+-- every Gmail read and write. Even when there is nothing to add, ALTER
+-- TABLE takes the strongest table lock, so each donor opening their
+-- public 18A link briefly blocked all work on donations, and the app
+-- needed owner rights to run at all.
+--
+-- Everything below already exists in a database the app has used; this
+-- makes sure every warehouse database has it, so the code can stop
+-- asking. Additive only, and a no-op where it is already there.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT;
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ;
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ;
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_donor_form JSONB;
+
+CREATE TABLE IF NOT EXISTS gmail_connections (
+  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gmail_email              VARCHAR(255),
+  display_name             VARCHAR(255),
+  token_type               VARCHAR(32) NOT NULL,
+  scope                    TEXT NOT NULL,
+  access_token_encrypted   TEXT NOT NULL,
+  refresh_token_encrypted  TEXT NOT NULL,
+  access_token_expires_at  TIMESTAMPTZ,
+  refresh_token_expires_at TIMESTAMPTZ,
+  connected_by_user_id     INTEGER REFERENCES users(id),
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE gmail_connections ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_gmail_connections_connected_by_user_id
+  ON gmail_connections (connected_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_gmail_connections_updated_at
+  ON gmail_connections (updated_at);
+ALTER TABLE gmail_connections ENABLE ROW LEVEL SECURITY;
+
+
+-- from 059_tidy_indexes
+-- ─────────────────────────────────────────────────────────────
+-- 059_tidy_indexes.sql
+--
+-- Duplicate indexes out, one missing index in.
+--
+-- Over time the same columns were indexed two or three times under
+-- different names (idx_pks_status and idx_pslip_status, for example).
+-- A copy speeds nothing up and makes every write maintain it. Each
+-- index dropped here has a twin on exactly the same columns that stays:
+-- where one of the pair backs a primary key or unique constraint, that
+-- one is kept; otherwise the one queries were already using is kept.
+--
+--   dropped                               kept
+--   idx_attendance_booking_id             uq_attendance_booking (unique)
+--   idx_certificate_settings_id           certificate_settings_pkey
+--   idx_dl_decanting                      idx_dl_record
+--   idx_dr_week, idx_dr_week_of           idx_decanting_records_week_of
+--   idx_dispatch_events_slip              dispatch_events_picking_slip_id_key (unique)
+--   idx_donation_email_logs_created_desc  idx_donation_email_logs_created
+--   idx_di_donation                       idx_donation_items_donation
+--   idx_di_product,
+--   idx_donation_items_product            idx_donation_items_product_id
+--   idx_donations_s18a_status             idx_donations_section_18a_status
+--   idx_donations_programme               idx_donations_programme_id
+--   idx_pke_slip                          idx_pevent_slip
+--   idx_pksi_slip                         idx_psi_slip
+--   idx_pksi_product                      idx_psi_product
+--   idx_pks_dispatch_date, idx_pslip_date idx_picking_slips_dispatch_date
+--   idx_pks_status                        idx_pslip_status
+--   idx_pks_assigned_to                   idx_pslip_assigned
+--   idx_reporting_factors_lookup          reporting_factors_factor_key_effective_from_key (unique)
+--   idx_reporting_queries_outcome         idx_reporting_queries_outcome_date
+--   idx_stock_count_lines_count_product   scl_one_line_per_product (unique)
+--   idx_stock_counts_date                 idx_sc_date
+--   idx_sm_created                        idx_sm_created_at
+--   idx_sm_reference                      idx_sm_ref
+--   idx_users_username                    users_username_key (unique)
+--
+-- Added: dispatch_event_lines.picking_slip_item_id, a foreign key on a
+-- table of about 24,000 rows that had no index, so deleting or
+-- checking a picking slip line scanned the whole table.
+-- ─────────────────────────────────────────────────────────────
+-- A copy is dropped only where its twin exists, so a database that
+-- drifted and has just one of the pair keeps it.
+DO $$
+DECLARE
+  pair text[];
+BEGIN
+  FOREACH pair SLICE 1 IN ARRAY ARRAY[
+    ['idx_attendance_booking_id', 'uq_attendance_booking'],
+    ['idx_certificate_settings_id', 'certificate_settings_pkey'],
+    ['idx_dl_decanting', 'idx_dl_record'],
+    ['idx_dr_week', 'idx_decanting_records_week_of'],
+    ['idx_dr_week_of', 'idx_decanting_records_week_of'],
+    ['idx_dispatch_events_slip', 'dispatch_events_picking_slip_id_key'],
+    ['idx_donation_email_logs_created_desc', 'idx_donation_email_logs_created'],
+    ['idx_di_donation', 'idx_donation_items_donation'],
+    ['idx_di_product', 'idx_donation_items_product_id'],
+    ['idx_donation_items_product', 'idx_donation_items_product_id'],
+    ['idx_donations_s18a_status', 'idx_donations_section_18a_status'],
+    ['idx_donations_programme', 'idx_donations_programme_id'],
+    ['idx_pke_slip', 'idx_pevent_slip'],
+    ['idx_pksi_slip', 'idx_psi_slip'],
+    ['idx_pksi_product', 'idx_psi_product'],
+    ['idx_pks_dispatch_date', 'idx_picking_slips_dispatch_date'],
+    ['idx_pslip_date', 'idx_picking_slips_dispatch_date'],
+    ['idx_pks_status', 'idx_pslip_status'],
+    ['idx_pks_assigned_to', 'idx_pslip_assigned'],
+    ['idx_reporting_factors_lookup', 'reporting_factors_factor_key_effective_from_key'],
+    ['idx_reporting_queries_outcome', 'idx_reporting_queries_outcome_date'],
+    ['idx_stock_count_lines_count_product', 'scl_one_line_per_product'],
+    ['idx_stock_counts_date', 'idx_sc_date'],
+    ['idx_sm_created', 'idx_sm_created_at'],
+    ['idx_sm_reference', 'idx_sm_ref'],
+    ['idx_users_username', 'users_username_key']
+  ] LOOP
+    IF to_regclass('public.' || pair[2]) IS NOT NULL THEN
+      EXECUTE format('DROP INDEX IF EXISTS public.%I', pair[1]);
+    END IF;
+  END LOOP;
+END
+$$;
+
+CREATE INDEX IF NOT EXISTS idx_dispatch_event_lines_slip_item
+  ON dispatch_event_lines (picking_slip_item_id);
+
+
+-- from 060_drop_unused_schema
+-- ─────────────────────────────────────────────────────────────
+-- 060_drop_unused_schema.sql
+--
+-- Tables, views, a type and columns that no code reads or writes.
+--
+-- Each one was checked against the server, the client, the scripts and
+-- the tests (October 2026 database audit). None appears in any query or
+-- any field the client shows. Kept on purpose although unused today:
+-- volunteers.consent_given and volunteers.retention_delete_after (for a
+-- POPIA retention job) and pending_donations.commit_incomplete_at (the
+-- Reconciliation tab shows it).
+--
+-- Not reversible: the columns' contents go with them. In the dev
+-- database the only filled ones were picking_slip_items.dispatched_quantity,
+-- purchase_orders.status_changed_by, storage_locations.capacity_note,
+-- supplier_products.added_at, stock_count_lines.client_uuid,
+-- stock_counts.submitted_at, quickbooks_sync_queue.next_attempt_at and
+-- donations.quickbooks_sync_status (always 'unsynced').
+--
+-- No CASCADE anywhere: if anything still depends on one of these in some
+-- warehouse database, the migration stops there and changes nothing.
+-- ─────────────────────────────────────────────────────────────
+
+-- Views nothing queries.
+DROP VIEW IF EXISTS vw_ecd_collection_history;
+DROP VIEW IF EXISTS vw_low_stock;
+
+-- operational_goals: its feature was removed. schema_migration_provenance:
+-- notes from manual alignments before the migration runner existed.
+DROP TABLE IF EXISTS operational_goals;
+DROP TABLE IF EXISTS schema_migration_provenance;
+
+-- The donation_category enum: donations.donation_category is a text
+-- column, and no column uses the type. Left alone if one ever does.
+DO $$
+BEGIN
+  IF to_regtype('public.donation_category') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_attribute a
+        WHERE a.atttypid = 'public.donation_category'::regtype
+          AND a.attnum > 0 AND NOT a.attisdropped
+     ) THEN
+    DROP TYPE public.donation_category;
+  END IF;
+END
+$$;
+
+-- Donor address and identity fields the intake form never saved. The
+-- Section 18A form keeps what the donor enters in section_18a_donor_form.
+-- The QuickBooks columns were never written: syncing uses
+-- quickbooks_sync_queue and quickbooks_object_map.
+ALTER TABLE donations
+  DROP COLUMN IF EXISTS donor_cellphone,
+  DROP COLUMN IF EXISTS donor_address_line1,
+  DROP COLUMN IF EXISTS donor_address_line2,
+  DROP COLUMN IF EXISTS donor_city_suburb,
+  DROP COLUMN IF EXISTS donor_province,
+  DROP COLUMN IF EXISTS donor_postal_code,
+  DROP COLUMN IF EXISTS donor_country,
+  DROP COLUMN IF EXISTS donor_identification_type,
+  DROP COLUMN IF EXISTS donor_identification_number,
+  DROP COLUMN IF EXISTS donor_identification_country_of_issue,
+  DROP COLUMN IF EXISTS quickbooks_sync_status,
+  DROP COLUMN IF EXISTS quickbooks_sync_reference_id,
+  DROP COLUMN IF EXISTS quickbooks_sync_error,
+  DROP COLUMN IF EXISTS quickbooks_synced_at,
+  DROP COLUMN IF EXISTS quickbooks_sync_attempted_at,
+  DROP COLUMN IF EXISTS section_18a_deemed_value_zar;
+
+ALTER TABLE pending_donations
+  DROP COLUMN IF EXISTS donor_cellphone,
+  DROP COLUMN IF EXISTS donor_address_line1,
+  DROP COLUMN IF EXISTS donor_address_line2,
+  DROP COLUMN IF EXISTS donor_city_suburb,
+  DROP COLUMN IF EXISTS donor_province,
+  DROP COLUMN IF EXISTS donor_postal_code,
+  DROP COLUMN IF EXISTS donor_country,
+  DROP COLUMN IF EXISTS donor_identification_type,
+  DROP COLUMN IF EXISTS donor_identification_number,
+  DROP COLUMN IF EXISTS donor_identification_country_of_issue;
+
+ALTER TABLE donors
+  DROP COLUMN IF EXISTS tax_reference,
+  DROP COLUMN IF EXISTS consent_given;
+
+-- A cohort-override flow on delivery receipts that was never built. Its
+-- check (an override needs a reason and an approver) goes with it;
+-- override_reason itself stays, it is used.
+ALTER TABLE delivery_receipts DROP CONSTRAINT IF EXISTS dr_override_requires_reason;
+ALTER TABLE delivery_receipts
+  DROP COLUMN IF EXISTS collector_contact,
+  DROP COLUMN IF EXISTS is_cohort_override,
+  DROP COLUMN IF EXISTS override_approved_by,
+  DROP COLUMN IF EXISTS auto_flagged_at;
+
+ALTER TABLE donation_allocations
+  DROP COLUMN IF EXISTS allocation_status,
+  DROP COLUMN IF EXISTS stock_movement_id;
+
+ALTER TABLE donation_items             DROP COLUMN IF EXISTS source_reference;
+ALTER TABLE picking_slip_items         DROP COLUMN IF EXISTS dispatched_quantity;
+ALTER TABLE purchase_orders            DROP COLUMN IF EXISTS status_changed_by;
+ALTER TABLE quickbooks_sync_queue      DROP COLUMN IF EXISTS next_attempt_at;
+ALTER TABLE recipe_own_order_centres   DROP COLUMN IF EXISTS added_at;
+ALTER TABLE stock_counts               DROP COLUMN IF EXISTS submitted_at;
+ALTER TABLE storage_locations          DROP COLUMN IF EXISTS capacity_note;
+ALTER TABLE supplier_products          DROP COLUMN IF EXISTS added_at;
+ALTER TABLE stock_count_lines
+  DROP COLUMN IF EXISTS client_uuid,
+  DROP COLUMN IF EXISTS adjustment_movement_id;
+
+-- The free-text location from before migration 050 added the address,
+-- suburb and pin. Empty, and nothing reads it.
+ALTER TABLE ecd_centres                DROP COLUMN IF EXISTS location;
