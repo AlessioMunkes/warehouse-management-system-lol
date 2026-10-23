@@ -28,12 +28,14 @@ router.get('/unread-count',  auth, requireRole(...ALL_STAFF), notificationContro
 router.post('/read-all',     auth, requireRole(...ALL_STAFF), notificationController.markAllRead);
 router.patch('/:id/read',    auth, requireRole(...ALL_STAFF), validateIntId, notificationController.markRead);
 
-router.get('/floor',              auth, notificationController.listFloor);
-router.get('/floor/unread-count', auth, notificationController.floorUnreadCount);
-router.post('/floor/read-all',    auth, notificationController.markAllFloorRead);
+// Staff only: read state is kept against a users row, and a guest's id
+// is a volunteers row (the same mix-up push.routes.js guards against).
+router.get('/floor',              auth, requireRole(...ALL_STAFF), notificationController.listFloor);
+router.get('/floor/unread-count', auth, requireRole(...ALL_STAFF), notificationController.floorUnreadCount);
+router.post('/floor/read-all',    auth, requireRole(...ALL_STAFF), notificationController.markAllFloorRead);
 // Reuses the same markRead as the manager route — it only ever
 // touches this user's own read state on an id it already fetched, so
 // there's no manager-only logic to duplicate here.
-router.patch('/floor/:id/read',   auth, validateIntId, notificationController.markRead);
+router.patch('/floor/:id/read',   auth, requireRole(...ALL_STAFF), validateIntId, notificationController.markRead);
 
 export default router;

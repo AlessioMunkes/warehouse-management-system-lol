@@ -17,7 +17,7 @@ import express from 'express';
 import certificateSettingsController from '../controllers/certificateSettings.controller.js';
 //import { auth, requireRole, ROLES } from '../middleware/auth.middleware.js';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
-import { MANAGERS_UP, ADMIN_ONLY } from '../constants/permissions.js';
+import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY } from '../constants/permissions.js';
 const router = express.Router();
 
 // All routes require authentication
@@ -25,9 +25,10 @@ router.use(auth);
 
 // ── GET /api/certificate-settings ──────────────────────────────
 // Returns the current certificate settings.
-// Any authenticated user can read settings.
+// Any staff member can read settings; a guest has no use for them.
 router.get(
   '/',
+  requireRole(...ALL_STAFF),
   certificateSettingsController.getSettings
 );
 

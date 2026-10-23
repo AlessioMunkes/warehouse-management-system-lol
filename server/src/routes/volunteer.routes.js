@@ -18,6 +18,7 @@ import { validateIntId }            from '../middleware/validate.middleware.js';
 import volunteerRepo                from '../repositories/volunteer.repository.js';
 import slipAccessRepo               from '../repositories/slipAccess.repository.js';
 import { isTodayGateCode, todayGateCode } from '../services/gateCode.service.js';
+import { guestSignInRateLimiter } from '../middleware/rateLimiter.middleware.js';
 
 const router = express.Router();
 
@@ -47,7 +48,7 @@ const asDate = (value) =>
 
 const SESSION_HOURS = 12;
 
-router.post('/sign-in', async (req, res) => {
+router.post('/sign-in', guestSignInRateLimiter, async (req, res) => {
   try {
     const { name, gateCode } = req.body;
 
@@ -58,8 +59,8 @@ router.post('/sign-in', async (req, res) => {
       return res.status(400).json({ message: 'Name is too long.' });
     }
     // The day's gate code shows the person is at the warehouse (see
-    // gateCode.service.js). A wrong one is a failed attempt to the
-    // rate limiter in front of this router.
+    // gateCode.service.js). A wrong one is a failed attempt to
+    // guestSignInRateLimiter.
     if (!isTodayGateCode(gateCode)) {
       return res.status(403).json({
         code: 'GATE_CODE',

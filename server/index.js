@@ -38,6 +38,7 @@ import donationAdminRoutes from './src/routes/donationAdmin.routes.js';
 import donationIntakeRouter from './src/routes/donationIntake.routes.js';
 import cookieParser     from 'cookie-parser';
 import loginRateLimiter  from './src/middleware/rateLimiter.middleware.js';
+import clientIp          from './src/middleware/clientIp.middleware.js';
 import loginRouter       from './src/routes/login.route.js';
 import sessionRouter     from './src/routes/session.route.js';
 import deliveryRouter    from './src/routes/delivery.routes.js';
@@ -102,6 +103,9 @@ const app  = express();
 // this, req.ip is the proxy's address for every request, so the login
 // rate limiter counted the whole warehouse as a single client.
 app.set('trust proxy', 1);
+// Behind Cloudflare that is still a proxy's address; this reads the
+// visitor's from the header TRUSTED_CLIENT_IP_HEADER names.
+app.use(clientIp());
 const port = process.env.PORT || 5000;
 // Origins allowed to call the API with the auth cookie.
 //   - dev:                 the Vite server on 5173/5174
@@ -213,7 +217,8 @@ app.use('/api/login',      loginRateLimiter, loginRouter);
 // would lock a warehouse tablet out of its own session.
 app.use('/api/me',         sessionRouter);
 app.use('/api/deliveries', deliveryRouter);
-app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
+// Guest sign-in has its own limiter, on that route only.
+app.use('/api/volunteers', volunteerRouter);
 app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
 app.use('/api/picking',    pickingRouter);
