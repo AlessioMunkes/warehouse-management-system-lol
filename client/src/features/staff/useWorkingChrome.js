@@ -5,12 +5,15 @@
 // work the room. On a phone the app's top bar, the task's own pinned
 // header, its pinned Finish bar and the bottom tab bar took about 400
 // of 844 pixels, leaving the lines being counted in a strip between
-// them. While the worker is working, they step back (the CSS is under
-// "Working on a phone" in the floor screens section of index.css):
-//   the top bar and the tab bar go,
-//   the task's header shrinks to its title,
-//   the Finish bar keeps its main button and one line of what is
-//   missing ("Start over" and other second buttons wait).
+// them. While the worker is working, they slide out of the way (the
+// CSS is under "Working on a phone" in the floor screens section of
+// index.css):
+//   the top bar slides up and the tab bar down,
+//   the task's header slides up until only its title shows,
+//   the Finish bar slides down until only its main button shows
+//   ("Start over" and other second buttons wait).
+// They only ever slide over the page; nothing changes height, so the
+// lines being worked never move except by the worker's own scrolling.
 //
 // WORKING means: scrolled down the task, or typing in a field (the
 // phone's keyboard is up and room is shortest then). Scrolling back up,
@@ -18,19 +21,16 @@
 // on a screen too short to scroll brings everything back, and so does
 // opening another screen.
 //
-// THE TOP. Folding the task's header away moves the page up by its
-// height, so a worker who had only just scrolled can find themselves at
-// the top with the bars still away, and a page at the top cannot be
-// scrolled further up to ask for them. So reaching the top brings them
-// back, and so does pulling down there (a swipe, or the mouse wheel).
-// Being merely near the top does not: scrolling down from just below
-// it is still working.
+// THE TOP. A page at the top cannot be scrolled further up to ask for
+// the bars, so reaching the top brings them back, and so does pulling
+// down there (a swipe, or the mouse wheel).
 //
 // Only phones: on a tablet or desk the CSS does nothing with it.
 //
 // The top bar belongs to ManagerLayout, outside the floor shell, so it
-// is reached through an attribute on <html>, data-stf-working, removed
-// again when the screen goes.
+// is reached through attributes on <html>: data-stf-floor while a floor
+// screen is open (the top bar is laid over the page, ready to slide),
+// data-stf-working while it is being worked. Both go with the screen.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 
@@ -43,11 +43,9 @@ const TOP = 24;
 const PULL = 24;
 // A scroll smaller than this either way is a wobble, not a direction.
 const STEP = 8;
-// After the bars change, scrolling is not read for this long. Hiding
-// them changes the page's height, the browser moves the scroll position
-// to match, and that move read as "scrolled up" brought the bars back,
-// which moved it again: the bars flickered.
-const SETTLE_MS = 350;
+// After the bars change, scrolling is not read for this long, so a
+// flick that is still settling cannot turn them straight back.
+const SETTLE_MS = 250;
 
 const isTypingField = (el) => Boolean(el?.matches?.(
   'input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]), textarea, select',
@@ -73,8 +71,37 @@ export default function useWorkingChrome(rootRef, pathname) {
     const scroller = root?.parentElement?.closest('main') ?? null;
     if (!root || !scroller) return undefined;
 
+    // How far things go (index.css, "Working on a phone"):
+    //   --app-topbar-h   the top bar's height: the page starts below it
+    //   --stf-head-fold  how much of the task header may go above the
+    //                    top, so its title is what stays (the view
+    //                    toggle above it goes)
+    //   --stf-foot-fold  how much of the Finish bar may go below the
+    //                    bottom, so its main button is what stays
+    //                    ("Start over" under it goes)
+    // Read again each time the bars go: what a screen puts in its header
+    // and bar changes as the work goes on.
+    const html = document.documentElement;
+    const measure = () => {
+      const bar = document.querySelector('.app-topbar');
+      if (bar) html.style.setProperty('--app-topbar-h', `${bar.offsetHeight}px`);
+      const title = root.querySelector('.stf-task-head .stf-task-title');
+      html.style.setProperty('--stf-head-fold', `${title ? Math.max(0, title.offsetTop - 8) : 0}px`);
+      const foot = root.querySelector('.stf-task-foot');
+      const main = foot?.querySelector('.stf-btn-primary');
+      const extra = foot?.querySelector('.stf-btn-secondary');
+      const fold = foot && main && extra
+        ? foot.getBoundingClientRect().bottom - main.getBoundingClientRect().bottom - 8
+        : 0;
+      html.style.setProperty('--stf-foot-fold', `${Math.max(0, fold)}px`);
+    };
+    html.setAttribute('data-stf-floor', '');
+    measure();
+    window.addEventListener('resize', measure);
+
     const set = (next) => {
       if (state.current.working === next) return;
+      if (next) measure();
       state.current = { working: next, changedAt: Date.now() };
       setWorking(next);
     };
@@ -116,6 +143,8 @@ export default function useWorkingChrome(rootRef, pathname) {
     root.addEventListener('focusin', onFocusIn);
     root.addEventListener('focusout', onFocusOut);
     return () => {
+      html.removeAttribute('data-stf-floor');
+      window.removeEventListener('resize', measure);
       scroller.removeEventListener('scroll', onScroll);
       scroller.removeEventListener('wheel', onWheel);
       scroller.removeEventListener('touchstart', onTouchStart);
