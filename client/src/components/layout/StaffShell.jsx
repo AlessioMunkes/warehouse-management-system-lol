@@ -12,6 +12,7 @@
 // small pop-up when new pallets are put on the floor, except when they
 // are already on the Packing screen.
 // ─────────────────────────────────────────────────────────────
+import { useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import usePressFlash from '../../features/staff/usePressFlash';
 import useKeepAwake from '../../features/staff/useKeepAwake';
 import useAccountLanguage from '../../features/staff/useAccountLanguage';
 import useFloorTranslation from '../../features/staff/useFloorTranslation';
+import useWorkingChrome from '../../features/staff/useWorkingChrome';
 import { useT } from '../../translations';
 import { STAFF } from '../../routes/paths';
 
@@ -85,9 +87,14 @@ export default function StaffShell({
   // No pop-up on the Packing screen itself; its tabs already show it.
   const onPackingPage = pathname.startsWith(STAFF.packing);
 
+  // On a phone, the bars step back while the worker is working
+  // (useWorkingChrome.js).
+  const shellRef = useRef(null);
+  const working = useWorkingChrome(shellRef, pathname);
+
   return (
     <ManagerLayout>
-      <div className={`stf-shell is-in-app${showTabBar ? '' : ' no-tabbar'}`}>
+      <div ref={shellRef} className={`stf-shell is-in-app${showTabBar ? '' : ' no-tabbar'}${working ? ' is-working' : ''}`}>
         <OfflineBar />
 
         <main className={wide ? 'stf-main is-wide' : 'stf-main'}>

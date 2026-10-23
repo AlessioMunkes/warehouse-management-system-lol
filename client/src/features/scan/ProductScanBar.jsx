@@ -35,7 +35,7 @@ import { ProductMatchCombobox } from '../donation/ProductMatchComboBox';
 import { linkBarcode, matchBarcode } from '../../services/productBarcodeAPI';
 import PalletScanner from './PalletScanner';
 import useBarcodeReader from './useBarcodeReader';
-import ScanFlash from './ScanFlash';
+import ScanFlash, { SHOW_MS } from './ScanFlash';
 import { useT } from '../../translations';
 
 const CAMERA_TROUBLE = ['denied', 'noCamera', 'failed'];
@@ -203,6 +203,10 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false,
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraTrouble, setCameraTrouble] = useState(null);
   const inputRef = useRef(null);
+  const barRef = useRef(null);
+  // Where the last read came from: the Barcode field (typed, or a USB
+  // or Bluetooth scanner) or the camera.
+  const source = useRef('typed');
   const { read, linked, message, looking, unknownCode, dismissUnknown, scanned } = useBarcodeReader({ onMatch, screen, referenceId });
 
   // The camera library is fetched the first time the camera opens, which
@@ -214,16 +218,35 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false,
     return () => window.cancelIdleCallback?.(id);
   }, []);
 
+  // When the tick goes, back to where the next scan comes in: the bar in
+  // view, and, for a typed or scanner read, the cursor in the Barcode
+  // field. Never for a camera read (it would open the phone's keyboard
+  // over the camera), and never away from a field the worker has gone
+  // on to type in.
+  useEffect(() => {
+    if (!scanned) return undefined;
+    const timer = setTimeout(() => {
+      const bar = barRef.current;
+      if (!bar) return;
+      bar.scrollIntoView?.({ block: 'nearest' });
+      const active = document.activeElement;
+      const free = !active || active === document.body || bar.contains(active);
+      if (source.current === 'typed' && free) inputRef.current?.focus({ preventScroll: true });
+    }, SHOW_MS);
+    return () => clearTimeout(timer);
+  }, [scanned]);
+
   const submitTyped = (event) => {
     event.preventDefault();
     const text = typed;
     setTyped('');
     inputRef.current?.focus();
+    source.current = 'typed';
     if (text.trim()) read(text);
   };
 
   return (
-    <div className="stf-scanbar">
+    <div className="stf-scanbar" ref={barRef}>
       <ScanFlash signal={scanned} label={t('barcode.scanned')} />
       <form className="stf-scanbar-row" onSubmit={submitTyped}>
         <TextField
@@ -259,7 +282,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false,
             kind="product"
             label={t('barcode.cameraLabel')}
             torchLabel={t('barcode.torch')}
-            onCode={read}
+            onCode={(text) => { source.current = 'camera'; read(text); }}
             onUnavailable={setCameraTrouble}
           />
         )

@@ -8,7 +8,7 @@
 //   - a GS1 case label hands its use-by date to the screen
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../services/productBarcodeAPI', () => ({
@@ -108,7 +108,7 @@ describe('a GS1 case label', () => {
 });
 
 describe('the green tick', () => {
-  it('shows for a scan that counted, buzzes the phone, and goes by itself', async () => {
+  it('shows for a scan that counted, buzzes the phone, and goes by itself after three seconds', { timeout: 10000 }, async () => {
     const vibrate = vi.fn();
     Object.defineProperty(navigator, 'vibrate', { configurable: true, value: vibrate });
     const user = userEvent.setup();
@@ -119,7 +119,7 @@ describe('the green tick', () => {
     expect(await screen.findByTestId('scan-flash')).toBeInTheDocument();
     expect(screen.getByText('Scanned')).toBeInTheDocument();
     expect(vibrate).toHaveBeenCalledWith(40);
-    await waitFor(() => expect(screen.queryByTestId('scan-flash')).toBeNull(), { timeout: 2000 });
+    await waitFor(() => expect(screen.queryByTestId('scan-flash')).toBeNull(), { timeout: 4500 });
   });
 
   it('does not show for a product the list does not want', async () => {
@@ -130,5 +130,31 @@ describe('the green tick', () => {
     await scan(user, '4006381333931');
     expect(await screen.findByText('Rice 1kg is not on this order.')).toBeInTheDocument();
     expect(screen.queryByTestId('scan-flash')).toBeNull();
+  });
+});
+
+describe('after the tick', () => {
+  it('puts the cursor back in the Barcode field for the next typed or scanner read', { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    render(<ProductScanBar onMatch={() => 'Rice 1kg: 1.'} />);
+    await waitFor(() => expect(api.getAllBarcodes).toHaveBeenCalled());
+
+    await scan(user, '4006381333931');
+    await screen.findByTestId('scan-flash');
+    act(() => { screen.getByLabelText('Barcode').blur(); });
+    expect(document.activeElement).toBe(document.body);
+    await waitFor(() => expect(screen.getByLabelText('Barcode')).toHaveFocus(), { timeout: 4500 });
+  });
+
+  it('leaves the cursor where the worker has gone on to type', { timeout: 10000 }, async () => {
+    const user = userEvent.setup();
+    render(<><ProductScanBar onMatch={() => 'Rice 1kg: 1.'} /><input aria-label="Count" /></>);
+    await waitFor(() => expect(api.getAllBarcodes).toHaveBeenCalled());
+
+    await scan(user, '4006381333931');
+    await screen.findByTestId('scan-flash');
+    act(() => { screen.getByLabelText('Count').focus(); });
+    await waitFor(() => expect(screen.queryByTestId('scan-flash')).toBeNull(), { timeout: 4500 });
+    expect(screen.getByLabelText('Count')).toHaveFocus();
   });
 });

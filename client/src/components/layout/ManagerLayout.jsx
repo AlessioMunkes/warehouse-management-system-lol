@@ -194,7 +194,7 @@ function ManagerLayoutShell({ children }) {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* ── Top bar ───────────────────────────────────────── */}
-        <header className="shrink-0 flex items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
+        <header className="app-topbar shrink-0 flex items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
           {/* Same breakpoint as the sidebar above, so exactly one of the
               two is ever on screen. */}
           <AppNavDrawer className="sm:hidden" />

@@ -7,7 +7,9 @@
 // to be big, central and gone quickly.
 //
 // `signal` goes up by one for every counted scan (useBarcodeReader's
-// `scanned`); each new number shows the tick for SHOW_MS. Only counted
+// `scanned`); each new number shows the tick for SHOW_MS, three
+// seconds, long enough to see from arm's length while putting a box
+// down. A scan in the meantime starts the three seconds again. Only counted
 // scans: a product that is not on the list keeps its warning message
 // and gets no tick, so green always means "it went in".
 //
@@ -18,7 +20,7 @@
 import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 
-const SHOW_MS = 900;
+export const SHOW_MS = 3000;
 
 export default function ScanFlash({ signal, label }) {
   // The last signal whose tick has been taken away again.
