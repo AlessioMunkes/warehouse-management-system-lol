@@ -35,6 +35,7 @@ import { ProductMatchCombobox } from '../donation/ProductMatchComboBox';
 import { linkBarcode, matchBarcode } from '../../services/productBarcodeAPI';
 import PalletScanner from './PalletScanner';
 import useBarcodeReader from './useBarcodeReader';
+import ScanFlash from './ScanFlash';
 import { useT } from '../../translations';
 
 const CAMERA_TROUBLE = ['denied', 'noCamera', 'failed'];
@@ -202,7 +203,16 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false,
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraTrouble, setCameraTrouble] = useState(null);
   const inputRef = useRef(null);
-  const { read, linked, message, looking, unknownCode, dismissUnknown } = useBarcodeReader({ onMatch, screen, referenceId });
+  const { read, linked, message, looking, unknownCode, dismissUnknown, scanned } = useBarcodeReader({ onMatch, screen, referenceId });
+
+  // The camera library is fetched the first time the camera opens, which
+  // made the first open slow. Fetched quietly once the page is idle
+  // instead, so tapping Use camera starts the camera straight away.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('requestIdleCallback' in window)) return undefined;
+    const id = window.requestIdleCallback(() => { import('html5-qrcode').catch(() => {}); });
+    return () => window.cancelIdleCallback?.(id);
+  }, []);
 
   const submitTyped = (event) => {
     event.preventDefault();
@@ -214,6 +224,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false,
 
   return (
     <div className="stf-scanbar">
+      <ScanFlash signal={scanned} label={t('barcode.scanned')} />
       <form className="stf-scanbar-row" onSubmit={submitTyped}>
         <TextField
           id={fieldId}
@@ -247,6 +258,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false,
           <PalletScanner
             kind="product"
             label={t('barcode.cameraLabel')}
+            torchLabel={t('barcode.torch')}
             onCode={read}
             onUnavailable={setCameraTrouble}
           />

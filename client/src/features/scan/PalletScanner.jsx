@@ -28,10 +28,31 @@
 // handed over again until it has been out of view for a moment, so the
 // next identical box is a new read and a lingering one is not.
 //
+// MAKING PRODUCT BARCODES QUICK TO READ. The thin bars of a retail
+// barcode are much harder for a phone than a big printed QR code, and
+// the camera's defaults made it slow: a 640x480 picture, ten tries a
+// second, and every frame tried a second time mirrored. In product
+// mode:
+//   - the camera is asked for 1280x720, and for continuous focus once
+//     it is running (both best effort: a camera that cannot is started
+//     as before rather than not at all)
+//   - 20 tries a second
+//   - no mirrored second try (a barcode is never seen in a mirror), which
+//     halves the work on phones that decode in JavaScript (iPhones)
+//   - a reading window almost the whole width and more of the height,
+//     so the code does not have to be lined up exactly
+// Android Chrome decodes with the phone's own barcode reader, which is
+// fast anyway; this is what makes the rest of the phones usable.
+//
+// TORCH. A warehouse aisle is often too dark to read a barcode. When
+// the camera has a torch and a `torchLabel` is given, a button on the
+// picture turns it on and off.
+//
 // Motion: the library's own scanning UI is not used (only its camera and
 // decoder), and nothing here animates.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Flashlight } from 'lucide-react';
 import { classifyCameraError } from './cameraErrors';
 
 // Long enough for someone to read a permission prompt and answer it.
@@ -46,21 +67,36 @@ const PRODUCT_GONE_MS = 800;
 
 const PRODUCT_FORMATS = ['EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_128'];
 
-// QR: a square. Product barcodes: nearly the full width, under half as tall.
+// Tries a second. QR codes are big and easy; barcodes need more chances.
+const FPS = { pallet: 10, product: 20 };
+
+// What product mode asks the camera for (see the header).
+const PRODUCT_VIDEO = { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } };
+
+// QR: a square. Product barcodes: nearly the full width, and most of the
+// height, so the code need not be lined up exactly.
 const scanWindow = (kind) => (width, height) => {
   if (kind === 'product') {
     return {
-      width: Math.max(50, Math.floor(width * 0.9)),
-      height: Math.max(50, Math.floor(Math.min(width, height) * 0.45)),
+      width: Math.max(50, Math.floor(width * 0.95)),
+      height: Math.max(50, Math.floor(Math.min(width, height) * 0.6)),
     };
   }
   const side = Math.floor(Math.min(width, height) * 0.7);
   return { width: side, height: side };
 };
 
-export default function PalletScanner({ onCode, onUnavailable, onReady, label, kind = 'pallet' }) {
+// A camera that cannot give what was asked for, as opposed to no camera
+// or no permission: worth one more try with the defaults.
+const isConstraintError = (err) => /overconstrained|constraint/i.test(`${err?.name ?? ''} ${err?.message ?? ''} ${typeof err === 'string' ? err : ''}`);
+
+export default function PalletScanner({ onCode, onUnavailable, onReady, label, kind = 'pallet', torchLabel = null }) {
   const reactId = useId();
   const elementId = `pallet-scanner-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  // The running camera's torch, when it has one.
+  const torch = useRef(null);
+  const [torchReady, setTorchReady] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   // The latest handlers, so the camera is not restarted when a parent
   // re-renders with new function identities.
@@ -121,32 +157,49 @@ export default function PalletScanner({ onCode, onUnavailable, onReady, label, k
           useBarCodeDetectorIfSupported: true,
           verbose: false,
         });
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: scanWindow(kind),
-          },
-          (text) => {
-            const now = Date.now();
-            if (cancelled) return;
-            if (kind === 'product') {
-              const same = text === lastText && now - lastSeenAt < PRODUCT_GONE_MS;
-              lastText = text;
-              lastSeenAt = now;
-              if (same) return;
-            } else {
-              if (now < quietUntil) return;
-              quietUntil = now + REPEAT_QUIET_MS;
-            }
-            handlers.current.onCode?.(text);
-          },
-          () => { /* a frame with no code in it: the normal case, not an error */ },
-        );
+        const onRead = (text) => {
+          const now = Date.now();
+          if (cancelled) return;
+          if (kind === 'product') {
+            const same = text === lastText && now - lastSeenAt < PRODUCT_GONE_MS;
+            lastText = text;
+            lastSeenAt = now;
+            if (same) return;
+          } else {
+            if (now < quietUntil) return;
+            quietUntil = now + REPEAT_QUIET_MS;
+          }
+          handlers.current.onCode?.(text);
+        };
+        const noCode = () => { /* a frame with no code in it: the normal case, not an error */ };
+        const config = {
+          fps: FPS[kind] ?? FPS.pallet,
+          qrbox: scanWindow(kind),
+          ...(kind === 'product' ? { disableFlip: true, videoConstraints: PRODUCT_VIDEO } : {}),
+        };
+        try {
+          await scanner.start({ facingMode: 'environment' }, config, onRead, noCode);
+        } catch (err) {
+          // The sharper picture is a wish, not a requirement.
+          if (!config.videoConstraints || !isConstraintError(err)) throw err;
+          const plain = { ...config };
+          delete plain.videoConstraints;
+          await scanner.start({ facingMode: 'environment' }, plain, onRead, noCode);
+        }
         started = true;
         if (cancelled) { await stop(); return; }
         settled = true;
         window.clearTimeout(timer);
+
+        // Best effort, once running: keep refocusing, and find the torch.
+        if (kind === 'product') {
+          try { await scanner.applyVideoConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch { /* fixed focus */ }
+        }
+        try {
+          const light = scanner.getRunningTrackCameraCapabilities?.().torchFeature?.();
+          if (light?.isSupported?.()) { torch.current = light; setTorchReady(true); }
+        } catch { /* no torch */ }
+
         handlers.current.onReady?.();
       } catch (err) {
         unavailable(classifyCameraError(err));
@@ -156,16 +209,32 @@ export default function PalletScanner({ onCode, onUnavailable, onReady, label, k
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      torch.current = null;
       stop();
     };
   }, [elementId, kind]);
 
+  const toggleTorch = async () => {
+    const next = !torchOn;
+    try {
+      await torch.current?.apply(next);
+      setTorchOn(next);
+    } catch { /* the camera refused; the button stays as it was */ }
+  };
+
   return (
-    <div
-      id={elementId}
-      className={`scan-view${kind === 'product' ? ' is-product' : ''}`}
-      role="img"
-      aria-label={label}
-    />
+    <div className={`scan-wrap${kind === 'product' ? ' is-product' : ''}`}>
+      <div
+        id={elementId}
+        className={`scan-view${kind === 'product' ? ' is-product' : ''}`}
+        role="img"
+        aria-label={label}
+      />
+      {torchReady && torchLabel ? (
+        <button type="button" className="scan-torch" aria-pressed={torchOn} onClick={toggleTorch}>
+          <Flashlight size={16} aria-hidden="true" /> {torchLabel}
+        </button>
+      ) : null}
+    </div>
   );
 }

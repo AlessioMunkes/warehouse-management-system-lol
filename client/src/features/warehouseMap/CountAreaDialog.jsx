@@ -27,6 +27,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Camera, Search, X } from 'lucide-react';
 import useBarcodeReader from '../scan/useBarcodeReader';
 import PalletScanner from '../scan/PalletScanner';
+import ScanFlash from '../scan/ScanFlash';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -119,6 +120,7 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
   return (
     <Dialog open onOpenChange={(open) => !open && !isSaving && onClose()}>
       <DialogContent className="sm:max-w-lg">
+        <ScanFlash signal={reader.scanned} label="Scanned" />
         <form onSubmit={save} className="contents">
           <DialogHeader>
             <DialogTitle>Count {area.name}</DialogTitle>
@@ -171,7 +173,7 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
             {cameraOpen ? (
               cameraTrouble
                 ? <p className="text-sm text-muted-foreground">The camera could not start. Type the numbers under the bars instead.</p>
-                : <PalletScanner kind="product" label="Camera for barcodes" onCode={reader.read} onUnavailable={() => setCameraTrouble(true)} />
+                : <PalletScanner kind="product" label="Camera for barcodes" torchLabel="Torch" onCode={reader.read} onUnavailable={() => setCameraTrouble(true)} />
             ) : null}
             {reader.looking ? <p role="status" className="text-sm text-muted-foreground">Looking it up</p> : null}
             {reader.unknownCode ? (

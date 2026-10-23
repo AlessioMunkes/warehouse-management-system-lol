@@ -106,3 +106,29 @@ describe('a GS1 case label', () => {
     ));
   });
 });
+
+describe('the green tick', () => {
+  it('shows for a scan that counted, buzzes the phone, and goes by itself', async () => {
+    const vibrate = vi.fn();
+    Object.defineProperty(navigator, 'vibrate', { configurable: true, value: vibrate });
+    const user = userEvent.setup();
+    render(<ProductScanBar onMatch={() => 'Rice 1kg: 1.'} />);
+    await waitFor(() => expect(api.getAllBarcodes).toHaveBeenCalled());
+
+    await scan(user, '4006381333931');
+    expect(await screen.findByTestId('scan-flash')).toBeInTheDocument();
+    expect(screen.getByText('Scanned')).toBeInTheDocument();
+    expect(vibrate).toHaveBeenCalledWith(40);
+    await waitFor(() => expect(screen.queryByTestId('scan-flash')).toBeNull(), { timeout: 2000 });
+  });
+
+  it('does not show for a product the list does not want', async () => {
+    const user = userEvent.setup();
+    render(<ProductScanBar onMatch={() => ({ tone: 'warn', text: 'Rice 1kg is not on this order.' })} />);
+    await waitFor(() => expect(api.getAllBarcodes).toHaveBeenCalled());
+
+    await scan(user, '4006381333931');
+    expect(await screen.findByText('Rice 1kg is not on this order.')).toBeInTheDocument();
+    expect(screen.queryByTestId('scan-flash')).toBeNull();
+  });
+});

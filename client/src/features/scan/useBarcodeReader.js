@@ -17,6 +17,8 @@
 //   4  A record of what the scan was (counted, not on the list, ...)
 //      goes to the server for the "caught by scanning" report, when
 //      the screen says where it is (`screen`).
+//   5  A scan that counted bumps `scanned` (the screen shows ScanFlash's
+//      green tick for it) and buzzes the phone once.
 //
 // Reads are handled one at a time, in order: a camera can read two
 // boxes faster than the server answers the first, and dropping the
@@ -73,9 +75,16 @@ const outcomeOf = (said) => {
   return said && typeof said === 'object' && said.tone === 'warn' ? 'not_on_list' : 'counted';
 };
 
+// A counted scan, felt as well as seen: a short buzz on phones that can.
+const buzz = () => {
+  try { navigator.vibrate?.(40); } catch { /* not this phone */ }
+};
+
 export default function useBarcodeReader({ onMatch, screen = null, referenceId = null }) {
   const t = useT();
   const [message, setMessage] = useState(null);
+  // Goes up by one for every scan that counted: what ScanFlash watches.
+  const [scanned, setScanned] = useState(0);
   const [looking, setLooking] = useState(false);
   const [unknownCode, setUnknownCode] = useState(null);
   const queue = useRef(Promise.resolve());
@@ -95,10 +104,14 @@ export default function useBarcodeReader({ onMatch, screen = null, referenceId =
       .catch(() => {});
   };
 
+  const counted = () => { setScanned((n) => n + 1); buzz(); };
+
   const apply = (match, label) => {
     const said = latest.current.onMatch(match, label);
     setMessage(asMessage(said));
-    record(outcomeOf(said), match.productId);
+    const outcome = outcomeOf(said);
+    if (outcome === 'counted') counted();
+    record(outcome, match.productId);
   };
 
   const handle = async (raw) => {
@@ -152,10 +165,11 @@ export default function useBarcodeReader({ onMatch, screen = null, referenceId =
     record('linked', match.productId);
     const said = latest.current.onMatch(match, { useBy: null, batch: null });
     setMessage(asMessage(said));
+    if (outcomeOf(said) === 'counted') counted();
   };
 
   return {
-    read, linked, message, setMessage, looking, unknownCode,
+    read, linked, message, setMessage, looking, unknownCode, scanned,
     dismissUnknown: () => setUnknownCode(null),
   };
 }

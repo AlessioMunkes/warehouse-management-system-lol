@@ -6618,6 +6618,27 @@ button.stf-panel-head:disabled { cursor: default; }
    its camera frame is wider than the pallet one. */
 .scan-view.is-product { max-width: 30rem; aspect-ratio: 4 / 3; }
 
+/* The frame and what sits on it (the torch button), the frame's width. */
+.scan-wrap { position: relative; width: 100%; max-width: 22rem; margin-inline: auto; }
+.scan-wrap.is-product { max-width: 30rem; }
+.scan-torch {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+.scan-torch[aria-pressed="true"] { background: #fff; color: #000; }
+
 /* Above an item list: the field, Find and the camera button on one row,
    wrapping under each other on a phone. */
 .stf-scanbar { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
