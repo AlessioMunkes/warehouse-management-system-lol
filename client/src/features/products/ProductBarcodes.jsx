@@ -36,14 +36,21 @@ export default function ProductBarcodes({ product, canManage, onChanged }) {
   const codeTyped = code.trim() !== '';
   const codeInvalid = codeTyped && !normaliseBarcode(code);
   const unitsValid = Number(units) > 0;
+  // Pressed with something missing: say what, beside the field, rather
+  // than leave a greyed-out button nobody can explain.
+  const [tried, setTried] = useState(false);
+  const codeMissing = tried && !codeTyped;
+  const unitsWrong = tried && !unitsValid;
 
   const add = async (event) => {
     event.preventDefault();
+    setTried(true);
+    if (!codeTyped || codeInvalid || !unitsValid) return;
     setBusy(true); setError(null);
     try {
       const created = await linkBarcode(product.id, { code, unitsPerScan: Number(units) });
       setRows((list) => [...(list ?? []).filter((r) => r.id !== created.id), created]);
-      setCode(''); setUnits('1');
+      setCode(''); setUnits('1'); setTried(false);
       onChanged?.();
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
@@ -90,27 +97,31 @@ export default function ProductBarcodes({ product, canManage, onChanged }) {
       ) : null}
 
       {canManage ? (
-        <form onSubmit={add} className="grid gap-4 sm:grid-cols-[1fr_8rem_auto] sm:items-start">
-          <Field data-invalid={codeInvalid || undefined}>
+        <form onSubmit={add} className="grid grid-cols-[8rem_auto] items-start gap-4">
+          {/* The code on its own row: the panel is narrow, and a code is long. */}
+          <Field className="col-span-2" data-invalid={codeInvalid || codeMissing || undefined}>
             <FieldLabel htmlFor="product-barcode-code">Barcode</FieldLabel>
             <Input
               id="product-barcode-code" value={code} autoComplete="off"
               onChange={(e) => setCode(e.target.value)}
-              aria-invalid={codeInvalid || undefined}
+              aria-invalid={codeInvalid || codeMissing || undefined}
             />
             {codeInvalid
               ? <FieldError>Not a barcode the system can read. Check the numbers.</FieldError>
-              : <FieldDescription>Scan it into this box or type the numbers.</FieldDescription>}
+              : codeMissing
+                ? <FieldError>Scan or type the barcode first.</FieldError>
+                : <FieldDescription>Scan it into this box or type the numbers.</FieldDescription>}
           </Field>
-          <Field>
+          <Field data-invalid={unitsWrong || undefined}>
             <FieldLabel htmlFor="product-barcode-units">Per scan</FieldLabel>
             <Input
               id="product-barcode-units" type="number" min="0" step="any" inputMode="decimal"
               value={units} onChange={(e) => setUnits(e.target.value)}
-              aria-invalid={!unitsValid || undefined}
+              aria-invalid={unitsWrong || undefined}
             />
+            {unitsWrong ? <FieldError>More than 0.</FieldError> : null}
           </Field>
-          <Button type="submit" className="sm:mt-6" disabled={busy || !codeTyped || codeInvalid || !unitsValid}>
+          <Button type="submit" className="mt-6 justify-self-start" disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : null}
             Add barcode
           </Button>
