@@ -47,7 +47,15 @@ const CAMERA_TROUBLE = ['denied', 'noCamera', 'failed'];
 // there is none, or no signal, the panel is exactly as it was. On a
 // screen with its own short list (`choices`: the order's or the
 // pallet's lines), only a match on that list is offered.
-export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
+//
+// What the pack IS is said whenever Open Food Facts knows it, matched
+// or not. And when it is clearly a stock item that is NOT on this
+// order or pallet (Koo baked beans scanned on a Samp order), the panel
+// says that, and nothing is chosen for it: a one-line order used to
+// arrive with its only line already ticked, one tap from linking a
+// beans barcode to Samp. `where` ('receiving' | 'packing') picks the
+// words.
+export function LinkBarcodePanel({ code, choices, onLinked, onCancel, where = null }) {
   const t = useT();
   const fieldId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const [productId, setProductId] = useState(choices?.length === 1 ? choices[0].productId : null);
@@ -57,6 +65,8 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
   const [error, setError] = useState(null);
   const [checking, setChecking] = useState(true);
   const [suggested, setSuggested] = useState(null);   // { food, matches }
+  const [food, setFood] = useState(null);             // what the pack is, matched or not
+  const [elsewhere, setElsewhere] = useState(null);   // the stock item it is, not on this list
 
   // The list the panel opened with: a match is looked for once per code.
   const openingChoices = useRef(choices);
@@ -65,12 +75,21 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
     Promise.resolve()
       .then(() => matchBarcode(code))
       .then((result) => {
-        if (cancelled || !result?.matches?.length) return;
+        if (cancelled || !result) return;
+        setFood(result.food ?? null);
+        const all = result.matches ?? [];
+        if (!all.length) return;
         const list = openingChoices.current;
-        const usable = list
-          ? result.matches.filter((m) => list.some((c) => String(c.productId) === String(m.productId)))
-          : result.matches;
-        if (!usable.length) return;
+        const onList = (m) => !list || list.some((c) => String(c.productId) === String(m.productId));
+        // Its best match is something this order or pallet does not
+        // have: say so, and choose nothing.
+        if (!onList(all[0])) {
+          setElsewhere(all[0]);
+          setProductId(null);
+          setProductName('');
+          return;
+        }
+        const usable = all.filter(onList);
         setSuggested({ food: result.food, matches: usable });
         setProductId((current) => current ?? usable[0].productId);
         setProductName((current) => current || usable[0].productName);
@@ -112,6 +131,14 @@ export function LinkBarcodePanel({ code, choices, onLinked, onCancel }) {
       <p className="stf-scan-hint">{t('barcode.new.body', { code })}</p>
 
       {checking ? <p className="stf-scan-hint" role="status">{t('barcode.match.checking')}</p> : null}
+      {elsewhere ? (
+        <Notice tone="warn">
+          {food?.name ? `${t('barcode.match.looksLike', { name: food.name })} ` : ''}
+          {t(where === 'packing' ? 'barcode.match.notOnPallet' : 'barcode.match.notOnOrder', { item: elsewhere.productName })}
+        </Notice>
+      ) : !best && food?.name ? (
+        <Notice>{t('barcode.match.looksLike', { name: food.name })}</Notice>
+      ) : null}
       {best ? (
         <Notice
           actions={!choices && suggested.matches.length > 1 ? suggested.matches.slice(1).map((m) => (
@@ -234,6 +261,7 @@ export default function ProductScanBar({ onMatch, linkChoices, disabled = false,
           key={unknownCode}
           code={unknownCode}
           choices={linkChoices}
+          where={screen}
           onLinked={(match) => linked(unknownCode, match)}
           onCancel={dismissUnknown}
         />
