@@ -127,7 +127,9 @@ export default function AssistantLauncher({ role, hintReady = true } = {}) {
         aria-expanded={open}
         aria-haspopup="dialog"
         className={[
-          'fixed right-4 z-40 flex size-14 items-center justify-center rounded-full',
+          // wms-launcher: index.css eases its move when a floor screen's
+          // bars step back on a phone.
+          'wms-launcher fixed right-4 z-40 flex size-14 items-center justify-center rounded-full',
           'bg-primary text-primary-foreground shadow-lg',
           'hover:brightness-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           // Only brightness transitions. The motion setting turns

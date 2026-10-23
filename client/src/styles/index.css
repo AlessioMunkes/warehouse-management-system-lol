@@ -3337,32 +3337,97 @@ body.reduced-movement *::after {
 /* ── Working on a phone (features/staff/useWorkingChrome.js) ─────
    While the worker scrolls down a task or types in a field, the bars
    around it step back so the lines being worked get the screen: the
-   top bar and the tab bar go, the task's header keeps only its title,
-   and the Finish bar keeps its button and one line of what is missing.
-   Scrolling back up brings them back. Phones only; nothing moves, so
-   Reduce motion has nothing to turn off. */
+   top bar and the tab bar slide away, the task's header folds down to
+   its title, and the Finish bar keeps its button and one line of what
+   is missing. Scrolling back up brings them back. Phones only.
+
+   It eases rather than snaps: 200ms, the same for every part so they
+   move as one. Everything that changes is something that can ease
+   (heights, padding, a slide), never display: none. Reduce motion (the
+   eye button, or the phone's own setting) makes it instant again: the
+   floor screens' motion rule turns every transition off, and the media
+   query below does too. */
 @media (max-width: 767px) {
-  html[data-stf-working] .app-topbar { display: none; }
+  .app-topbar,
+  .stf-shell,
+  .stf-tabbar,
+  .stf-task-head,
+  .stf-task-title,
+  .stf-task-sub,
+  .stf-task-head .stf-card-toggle,
+  .stf-task-foot,
+  .stf-task-foot .stf-btn-secondary,
+  button.wms-launcher {
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+  .app-topbar {
+    max-height: 96px;
+    overflow: hidden;
+    transition-property: max-height, padding, border-width, opacity;
+  }
+  .stf-shell { transition-property: padding-bottom; }
+  .stf-tabbar { transition-property: transform; }
+  .stf-task-head { transition-property: padding; }
+  .stf-task-title { transition-property: font-size; }
+  .stf-task-sub,
+  .stf-task-head .stf-card-toggle {
+    max-height: 160px;
+    transition-property: max-height, margin, opacity;
+  }
+  .stf-task-foot { transition-property: padding; }
+  .stf-task-foot .stf-btn-secondary { max-height: 80px; transition-property: max-height, min-height, padding, margin, border-width, opacity; }
+  button.wms-launcher { transition-property: bottom, filter; }
+
+  html[data-stf-working] .app-topbar {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-width: 0;
+    opacity: 0;
+  }
   /* The Help button lifts clear of the Finish bar, which it would
      otherwise sit on. Its position is set on <html> from JS, so this has
      to win over that (AssistantLauncher.jsx). */
   html[data-stf-working] { --wms-launcher-bottom: 150px !important; }
   .stf-shell.is-working { --stf-tabbar-h: 0px; }
-  .stf-shell.is-working .stf-tabbar { display: none; }
+  .stf-shell.is-working .stf-tabbar { transform: translateY(calc(100% + 2px)); }
   .stf-shell.is-working .stf-task-head { padding: 8px 0; }
   .stf-shell.is-working .stf-task-head .stf-card-toggle,
-  .stf-shell.is-working .stf-task-sub { display: none; }
+  .stf-shell.is-working .stf-task-sub {
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
   .stf-shell.is-working .stf-task-title { font-size: 18px; }
   .stf-shell.is-working .stf-task-foot { padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); }
   /* The Finish button stays; "Start over" and the like wait for the
      worker to scroll back up. */
-  .stf-shell.is-working .stf-task-foot .stf-btn-secondary { display: none; }
+  .stf-shell.is-working .stf-task-foot .stf-btn-secondary {
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin: 0;
+    border-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
   .stf-shell.is-working .stf-task-note {
     margin-bottom: 6px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .app-topbar, .stf-shell, .stf-tabbar, .stf-task-head, .stf-task-title, .stf-task-sub,
+  .stf-task-head .stf-card-toggle, .stf-task-foot, .stf-task-foot .stf-btn-secondary,
+  button.wms-launcher { transition: none; }
 }
 
 /* On a wide screen the commit lives in the side pane, so the sticky

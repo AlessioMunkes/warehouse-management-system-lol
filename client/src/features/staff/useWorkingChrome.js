@@ -14,8 +14,17 @@
 //
 // WORKING means: scrolled down the task, or typing in a field (the
 // phone's keyboard is up and room is shortest then). Scrolling back up,
-// reaching the top, or leaving the field on a screen too short to
-// scroll brings everything back, and so does opening another screen.
+// reaching the very top, pulling down at the top, or leaving the field
+// on a screen too short to scroll brings everything back, and so does
+// opening another screen.
+//
+// THE TOP. Folding the task's header away moves the page up by its
+// height, so a worker who had only just scrolled can find themselves at
+// the top with the bars still away, and a page at the top cannot be
+// scrolled further up to ask for them. So reaching the top brings them
+// back, and so does pulling down there (a swipe, or the mouse wheel).
+// Being merely near the top does not: scrolling down from just below
+// it is still working.
 //
 // Only phones: on a tablet or desk the CSS does nothing with it.
 //
@@ -25,8 +34,13 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 
-// Scrolled less than this from the top: not working, whatever else.
+// At the top: this close to it counts.
+const AT_TOP = 2;
+// Leaving a field on a page scrolled less than this: nothing to scroll
+// back up through, so the bars come back.
 const TOP = 24;
+// A pull down at the top this far (in pixels) asks for the bars.
+const PULL = 24;
 // A scroll smaller than this either way is a wobble, not a direction.
 const STEP = 8;
 // After the bars change, scrolling is not read for this long. Hiding
@@ -69,12 +83,22 @@ export default function useWorkingChrome(rootRef, pathname) {
     const onScroll = () => {
       const y = scroller.scrollTop;
       const settling = Date.now() - state.current.changedAt < SETTLE_MS;
-      if (!settling) {
-        if (y < TOP) set(false);
-        else if (y - lastY > STEP) set(true);
+      if (y <= AT_TOP) set(false);
+      else if (!settling) {
+        if (y - lastY > STEP) set(true);
         else if (lastY - y > STEP) set(false);
       }
       lastY = y;
+    };
+    // Pulling down at the top: the page cannot scroll up, so no scroll
+    // event says so.
+    const atTop = () => scroller.scrollTop <= AT_TOP;
+    const onWheel = (e) => { if (e.deltaY < 0 && atTop()) set(false); };
+    let touchY = null;
+    const onTouchStart = (e) => { touchY = e.touches?.[0]?.clientY ?? null; };
+    const onTouchMove = (e) => {
+      const y = e.touches?.[0]?.clientY;
+      if (touchY !== null && y !== undefined && y - touchY > PULL && atTop()) set(false);
     };
     const onFocusIn = (e) => { if (isTypingField(e.target)) set(true); };
     // Out of the field on a screen too short to scroll: there is no
@@ -86,10 +110,16 @@ export default function useWorkingChrome(rootRef, pathname) {
     };
 
     scroller.addEventListener('scroll', onScroll, { passive: true });
+    scroller.addEventListener('wheel', onWheel, { passive: true });
+    scroller.addEventListener('touchstart', onTouchStart, { passive: true });
+    scroller.addEventListener('touchmove', onTouchMove, { passive: true });
     root.addEventListener('focusin', onFocusIn);
     root.addEventListener('focusout', onFocusOut);
     return () => {
       scroller.removeEventListener('scroll', onScroll);
+      scroller.removeEventListener('wheel', onWheel);
+      scroller.removeEventListener('touchstart', onTouchStart);
+      scroller.removeEventListener('touchmove', onTouchMove);
       root.removeEventListener('focusin', onFocusIn);
       root.removeEventListener('focusout', onFocusOut);
     };

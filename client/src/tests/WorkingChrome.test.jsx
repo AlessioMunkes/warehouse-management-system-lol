@@ -75,6 +75,37 @@ describe('the bars around a floor task, on a phone', () => {
     expect(screen.getByText('resting')).toBeInTheDocument();
   });
 
+  it('stay away just below the top while the worker carries on down, and come back at the very top', () => {
+    render(<Harness />);
+    scrollTo(120);
+    scrollTo(20);       // the header folding away carried the page up
+    expect(screen.getByText('working')).toBeInTheDocument();
+    later();
+    scrollTo(40);       // the worker carries on down from just below the top
+    expect(screen.getByText('working')).toBeInTheDocument();
+    later();
+    scrollTo(1);
+    expect(screen.getByText('resting')).toBeInTheDocument();
+  });
+
+  it('come back on pulling down at the top, where the page cannot scroll', () => {
+    render(<Harness />);
+    scrollTo(120);
+    // The header folding away carried the page to the top, inside the pause.
+    scrollTo(0);
+    const el = screen.getByTestId('scroller');
+    later();
+    act(() => { screen.getByLabelText('Count').focus(); });
+    expect(screen.getByText('working')).toBeInTheDocument();
+    fireEvent.wheel(el, { deltaY: -40 });
+    expect(screen.getByText('resting')).toBeInTheDocument();
+
+    act(() => { screen.getByLabelText('Count').focus(); });
+    fireEvent.touchStart(el, { touches: [{ clientY: 100 }] });
+    fireEvent.touchMove(el, { touches: [{ clientY: 160 }] });
+    expect(screen.getByText('resting')).toBeInTheDocument();
+  });
+
   it('step back while a field is being typed in, and come back after it on a short screen', async () => {
     render(<Harness />);
     act(() => { screen.getByLabelText('Count').focus(); });
