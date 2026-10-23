@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { suggestProduct } from '@/services/productBarcodeAPI';
 import { normaliseBarcode } from '@/features/scan/productCode';
+import useCameraScan from '@/features/scan/useCameraScan';
 
 const REASON = { size: 'same pack size', name: 'same name', kind: 'same kind of food' };
 
@@ -37,9 +38,9 @@ export default function ProductBarcodeStart({ onSeed, onCode }) {
   const [note, setNote] = useState(null);
   const [error, setError] = useState(null);
 
-  const look = async (event) => {
-    event.preventDefault();
-    const parsed = normaliseBarcode(code);
+  const lookUp = async (value) => {
+    if (!String(value ?? '').trim()) { setError('Scan or type the barcode first.'); return; }
+    const parsed = normaliseBarcode(value);
     if (!parsed) { setError('Not a barcode the system can read. Check the numbers.'); return; }
     setBusy(true); setError(null); setNote(null);
     try {
@@ -67,21 +68,34 @@ export default function ProductBarcodeStart({ onSeed, onCode }) {
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
 
+  // A camera read fills the box and looks it up straight away: holding
+  // the pack up was the whole of the asking.
+  const camera = useCameraScan((text) => {
+    const value = normaliseBarcode(text)?.code ?? text;
+    setCode(value);
+    setError(null);
+    lookUp(value);
+  });
+
   return (
-    <form onSubmit={look} className="mb-6 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
+    <form onSubmit={(event) => { event.preventDefault(); lookUp(code); }} className="mb-6">
       <Field data-invalid={error ? true : undefined}>
         <FieldLabel htmlFor="product-start-barcode">Start from a barcode</FieldLabel>
-        <Input
-          id="product-start-barcode" value={code} autoComplete="off"
-          onChange={(e) => { setCode(e.target.value); setError(null); }}
-        />
+        <div className="flex flex-wrap gap-2">
+          <Input
+            id="product-start-barcode" value={code} autoComplete="off" className="min-w-0 flex-1 basis-48"
+            onChange={(e) => { setCode(e.target.value); setError(null); }}
+          />
+          {camera.button}
+          <Button type="submit" variant="outline" disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : <ScanBarcode />}
+            Look up
+          </Button>
+        </div>
         {error ? <FieldError>{error}</FieldError>
-          : <FieldDescription>{note ?? 'Optional. Scan the pack to fill in its details.'}</FieldDescription>}
+          : <FieldDescription>{note ?? 'Optional. Scan the pack with the camera or a USB scanner to fill in its details.'}</FieldDescription>}
+        {camera.view}
       </Field>
-      <Button type="submit" variant="outline" className="sm:mt-6" disabled={busy || !code.trim()}>
-        {busy ? <Loader2 className="animate-spin" /> : <ScanBarcode />}
-        Look up
-      </Button>
     </form>
   );
 }

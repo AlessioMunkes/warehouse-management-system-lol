@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { listBarcodes, linkBarcode, removeBarcode } from '@/services/productBarcodeAPI';
 import { normaliseBarcode } from '@/features/scan/productCode';
+import useCameraScan from '@/features/scan/useCameraScan';
 
 export default function ProductBarcodes({ product, canManage, onChanged }) {
   const [rows, setRows] = useState(null);
@@ -39,6 +40,13 @@ export default function ProductBarcodes({ product, canManage, onChanged }) {
   // Pressed with something missing: say what, beside the field, rather
   // than leave a greyed-out button nobody can explain.
   const [tried, setTried] = useState(false);
+  // The camera fills the box with what it read, in its stored form (a
+  // GS1 case label's GTIN, a UPC as its EAN-13). The admin then checks
+  // Per scan and adds it.
+  const camera = useCameraScan((text) => {
+    setCode(normaliseBarcode(text)?.code ?? text);
+    setTried(false);
+  });
   const codeMissing = tried && !codeTyped;
   const unitsWrong = tried && !unitsValid;
 
@@ -101,16 +109,20 @@ export default function ProductBarcodes({ product, canManage, onChanged }) {
           {/* The code on its own row: the panel is narrow, and a code is long. */}
           <Field className="col-span-2" data-invalid={codeInvalid || codeMissing || undefined}>
             <FieldLabel htmlFor="product-barcode-code">Barcode</FieldLabel>
-            <Input
-              id="product-barcode-code" value={code} autoComplete="off"
-              onChange={(e) => setCode(e.target.value)}
-              aria-invalid={codeInvalid || codeMissing || undefined}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="product-barcode-code" value={code} autoComplete="off"
+                onChange={(e) => setCode(e.target.value)}
+                aria-invalid={codeInvalid || codeMissing || undefined}
+              />
+              {camera.button}
+            </div>
             {codeInvalid
               ? <FieldError>Not a barcode the system can read. Check the numbers.</FieldError>
               : codeMissing
                 ? <FieldError>Scan or type the barcode first.</FieldError>
-                : <FieldDescription>Scan it into this box or type the numbers.</FieldDescription>}
+                : <FieldDescription>Use the camera, a USB scanner in this box, or type the numbers.</FieldDescription>}
+            {camera.view}
           </Field>
           <Field data-invalid={unitsWrong || undefined}>
             <FieldLabel htmlFor="product-barcode-units">Per scan</FieldLabel>

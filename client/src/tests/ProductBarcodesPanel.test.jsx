@@ -15,6 +15,11 @@ vi.mock('../services/productBarcodeAPI', () => ({
   removeBarcode: vi.fn(),
 }));
 
+// A camera that reads a UPC-A when its button is pressed.
+vi.mock('../features/scan/PalletScanner', () => ({
+  default: ({ onCode }) => <button type="button" onClick={() => onCode('036000291452')}>Pretend to read</button>,
+}));
+
 const api = await import('../services/productBarcodeAPI');
 const { default: ProductBarcodes } = await import('../features/products/ProductBarcodes');
 
@@ -54,5 +59,15 @@ describe('adding a barcode to a product', () => {
     await user.click(screen.getByRole('button', { name: 'Add barcode' }));
     expect(screen.getByText(/Not a barcode the system can read/)).toBeInTheDocument();
     expect(api.linkBarcode).not.toHaveBeenCalled();
+  });
+
+  it('fills the box from the camera, in its stored form, and closes the camera', async () => {
+    const user = userEvent.setup();
+    render(<ProductBarcodes product={BUTTERNUT} canManage />);
+    await user.click(await screen.findByRole('button', { name: 'Camera' }));
+    await user.click(screen.getByRole('button', { name: 'Pretend to read' }));
+    expect(screen.getByLabelText('Barcode')).toHaveValue('0036000291452');
+    expect(screen.queryByRole('button', { name: 'Pretend to read' })).toBeNull();
+    expect(api.linkBarcode).not.toHaveBeenCalled();   // the admin still presses Add
   });
 });
