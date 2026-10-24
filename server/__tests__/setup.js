@@ -100,3 +100,16 @@ vi.mock('../src/repositories/calendar.repository.js', () => ({
     remove: vi.fn(async () => null),
   },
 }));
+
+// ── The account behind each token ─────────────────────────────
+// auth.middleware.js re-reads the account on every request. Every
+// file gets an active account at session version 0 (what a test
+// token without `sv` carries) and an open guest visit. No role, so
+// the token's role stands. auth.session.test.js asks for the real
+// module and tests the refusals.
+vi.mock('../src/repositories/session.repository.js', () => ({
+  default: {
+    findStaffSession: vi.fn(async (id) => ({ id, is_active: true, archived_at: null, session_version: 0 })),
+    findGuestSession: vi.fn(async (id) => ({ id, signed_out_at: null })),
+  },
+}));

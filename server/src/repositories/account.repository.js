@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 import { logAudit } from './auditLog.repository.js';
+import { SESSION_VERSION_SQL } from '../utils/sessionVersion.js';
 
 /**
  * Login: the account with this username (any case), hash included for
@@ -19,7 +20,8 @@ import { logAudit } from './auditLog.repository.js';
  */
 const findForLogin = async (username) => {
   const { rows } = await pool.query(
-    `SELECT id, username, first_name, last_name, role, password_hash, is_active, email
+    `SELECT id, username, first_name, last_name, role, password_hash, is_active, email,
+            ${SESSION_VERSION_SQL} AS session_version
      FROM users
      WHERE LOWER(username) = LOWER($1)`,
     [username],
@@ -68,7 +70,11 @@ const setPasswordHash = async (userId, passwordHash) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [userId, passwordHash]);
+    // A new password ends every session signed in with the old one (055).
+    await client.query(
+      `UPDATE users SET password_hash = $2, session_version = session_version + 1 WHERE id = $1`,
+      [userId, passwordHash],
+    );
     await logAudit(client, {
       entityType: 'user', entityId: userId, action: 'password_changed', actorId: userId,
       reason: 'Changed their own password from Profile.',

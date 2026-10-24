@@ -288,6 +288,28 @@ const FAMILIES = {
     order: `1 DESC, 2`,
   },
 
+  // One barcode scan's outcome (migration 053). Who scanned is not shown.
+  scan_events: {
+    noun: 'scans',
+    from: `barcode_scan_events e
+      LEFT JOIN products p ON p.id = e.product_id`,
+    date: sastDate('e.scanned_at'),
+    columns: [
+      col('when', 'Scanned', 'datetime', sastTime('e.scanned_at')),
+      col('screen', 'Where', 'text', `INITCAP(REPLACE(e.screen, '_', ' '))`),
+      col('product', 'Product', 'text', `COALESCE(p.name, 'Unknown product')`),
+      col('outcome', 'What it was', 'text', `CASE e.outcome
+        WHEN 'not_on_list' THEN 'Not on the pallet or order'
+        WHEN 'counted' THEN 'Counted'
+        WHEN 'already_done' THEN 'Already done'
+        WHEN 'unknown' THEN 'Unknown barcode'
+        WHEN 'linked' THEN 'Linked'
+        ELSE 'Could not read' END`),
+    ],
+    filters: { product_id: `e.product_id = $?` },
+    order: `1 DESC`,
+  },
+
   // A donation, never its donor.
   donations: {
     noun: 'donations',
@@ -407,6 +429,7 @@ export const REPORT_RECORDS = {
   picking_turnaround:         { family: 'pallets', where: [`ps.started_at IS NOT NULL`, `ps.completed_at > ps.started_at`] },
   slip_pipeline:              { family: 'pallets', noDate: true, where: [`ps.dispatch_date BETWEEN ${TODAY} - 7 AND ${TODAY} + 14`] },
   picking_flag_rate:          { family: 'slip_lines', where: [`psi.status IN ('confirmed', 'flagged')`] },
+  scan_catches:               { family: 'scan_events', where: [`e.outcome = 'not_on_list'`, `e.screen IN ('packing', 'receiving')`] },
   goods_received:             { family: 'delivery_lines' },
   receiving_discrepancy_rate: { family: 'delivery_lines' },
   unresolved_discrepancies:   { family: 'delivery_lines', where: [`COALESCE(dni.discrepancy_quantity, 0) <> 0`, `dni.discrepancy_resolved = false`] },

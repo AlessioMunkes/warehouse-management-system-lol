@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate }           from 'react-router-dom';
+import { useNavigate }                 from 'react-router-dom';
 import L                               from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getPublicImpactSummary }      from '../services/publicImpactAPI';
-import { LEGAL }                       from '../routes/paths';
 
 // ── Image fallback ───────────────────────────────────────────
 function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
@@ -485,10 +484,6 @@ const LandingPage = () => {
               soup kitchen across three provinces.
             </p>
             <div className="lol-hero-actions">
-              <button type="button" className="lol-btn-primary lol-btn-large" onClick={() => navigate('/login')}>
-                Log in
-                <Icon name="arrow" size={18} />
-              </button>
               <button type="button" className="lol-btn-secondary lol-btn-large" onClick={() => navigate('/guest')}>
                 I'm volunteering today
               </button>
@@ -744,8 +739,8 @@ const LandingPage = () => {
             <span>Ladles of Love is a registered South African non-profit organisation.</span>
             <span>© Ladles of Love · Warehouse Management System</span>
             <span className="lol-footer-legal">
-              <Link to={LEGAL.privacy}>Privacy Policy</Link>
-              <Link to={LEGAL.terms}>Terms of Service</Link>
+              <a href="https://wms-lol.onrender.com/privacy">Privacy Policy</a>
+              <a href="https://wms-lol.onrender.com/terms">Terms of Service</a>
             </span>
           </div>
         </div>

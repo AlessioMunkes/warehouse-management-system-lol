@@ -307,6 +307,7 @@ describe('GuestLoginPage', () => {
     renderGuestPage('/guest');
     const select = await screen.findByLabelText('Warehouse');
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Thabo' } });
+    fireEvent.change(screen.getByLabelText('Gate code'), { target: { value: '123 456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText(/Choose the warehouse/)).toBeInTheDocument();
     fireEvent.change(select, { target: { value: 'gauteng' } });
@@ -321,6 +322,7 @@ describe('GuestLoginPage', () => {
     await waitFor(() => expect(sent.some((c) => c.url === '/api/public/warehouses')).toBe(true));
     expect(screen.queryByLabelText('Warehouse')).toBeNull();
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Thabo' } });
+    fireEvent.change(screen.getByLabelText('Gate code'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByTestId('home');
     expect(sent.find((c) => c.url === '/api/volunteers/sign-in').warehouse).toBe('gauteng');
@@ -332,8 +334,27 @@ describe('GuestLoginPage', () => {
     await waitFor(() => expect(sent.some((c) => c.url === '/api/public/warehouses')).toBe(true));
     expect(screen.queryByLabelText('Warehouse')).toBeNull();
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Thabo' } });
+    fireEvent.change(screen.getByLabelText('Gate code'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByTestId('home');
-    expect(sent.find((c) => c.url === '/api/volunteers/sign-in').warehouse).toBeNull();
+    const signIn = sent.find((c) => c.url === '/api/volunteers/sign-in');
+    expect(signIn.warehouse).toBeNull();
+    expect(JSON.parse(signIn.body)).toMatchObject({ name: 'Thabo', gateCode: '123456' });
+  });
+
+  it('needs the gate code, and says so in plain words when it is wrong', async () => {
+    respond = (call) => (call.url === '/api/volunteers/sign-in'
+      ? { status: 403, body: { code: 'GATE_CODE', message: 'server wording' } }
+      : server(false)(call));
+    renderGuestPage('/guest');
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Thabo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByText(/Enter the 6-digit gate code/)).toBeInTheDocument();
+    expect(sent.some((c) => c.url === '/api/volunteers/sign-in')).toBe(false);
+
+    fireEvent.change(screen.getByLabelText('Gate code'), { target: { value: '000000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByText(/That gate code is not right/)).toBeInTheDocument();
+    expect(screen.queryByTestId('home')).toBeNull();
   });
 });

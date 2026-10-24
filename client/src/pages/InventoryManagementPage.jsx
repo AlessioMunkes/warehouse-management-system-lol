@@ -10,6 +10,11 @@
 // dashboard's low-stock tile and the low-stock notification — which
 // both link to ?status=lowstock — land on the right tab, and a tab
 // survives a refresh.
+//
+// The last tab, Map (?status=map), is the warehouse floor plan in place
+// of the list (features/warehouseMap/). It is not a filter of the list,
+// so it has no count. A difference a count turns up is adjusted from
+// there with the same dialog as a row here.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -23,6 +28,7 @@ import StockManifestTable from "../features/inventory/StockManifestTable";
 import StockDetailPanel from "../features/inventory/StockDetailPanel";
 import AdjustStockModal from "../features/inventory/AdjustStockModal";
 import { VIEWS, countViews, viewById } from "../features/inventory/inventoryViews";
+import WarehouseMapTab from "../features/warehouseMap/WarehouseMapTab";
 import { getManifest, adjustStock } from "../services/stockAPI";
 import { STAFF } from "../routes/paths";
 import { useToast } from "@/components/ui/toastContext";
@@ -33,11 +39,14 @@ import ErrorBanner from "@/components/ui/error-banner";
 const CAN_ADJUST = ["manager", "admin"];
 const CAN_ORDER  = ["manager", "admin"];
 
+const MAP_TAB = "map";
+
 export default function InventoryManagementPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const view = viewById(searchParams.get("status")).id;
+  const isMap = searchParams.get("status") === MAP_TAB;
+  const view = isMap ? MAP_TAB : viewById(searchParams.get("status")).id;
 
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -190,21 +199,36 @@ export default function InventoryManagementPage() {
         label="Stock views"
         value={view}
         onChange={changeView}
-        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+        tabs={[
+          ...VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] })),
+          { id: MAP_TAB, label: "Map" },
+        ]}
       />
 
-      <div className="mt-6">
-        <StockManifestTable
-          products={products}
-          view={view}
-          isLoading={isLoading}
-          canAdjust={canAdjust}
-          canOrder={canOrder}
-          onOpen={(p) => setOpenId(p.id)}
-          onBulkAdjust={startAdjusting}
-          onRaisePurchaseOrder={raisePurchaseOrder}
-        />
-      </div>
+      {isMap ? (
+        <div className="mt-6">
+          <WarehouseMapTab
+            canAdjust={canAdjust}
+            onAdjust={(productId) => {
+              const product = products.find((p) => p.id === productId);
+              if (product) startAdjusting([product]);
+            }}
+          />
+        </div>
+      ) : (
+        <div className="mt-6">
+          <StockManifestTable
+            products={products}
+            view={view}
+            isLoading={isLoading}
+            canAdjust={canAdjust}
+            canOrder={canOrder}
+            onOpen={(p) => setOpenId(p.id)}
+            onBulkAdjust={startAdjusting}
+            onRaisePurchaseOrder={raisePurchaseOrder}
+          />
+        </div>
+      )}
 
       {openProduct ? (
         <StockDetailPanel

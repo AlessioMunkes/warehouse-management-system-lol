@@ -18,19 +18,18 @@
 // (query, connect, on, end), so no repository changes between modes.
 // The routing itself lives in dbRouter.js.
 //
-// Supabase (and most managed Postgres providers) require SSL.
-// rejectUnauthorized: false trusts Supabase's cert chain without
-// vendoring their CA bundle. Set DB_SSL=false for a local Postgres
-// instance that doesn't use SSL at all.
+// Supabase (and most managed Postgres providers) require SSL. Whether
+// the database's certificate is checked is set by DB_SSL and
+// DB_SSL_CA; see dbSsl.js.
 // ─────────────────────────────────────────────────────────────
 import pg from 'pg';
 import { createDbRouter, parseWarehouseUrls, POOL_OPTIONS } from './dbRouter.js';
 import { currentWarehouse } from './warehouseContext.js';
+import { dbSslConfig } from './dbSsl.js';
 
 const { Pool } = pg;
 
-const sslConfig =
-  process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false };
+const sslConfig = dbSslConfig();
 
 let warehouseUrls;
 try {

@@ -72,9 +72,12 @@ import { calculateDecantingPlan, recordDecanting } from '../../services/decantin
 // The same list the planner and ProductLineRow offer. Importing it
 // rather than restating it is the point: a fourth bag size added here
 // appears in both, or in neither.
-import { STANDARD_SIZES, sizesToKg } from './BagSizes';
+import { STANDARD_SIZES, sizesToKg, sizeLabelToKg } from './BagSizes';
 import BagSizeToggle from './BagSizeToggle';
 import DecantingSheetPDF from './DecantingSheetPDF';
+import { openBagLabelPdf } from './bagLabelPdf';
+import { linkBarcode } from '../../services/productBarcodeAPI';
+import { ownBagCode } from '../scan/productCode';
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import { Panel, PlanResult } from './DecantingParts';
@@ -86,6 +89,13 @@ import {
 // the bag as often as by the name on it. Module level for a stable
 // identity — see the same note in ReceivingFlow.jsx.
 const productText = (product) => [product?.name, product?.sku].filter(Boolean).join(' ');
+
+// How many of the product's own unit one bag is: sizes are in kg, and
+// a product counted in g or ml takes a thousand of them per kg.
+const unitsPerBag = (sizeKg, unit) => (unit === 'g' || unit === 'ml' ? sizeKg * 1000 : sizeKg);
+
+// Today in Cape Town, as 'YYYY-MM-DD'.
+const todaySast = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(new Date());
 
 const MODE_KEY = 'stf_decanting_view_mode';
 const MODES = [
@@ -174,6 +184,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   const [doneRecord, setDoneRecord] = useState(null);
   // True when the last sheet could not be sent and is on the phone.
   const [queued, setQueued] = useState(false);
+  const [labelsBusy, setLabelsBusy] = useState(false);
+  const [labelsError, setLabelsError] = useState(null);
 
   const step = STEP_META[phase];
   const weekOf = useMemo(() => mondayOfThisWeek(), []);
@@ -471,7 +483,34 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     }
   };
 
+  // ── Bag labels ──────────────────────────────────────────────
+  // One sticker per bag counted back, each size with its own code. The
+  // codes are linked to the product (with the bag size as units per
+  // scan) before the sheet opens, so a bag scanned at packing counts
+  // the right amount. Linking twice is harmless: the server treats the
+  // same link as done.
+  const printBagLabels = async () => {
+    setLabelsBusy(true);
+    setLabelsError(null);
+    try {
+      const bags = activeBagLabels
+        .map((label) => ({ label, count: Number(produced[label]) || 0, sizeKg: sizeLabelToKg(label) }))
+        .filter((b) => b.count > 0 && Number.isFinite(b.sizeKg))
+        .map((b) => ({ ...b, code: ownBagCode(product.id, b.sizeKg) }));
+      await Promise.all(bags.map((b) => linkBarcode(product.id, {
+        code: b.code, unitsPerScan: unitsPerBag(b.sizeKg, product.default_unit),
+      })));
+      const { opened } = openBagLabelPdf({ productName: product.name, bags, decantedOn: todaySast() });
+      if (!opened) setLabelsError('The labels could not open. Allow pop-ups for this site and try again.');
+    } catch (err) {
+      setLabelsError(err.message);
+    } finally {
+      setLabelsBusy(false);
+    }
+  };
+
   const restart = () => {
+    setLabelsError(null);
     setDoneRecord(null);
     setPhase('which');
     setProductId('');
@@ -810,9 +849,17 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
           Number(wastageKg) > 0 ? { value: `${wastageKg} kg`, label: 'wastage' } : null,
         ]}
         onClose={restart}
-        action={doneRecord && !queued ? { label: 'View decanting sheet', onClick: () => setPdfRecord(doneRecord) } : null}
+        action={doneRecord && !queued ? [
+          { label: 'View decanting sheet', onClick: () => setPdfRecord(doneRecord) },
+          // Linking the bag codes needs signal, so labels come with the
+          // sheet, once the server has the run.
+          madeTotal > 0 ? {
+            label: labelsBusy ? 'Making labels' : 'Print bag labels', onClick: printBagLabels, disabled: labelsBusy,
+          } : null,
+        ] : null}
       >
         {queued ? offlineLine('Do not record it again.') : 'Bags and waste recorded.'}
+        {labelsError ? <Notice tone="warn">{labelsError}</Notice> : null}
       </SuccessDialog>
 
       {pdfRecord ? (

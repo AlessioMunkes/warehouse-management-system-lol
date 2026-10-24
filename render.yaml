@@ -43,6 +43,16 @@ services:
         generateValue: true    # Render generates a strong random value
       - key: DB_SSL
         value: "true"
+      # Render serves every app through Cloudflare, which puts the
+      # visitor's address in this header and refuses requests that try
+      # to set it. Without it every rate limiter counts the whole
+      # internet as a few clients. See clientIp.middleware.js.
+      - key: TRUSTED_CLIENT_IP_HEADER
+        value: cf-connecting-ip
+      # Turns on checking the database's certificate. Paste the Supabase
+      # CA (Project Settings > Database > SSL Configuration) as PEM text.
+      - key: DB_SSL_CA
+        sync: false
       # The AI features. WITHOUT THIS KEY BOTH ARE SILENTLY OFF:
       # provider.isEnabled() is Boolean(GEMINI_API_KEY), so the help
       # panel answers "the help assistant is not switched on" and the

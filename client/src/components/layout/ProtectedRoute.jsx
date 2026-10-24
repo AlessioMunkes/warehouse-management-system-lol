@@ -15,6 +15,8 @@ import { useAuth } from '../../context/AuthContext';
 import { homeForRole } from './navSections';
 import ManagerLayout from './ManagerLayout';
 import AssistantLauncher from '../../features/assistant/AssistantLauncher';
+import WelcomeDialog from '../../features/onboarding/WelcomeDialog';
+import useWelcome from '../../features/onboarding/useWelcome';
 import LoadingScreen from '../ui/loading-screen';
 
 // `shell` wraps the whole group in the app shell — sidebar on desktop,
@@ -29,6 +31,8 @@ import LoadingScreen from '../ui/loading-screen';
 // replacing that shell with this one.
 const ProtectedRoute = ({ roles, shell = false } = {}) => {
   const { user, isLoading } = useAuth();
+  // Before any early return: a hook has to run on every render.
+  const welcome = useWelcome(user);
 
   // Still checking with the server — decide nothing yet.
   if (isLoading) {
@@ -63,10 +67,15 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
   // screens to open and a tighter limit (assistant.routes.js).
   const content = shell ? <ManagerLayout><Outlet /></ManagerLayout> : <Outlet />;
 
+  // First use rides here for the same reason the launcher does: it
+  // shows on whichever screen someone first reaches after signing in.
+  // The welcome card comes first; the tip on the Help button waits for
+  // it to close, so the two are never said at once.
   return (
     <>
       {content}
-      <AssistantLauncher role={user.role} />
+      <WelcomeDialog user={user} open={welcome.open} onClose={welcome.dismiss} />
+      <AssistantLauncher role={user.role} hintReady={!welcome.open} />
     </>
   );
 };

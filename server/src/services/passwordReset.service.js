@@ -23,12 +23,9 @@
 // returns the generic response FIRST, and performRequestSideEffects
 // runs after that, fire-and-forget, with its own rejection swallowed.
 //
-// KNOWN LIMITATION: confirmReset does not invalidate any other
-// existing session/token for the account. A session issued before the
-// reset remains valid after it. Fixing that needs a
-// users.password_changed_at (or a session-version) column and a check
-// in auth.middleware.js's verifySession — tracked separately, not
-// built here.
+// A reset ends every existing session for the account: the password
+// write raises users.session_version (migration 055), and
+// auth.middleware.js refuses any token carrying the old number.
 // ─────────────────────────────────────────────────────────────
 import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';

@@ -39,6 +39,7 @@ export const PHRASINGS = [
   { q: 'how many slips are still pending', expect: ['slip_pipeline', 'custom:picking_slips'] },
   { q: 'picking slips by status', expect: ['slip_pipeline', 'custom:picking_slips'] },
   { q: 'which products do packers flag most', expect: ['picking_flag_rate'] },
+  { q: 'how many wrong items did scanning catch', expect: ['scan_catches'] },
   { q: 'how long does it take to pack a slip', expect: ['picking_turnaround'] },
   { q: 'is decanting wastage getting worse', expect: ['decanting_wastage'] },
   { q: 'how much do we lose when decanting', expect: ['decanting_wastage', 'decanting_margin_rate'] },

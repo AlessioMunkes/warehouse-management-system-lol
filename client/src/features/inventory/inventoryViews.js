@@ -9,6 +9,7 @@
 // recomputes what the server decided. isShortfall and isLowStock come
 // from getManifest's SQL, derived from AVAILABLE.
 // ─────────────────────────────────────────────────────────────
+import { normaliseBarcode } from '../scan/productCode';
 
 export const EXPIRY_WINDOW_DAYS = 30;
 // Which deliveries are still on the shelf is worked out, not counted
@@ -111,7 +112,11 @@ export const FILTERS = [
 export const matchesSearch = (p, query) => {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [p.name, p.sku, p.barcode, p.ean].some((v) => v?.toLowerCase().includes(q));
+  // A scanned or typed barcode also matches in its stored form: a 12-digit
+  // UPC finds the 13-digit EAN it was saved as.
+  const code = normaliseBarcode(query)?.code;
+  return [p.name, p.sku, ...(p.barcodes ?? [])].some((v) => v?.toLowerCase().includes(q))
+    || Boolean(code && p.barcodes?.includes(code));
 };
 
 // Rows for a view, filters and search, in the server's order

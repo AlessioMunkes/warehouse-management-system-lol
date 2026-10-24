@@ -115,6 +115,8 @@ the classification queue and Section 18A.
 | `guest` | The volunteer screens' building blocks | Guests |
 | `purchaseOrders` | The order list, form, detail and timeline; the QuickBooks import | Manager |
 | `inventory` | Stock on hand, adjustments, the ledger, reconciliation | Manager |
+| `warehouseMap` | The floor plan: the admin's layout builder, the Map tab on Inventory, counting an area | Manager, Admin |
+| `impactMap` | The Impact map of centres (manager) and Centre locations, where an admin places each centre | Manager, Admin |
 | `pickingSlips` | Generating, creating, editing and assigning slips | Manager |
 | `beneficiaries` | The centre form and table columns | Manager |
 | `communityRequests` | Benevolent requests: the floor's flow and the manager's panels | Staff, Manager |
@@ -247,6 +249,8 @@ wording. One flat folder per area, with no folders inside.
 | `units` | Converting between units, and the whole-number rule for items that are not decantable |
 | `assistant` | What the chat helper knows |
 | `privacy` | Removing personal details from logs |
+| `warehouseMap` | What each area of the map holds now, worked out from the counts (`placement.js`), and the checks on a floor plan (`layout.js`) |
+| `impactMap` | The Impact map's period in South African days (`impactRange.js`) |
 
 ### Things worth knowing
 

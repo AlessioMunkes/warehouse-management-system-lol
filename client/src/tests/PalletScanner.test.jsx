@@ -21,17 +21,20 @@ const camera = {
 };
 
 vi.mock('html5-qrcode', () => ({
-  Html5QrcodeSupportedFormats: { QR_CODE: 0 },
+  Html5QrcodeSupportedFormats: { QR_CODE: 0, CODE_128: 5, EAN_13: 9, EAN_8: 10, UPC_A: 14, UPC_E: 15 },
   Html5Qrcode: class {
     constructor(id, options) { camera.constructed.push({ id, options }); }
     async start(facing, config, onRead) {
       camera.lastRead = onRead;
       camera.facing = facing;
       camera.config = config;
+      camera.starts?.push(config);
       return camera.start(config, onRead);
     }
     async stop() { return camera.stop(); }
     clear() { return camera.clear(); }
+    async applyVideoConstraints(c) { camera.applied = c; }
+    getRunningTrackCameraCapabilities() { return camera.caps; }
   },
 }));
 
@@ -61,6 +64,9 @@ beforeEach(() => {
   camera.start = vi.fn().mockResolvedValue(undefined);
   camera.stop = vi.fn().mockResolvedValue(undefined);
   camera.clear = vi.fn();
+  camera.applied = null;
+  camera.starts = [];
+  camera.caps = { torchFeature: () => ({ isSupported: () => false, apply: vi.fn() }) };
   withCamera(true);
 });
 
@@ -136,6 +142,85 @@ describe('PalletScanner: the camera works', () => {
     now.mockReturnValue(1_000_000 + 2000);
     camera.lastRead('nope');
     expect(handlers.onCode).toHaveBeenCalledTimes(2);
+    now.mockRestore();
+  });
+
+  it('reads product barcodes through a wide window in product mode', async () => {
+    mount({ kind: 'product' });
+    await settle();
+    expect(camera.constructed[0].options.formatsToSupport).toEqual([9, 10, 14, 15, 5]);
+    expect(camera.config.qrbox(400, 600)).toEqual({ width: 380, height: 240 });
+  });
+
+  // What makes thin retail bars quick to read (PalletScanner's header).
+  it('asks for a sharper picture, more tries a second, no mirrored retry, and continuous focus', async () => {
+    mount({ kind: 'product' });
+    await settle();
+    expect(camera.config).toMatchObject({
+      fps: 20, disableFlip: true,
+      videoConstraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+    expect(camera.applied).toEqual({ advanced: [{ focusMode: 'continuous' }] });
+  });
+
+  it('keeps pallet QR scanning as it was', async () => {
+    mount();
+    await settle();
+    expect(camera.config.fps).toBe(10);
+    expect(camera.config.videoConstraints).toBeUndefined();
+    expect(camera.config.disableFlip).toBeUndefined();
+  });
+
+  it('starts with the camera’s defaults when it cannot give the sharper picture', async () => {
+    camera.start = vi.fn()
+      .mockRejectedValueOnce(domError('OverconstrainedError'))
+      .mockResolvedValue(undefined);
+    const { handlers } = mount({ kind: 'product' });
+    await settle();
+    expect(camera.starts).toHaveLength(2);
+    expect(camera.starts[1].videoConstraints).toBeUndefined();
+    expect(handlers.onReady).toHaveBeenCalledTimes(1);
+    expect(handlers.onUnavailable).not.toHaveBeenCalled();
+  });
+
+  it('offers the torch when the camera has one, and turns it on and off', async () => {
+    const apply = vi.fn().mockResolvedValue(undefined);
+    camera.caps = { torchFeature: () => ({ isSupported: () => true, apply }) };
+    const { getByRole } = mount({ kind: 'product', torchLabel: 'Torch' });
+    await settle();
+    const button = getByRole('button', { name: 'Torch' });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    await act(async () => { button.click(); });
+    expect(apply).toHaveBeenLastCalledWith(true);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('shows no torch button on a camera without one', async () => {
+    const { queryByRole } = mount({ kind: 'product', torchLabel: 'Torch' });
+    await settle();
+    expect(queryByRole('button', { name: 'Torch' })).toBeNull();
+  });
+
+  // Holding one box over the camera is one count; the next identical
+  // box, brought in after the first has gone, is another.
+  it('counts a held product code once, and again once it has left the frame', async () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+    const { handlers } = mount({ kind: 'product' });
+    await settle();
+
+    for (let i = 0; i < 20; i += 1) {
+      now.mockReturnValue(1_000_000 + i * 100);
+      camera.lastRead('4006381333931');
+    }
+    expect(handlers.onCode).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(1_000_000 + 1900 + 900);
+    camera.lastRead('4006381333931');
+    expect(handlers.onCode).toHaveBeenCalledTimes(2);
+
+    camera.lastRead('96385074');
+    expect(handlers.onCode).toHaveBeenCalledTimes(3);
     now.mockRestore();
   });
 

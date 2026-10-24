@@ -38,6 +38,7 @@ import donationAdminRoutes from './src/routes/donationAdmin.routes.js';
 import donationIntakeRouter from './src/routes/donationIntake.routes.js';
 import cookieParser     from 'cookie-parser';
 import loginRateLimiter  from './src/middleware/rateLimiter.middleware.js';
+import clientIp          from './src/middleware/clientIp.middleware.js';
 import loginRouter       from './src/routes/login.route.js';
 import sessionRouter     from './src/routes/session.route.js';
 import deliveryRouter    from './src/routes/delivery.routes.js';
@@ -57,6 +58,7 @@ import assistantRouter   from './src/routes/assistant.routes.js';
 import userRouter        from './src/routes/user.routes.js';
 import userInviteRouter  from './src/routes/userInvite.routes.js';
 import productRouter     from './src/routes/product.routes.js';
+import productBarcodeRouter from './src/routes/productBarcode.routes.js';
 import dashboardRouter   from './src/routes/dashboard.routes.js';
 import financeRouter     from './src/routes/finance.routes.js';
 import beneficiaryRouter from './src/routes/beneficiary.routes.js';
@@ -74,6 +76,9 @@ import settingsRouter from './src/routes/settings.routes.js';
 import calendarRouter from './src/routes/calendar.routes.js';
 import recipeRouter from './src/routes/recipe.routes.js';
 import photoRouter from './src/routes/photo.routes.js';
+import warehouseMapRouter from './src/routes/warehouseMap.routes.js';
+import impactMapRouter from './src/routes/impactMap.routes.js';
+import centreLocationRouter from './src/routes/centreLocation.routes.js';
 import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
@@ -98,6 +103,9 @@ const app  = express();
 // this, req.ip is the proxy's address for every request, so the login
 // rate limiter counted the whole warehouse as a single client.
 app.set('trust proxy', 1);
+// Behind Cloudflare that is still a proxy's address; this reads the
+// visitor's from the header TRUSTED_CLIENT_IP_HEADER names.
+app.use(clientIp());
 const port = process.env.PORT || 5000;
 // Origins allowed to call the API with the auth cookie.
 //   - dev:                 the Vite server on 5173/5174
@@ -209,7 +217,8 @@ app.use('/api/login',      loginRateLimiter, loginRouter);
 // would lock a warehouse tablet out of its own session.
 app.use('/api/me',         sessionRouter);
 app.use('/api/deliveries', deliveryRouter);
-app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
+// Guest sign-in has its own limiter, on that route only.
+app.use('/api/volunteers', volunteerRouter);
 app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
 app.use('/api/picking',    pickingRouter);
@@ -234,6 +243,7 @@ app.use('/api/assistant',  assistantRouter);
 app.use('/api/users',      userRouter);
 app.use('/api/admin',      adminRouter);
 app.use('/api/invites',    userInviteRouter);
+app.use('/api/products',   productBarcodeRouter);
 app.use('/api/products',   productRouter);
 app.use('/api/dashboard',  dashboardRouter);
 app.use('/api/finance',    financeRouter);
@@ -253,6 +263,11 @@ app.use('/api/calendar', calendarRouter);
 app.use('/api/recipes', recipeRouter);
 // Photos a worker takes of a flagged item or a delivery.
 app.use('/api/photos', photoRouter);
+// The floor plan and the counts managers record into it.
+app.use('/api/warehouse-map', warehouseMapRouter);
+// Where each centre is, and what reached it.
+app.use('/api/impact-map', impactMapRouter);
+app.use('/api/centre-locations', centreLocationRouter);
 app.use('/api/public/warehouses', publicWarehousesRouter);
 app.use('/api/public',      publicImpactRouter);
 

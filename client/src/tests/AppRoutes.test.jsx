@@ -97,7 +97,7 @@ describe('sidebars built from the table', () => {
         'Benevolent requests /noc/community-requests',
       ]],
       ['Programmes', ['Feed the Soil /noc/feed-the-soil', 'Volunteer events /volunteers']],
-      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report']],
+      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report', 'Impact map /noc/impact-map']],
     ]);
   });
 
@@ -118,7 +118,7 @@ describe('sidebars built from the table', () => {
         'Section 18A /admin/section-18a',
       ]],
       // The Gmail screen is Settings' Email section now.
-      ['Setup', ['Settings /admin/settings']],
+      ['Setup', ['Warehouse layout /admin/warehouse-layout', 'Settings /admin/settings']],
     ]);
   });
 

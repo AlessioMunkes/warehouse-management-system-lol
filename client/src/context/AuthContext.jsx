@@ -222,8 +222,10 @@ export const AuthProvider = ({ children }) => {
 
   // warehouse: the site a volunteer picked on the sign-in page, in
   // multi-warehouse mode. Sent with this one request only.
-  const loginAsGuest = async (name, warehouse = null) => {
-    const data = await runWithWarehouse(warehouse, () => apiPost('/api/volunteers/sign-in', { name }));
+  // gateCode: the day's code posted at the gate, which shows the
+  // person is at the warehouse (server/src/services/gateCode.service.js).
+  const loginAsGuest = async (name, warehouse = null, gateCode = '') => {
+    const data = await runWithWarehouse(warehouse, () => apiPost('/api/volunteers/sign-in', { name, gateCode }));
     syncWarehouse(data.user);
     writeCachedUser(data.user);
     setUser(data.user);

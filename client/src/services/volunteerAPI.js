@@ -57,4 +57,11 @@ export const signOutVisit = async (id) => {
   return toVisit(body.data ?? {});
 };
 
-export default { getGuestLog, getGuestLogPage, signOutVisit };
+// Today's six-digit code that guests type to sign in, for managers and
+// admins to post at the gate. { code, date }.
+export const getGateCode = async () => {
+  const body = await apiGet('/api/volunteers/gate-code');
+  return body.data ?? null;
+};
+
+export default { getGuestLog, getGuestLogPage, signOutVisit, getGateCode };

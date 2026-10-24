@@ -10,6 +10,7 @@
 import pool from '../config/db.js';
 import stockModel from './stock.repository.js';
 import { logAudit } from './auditLog.repository.js';
+import { normaliseBarcode } from '../utils/barcode.js';
 
 // ── General Product CRUD Operations ─────────────────────────
 
@@ -26,13 +27,21 @@ import { logAudit } from './auditLog.repository.js';
 // quantity_on_hand is deliberately NOT selected. The catalogue is master
 // data; a raw on-hand figure here would disagree with the manifest and
 // the dispatch gate, which both report available (on hand - committed).
+//
+// barcodes is every code linked to the product (migration 052) as a
+// plain array. The full rows, with units per scan and who linked them,
+// come from productBarcode.repository.js on the product's panel.
 const PRODUCT_COLUMNS = `
   p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg,
   p.is_active, p.created_at, p.category, p.is_perishable, p.is_decantable,
   p.default_unit, p.storage_type, p.default_location_id,
   p.archived_at, p.unit_cost, p.quantity_per_meal,
   COALESCE(sl.reorder_threshold, 0) AS reorder_threshold,
-  sl.unit AS ledger_unit`;
+  sl.unit AS ledger_unit,
+  COALESCE(
+    (SELECT array_agg(pb.code ORDER BY pb.code) FROM product_barcodes pb WHERE pb.product_id = p.id),
+    '{}'::varchar[]
+  ) AS barcodes`;
 
 const PRODUCT_FROM = `
   FROM products p
@@ -59,7 +68,9 @@ const listProducts = async ({ includeInactive = false, search = null } = {}) => 
     params.push(`%${search}%`);
     where.push(`(p.name ILIKE $${params.length}
               OR p.stock_keeping_unit ILIKE $${params.length}
-              OR p.category ILIKE $${params.length})`);
+              OR p.category ILIKE $${params.length}
+              OR EXISTS (SELECT 1 FROM product_barcodes pb
+                          WHERE pb.product_id = p.id AND pb.code ILIKE $${params.length}))`);
   }
 
   const result = await pool.query(
@@ -430,16 +441,23 @@ const searchProductsByName = async (term, { limit = 10 } = {}) => {
   if (!trimmed) return [];
 
   const escaped = trimmed.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  // A scanner "types" a barcode into this same search box. The code also
+  // matches in its stored form, so a 12-digit UPC or a 14-digit case
+  // code finds the 13-digit EAN it was saved as.
+  const barcode = normaliseBarcode(trimmed)?.code ?? null;
   const query = `
     SELECT id, name, stock_keeping_unit AS sku, weight_kg
     FROM products
     WHERE is_active = true
       AND stock_keeping_unit NOT ILIKE 'PENDING-%'
-      AND (name ILIKE $1 OR stock_keeping_unit ILIKE $1)
+      AND (name ILIKE $1 OR stock_keeping_unit ILIKE $1
+           OR EXISTS (SELECT 1 FROM product_barcodes pb
+                       WHERE pb.product_id = products.id
+                         AND (pb.code ILIKE $1 OR pb.code = $3)))
     ORDER BY name ASC
     LIMIT $2;
   `;
-  const result = await pool.query(query, [`%${escaped}%`, limit]);
+  const result = await pool.query(query, [`%${escaped}%`, limit, barcode]);
   if (result.rows.length > 0) return result.rows;
 
   const candidates = await pool.query(

@@ -92,11 +92,16 @@ export const hashFinanceReportToken = (token) =>
 
 const newFinanceReportToken = () => crypto.randomBytes(TOKEN_BYTES).toString('base64url');
 
+// A report link is a bearer token: anyone holding the URL reads the
+// figures. It stops working after this many days.
+export const REPORT_LINK_DAYS = 30;
+
 const regenerateReportLink = async ({ createdBy } = {}) => {
   const token = newFinanceReportToken();
   const link = await financeRepository.createReportAccessLink({
     tokenHash: hashFinanceReportToken(token),
     createdBy,
+    days: REPORT_LINK_DAYS,
   });
 
   return {
@@ -112,12 +117,12 @@ const revokeReportLink = async ({ revokedBy } = {}) =>
 const getPublicFinanceSummary = async (token, query = {}) => {
   const text = String(token || '').trim();
   if (!TOKEN_RE.test(text)) {
-    fail(404, 'Finance report link is invalid or has been revoked.');
+    fail(404, 'This finance report link has expired or been replaced. Ask the warehouse for a new one.');
   }
 
   const link = await financeRepository.getActiveReportAccessLinkByHash(hashFinanceReportToken(text));
   if (!link) {
-    fail(404, 'Finance report link is invalid or has been revoked.');
+    fail(404, 'This finance report link has expired or been replaced. Ask the warehouse for a new one.');
   }
 
   return getFinanceSummary(query);
@@ -166,7 +171,7 @@ const sendFinanceReportLink = async ({ sentBy } = {}) => {
     'Use this secure link to open the read-only Warehouse Movement Report:',
     url,
     '',
-    'If a new link is generated later, this link may stop working.',
+    `This link works for ${REPORT_LINK_DAYS} days, or until a new one is sent.`,
   ].join('\n');
   const safeUrl = escapeHtml(url);
   const html = renderLadlesEmail({
@@ -177,7 +182,7 @@ const sendFinanceReportLink = async ({ sentBy } = {}) => {
       <p style="${emailStyles.paragraph}">Use this secure link to open the read-only Warehouse Movement Report:</p>
       <p style="${emailStyles.paragraph}"><a href="${safeUrl}" style="${emailStyles.cta}">Open Warehouse Movement Report</a></p>
       <p style="${emailStyles.paragraph}"><a href="${safeUrl}" style="color:#d85b2a;text-decoration:none;">${safeUrl}</a></p>
-      <p style="${emailStyles.note}">If a new link is generated later, this link may stop working.</p>
+      <p style="${emailStyles.note}">This link works for ${REPORT_LINK_DAYS} days, or until a new one is sent.</p>
     `,
   });
 

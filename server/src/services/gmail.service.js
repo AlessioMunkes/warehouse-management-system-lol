@@ -108,17 +108,14 @@ const handleOAuthCallback = async ({ code = null, state = null, oauthError = nul
   const config = getGmailConfig();
   const oauth2Client = getOAuth2Client(config);
 
-  console.log("STEP 1 - Before token exchange");
-  console.time("tokenExchange");
+  // Errors are logged by message only. A Google client error carries
+  // the request it made, and for the token exchange that includes the
+  // authorization code and the client secret.
   let tokenResponse;
   try {
     tokenResponse = await oauth2Client.getToken(code);
-    console.timeEnd("tokenExchange");
-    console.log("STEP 1 COMPLETE");
   } catch (err) {
-    console.timeEnd("tokenExchange");
-    console.error("FAILED AT TOKEN EXCHANGE");
-    console.error(err);
+    console.error('[gmail] token exchange failed:', err.message);
     throw err;
   }
 
@@ -132,17 +129,12 @@ const handleOAuthCallback = async ({ code = null, state = null, oauthError = nul
     ? new Date(tokens.expiry_date)
     : new Date(now + 3600 * 1000);
 
-  console.log("STEP 2 - Setting OAuth client credentials");
   oauth2Client.setCredentials(tokens);
-  console.log("STEP 2 COMPLETE");
 
   let gmailEmail = null;
   let displayName = null;
-  let hasIdToken = false;
 
-  console.log("Decoding ID token...");
   if (tokens.id_token) {
-    hasIdToken = true;
     try {
       const payload = JSON.parse(
         Buffer.from(tokens.id_token.split('.')[1], 'base64').toString('utf8')
@@ -153,31 +145,17 @@ const handleOAuthCallback = async ({ code = null, state = null, oauthError = nul
       // Non-fatal: display name defaults to null and can be set in the UI.
     }
   }
-  console.log({
-    email: gmailEmail,
-    displayName,
-    hasIdToken,
-  });
-
   if (!gmailEmail) {
-    console.log("STEP 3 - Fetching Gmail profile");
-    console.time("gmailProfile");
     try {
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
       const profile = await gmail.users.getProfile({ userId: 'me' });
-      console.timeEnd("gmailProfile");
-      console.log("STEP 3 COMPLETE");
       gmailEmail = profile.data.emailAddress || null;
     } catch (err) {
-      console.timeEnd("gmailProfile");
-      console.error("FAILED AT GMAIL PROFILE");
-      console.error(err);
+      console.error('[gmail] profile lookup failed:', err.message);
       throw err;
     }
   }
 
-  console.log("STEP 4 - Saving Gmail connection");
-  console.time("upsertConnection");
   try {
     await gmailRepo.upsertConnection({
       gmailEmail,
@@ -190,20 +168,11 @@ const handleOAuthCallback = async ({ code = null, state = null, oauthError = nul
       refreshTokenExpiresAt: null,
       connectedByUserId: tracked.initiatedByUserId,
     });
-    console.timeEnd("upsertConnection");
-    console.log("STEP 4 COMPLETE");
   } catch (err) {
-    console.timeEnd("upsertConnection");
-    console.error("FAILED AT UPSERT CONNECTION");
-    console.error(err);
+    console.error('[gmail] saving the connection failed:', err.message);
     throw err;
   }
 
-  const saved = await gmailRepo.findConnectionByUserId(tracked.initiatedByUserId);
-  console.log("SAVED CONNECTION AFTER UPSERT:");
-  console.log(saved);
-
-  console.log("Returning success response");
   return { connected: true, email: gmailEmail };
 };
 
@@ -396,17 +365,9 @@ const sendEmail = async ({ to, subject, text, html = null, attachments = [] }, i
   // With a userId, send as that admin's connection. Without one (the
   // system-side donation email flows) send as the organisation account:
   // the most recently connected Gmail connection.
-console.log("===== SEND EMAIL =====");
-console.log("User ID:", initiatedByUserId);
-
   const connection = initiatedByUserId
     ? await gmailRepo.findConnectionByUserId(initiatedByUserId)
     : await gmailRepo.findLatestConnection();
-    console.log("Connection:", {
-      exists: Boolean(connection),
-      id: connection?.id ?? null,
-      gmail_email: connection?.gmail_email ?? null,
-    });
 
   if (!connection) {
     fail(

@@ -26,6 +26,23 @@ const loginRateLimiter = rateLimit({
   skipSuccessfulRequests: true,
 });
 
+// ── Guest sign-in ─────────────────────────────────────────────
+// Its own counter. It used to share loginRateLimiter's, mounted on all
+// of /api/volunteers, so a manager's failed guest-log reads counted
+// towards locking out staff login, and the other way round. A wrong
+// gate code is the failure this counts: 10 in 15 minutes, which is
+// nowhere near enough to guess one of a million codes in a day.
+export const guestSignInRateLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             10,
+  standardHeaders: 'draft-8',
+  legacyHeaders:   false,
+  skipSuccessfulRequests: true,
+  message: {
+    message: 'Too many sign-in attempts. Please wait 15 minutes, or ask a staff member for help.',
+  },
+});
+
 // ── Public slip lookup (BR-22) ────────────────────────────────
 // GET /api/slip/:token and /api/slip/code/:code are unauthenticated by
 // necessity — a volunteer holding a printed poster has no session yet.

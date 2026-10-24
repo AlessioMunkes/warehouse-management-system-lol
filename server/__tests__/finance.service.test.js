@@ -251,6 +251,7 @@ describe('financeService report links', () => {
 
     const call = repoMock.createReportAccessLink.mock.calls[0][0];
     expect(call.createdBy).toBe(9);
+    expect(call.days).toBe(30);
     expect(call.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(call.tokenHash).not.toBe(result.token);
   });

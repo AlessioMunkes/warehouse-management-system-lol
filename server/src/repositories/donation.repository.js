@@ -531,16 +531,6 @@ const listSection18AQueue = async () => {
 };
 
 const saveSection18AFormToken = async ({ donationId, tokenHash, expiresAt }, client = pool) => {
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT`
-  );
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ`
-  );
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
-  );
-
   const result = await client.query(
     `UPDATE donations
      SET section_18a_form_token_hash = $1,
@@ -553,16 +543,6 @@ const saveSection18AFormToken = async ({ donationId, tokenHash, expiresAt }, cli
 };
 
 const getDonationBySection18AFormTokenHash = async (tokenHash, client = pool) => {
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT`
-  );
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ`
-  );
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
-  );
-
   const result = await client.query(
     `SELECT *
      FROM donations
@@ -574,13 +554,6 @@ const getDonationBySection18AFormTokenHash = async (tokenHash, client = pool) =>
 };
 
 const saveSection18AFormSubmission = async ({ donationId, formData }, client = pool) => {
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
-  );
-  await client.query(
-    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_donor_form JSONB`
-  );
-
   const result = await client.query(
     `UPDATE donations
      SET donor_name = $1,

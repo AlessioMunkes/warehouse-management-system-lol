@@ -82,6 +82,8 @@ export const PAGE_LOADERS = {
   donationManagement: () => import('../pages/DonationManagementPage'),
   section18a:       () => import('../pages/Section18AManagementPage'),
   settings:         () => import('../pages/SettingsPage'),
+  warehouseLayout:  () => import('../pages/WarehouseLayoutPage'),
+  impactMap:        () => import('../pages/ImpactMapPage'),
   financeReport:    () => import('../pages/FinanceWarehouseReportPage'),
 
   guestHome:        () => import('../pages/GuestHomePage'),
@@ -161,6 +163,8 @@ export const PAGES = {
   section18a:       <L.section18a />,
   emailIntegration: <L.settings defaultSection="email" />,
   settings:         <L.settings />,
+  warehouseLayout:  <L.warehouseLayout />,
+  impactMap:        <L.impactMap />,
   financeReport:    <L.financeReport />,
 
   guestHome:        <L.guestHome />,

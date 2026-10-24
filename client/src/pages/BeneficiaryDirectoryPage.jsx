@@ -11,11 +11,22 @@
 // unapproved centre shows a distinct badge and an "Approve" action
 // alongside Edit/Deactivate, and picking.repository.js's own
 // createSlip/generateSlips gate is exactly what that approval unlocks.
+//
+// WHERE A CENTRE IS. Its address, suburb and pin (for the Impact map)
+// are read from the location endpoint and joined onto each row here,
+// and saved through it after the centre itself, only when they changed
+// (features/beneficiaries/beneficiaryLocation.js). The beneficiary
+// endpoints and their rules are untouched. "No location" lists the
+// active centres not yet on the map.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }     from '../context/AuthContext';
 import BeneficiaryForm from '../features/beneficiaries/BeneficiaryForm';
 import beneficiaryAPI  from '../services/beneficiaryAPI';
+import { listCentreLocations, setCentreLocation } from '../services/impactMapAPI';
+import {
+  hasPin, locationChanged, locationOf, placeLine, withoutLocation,
+} from '../features/beneficiaries/beneficiaryLocation';
 import useTableView    from '../features/masterdata/useTableView';
 import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
 import MasterDataTable from '../features/masterdata/MasterDataTable';
@@ -32,7 +43,7 @@ import ListToolbar   from '@/components/ui/list-toolbar';
 import DetailPanel   from '@/components/ui/detail-panel';
 import EmptyState    from '@/components/ui/empty-state';
 import ErrorBanner   from '@/components/ui/error-banner';
-import { Plus, Pencil, Power, ShieldCheck, RotateCcw, Building2 } from 'lucide-react';
+import { Plus, Pencil, Power, ShieldCheck, RotateCcw, Building2, MapPin } from 'lucide-react';
 import { useRecordCache } from '@/lib/recordCache';
 import { formatShortDate as fmtDate } from '@/lib/dates';
 
@@ -46,7 +57,13 @@ const VIEWS = [
   { id: 'tuesday',  label: 'Tuesday',           test: (b) => b.cohort === 'tuesday' },
   { id: 'thursday', label: 'Thursday',          test: (b) => b.cohort === 'thursday' },
   { id: 'pending',  label: 'Awaiting approval', alert: true, test: (b) => !b.approvedAt },
+  { id: 'unplaced', label: 'No location',       test: (b) => b.isActive !== false && !hasPin(b) },
 ];
+
+// The location fields a row takes from the location endpoint.
+const withLocation = (row, loc) => (loc ? {
+  ...row, address: loc.address, suburb: loc.suburb, lat: loc.lat, lng: loc.lng, locationSource: loc.source,
+} : row);
 
 const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onApprove, onRollbackCohort, onClose }) => (
   <DetailPanel
@@ -88,6 +105,15 @@ const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onA
       <div><dt className="text-muted-foreground">Children served</dt><dd>{beneficiary.childCount ?? 'Not recorded'}</dd></div>
       <div><dt className="text-muted-foreground">Approved</dt><dd>{beneficiary.approvedAt ? fmtDate(beneficiary.approvedAt) : 'Not yet approved'}</dd></div>
       <div><dt className="text-muted-foreground">Last collection</dt><dd>{fmtDate(beneficiary.lastCollectedDate)}</dd></div>
+      <div className="min-w-0 sm:col-span-2">
+        <dt className="text-muted-foreground">Location</dt>
+        <dd className="flex flex-wrap items-center gap-2 break-words">
+          {placeLine(beneficiary) || (hasPin(beneficiary) ? 'No address recorded' : 'Not set')}
+          {hasPin(beneficiary)
+            ? <StatusBadge tone="good" icon={MapPin}>On the Impact map</StatusBadge>
+            : <StatusBadge tone="warn" icon={MapPin}>No pin</StatusBadge>}
+        </dd>
+      </div>
     </dl>
 
     {!beneficiary.approvedAt ? (
@@ -103,7 +129,9 @@ export default function BeneficiaryDirectoryPage() {
   const { user } = useAuth();
   const canManage = CAN_MANAGE.includes(user?.role);
 
-  const [beneficiaries, setBeneficiaries] = useState([]);
+  const [rows, setRows] = useState([]);
+  // id -> where the centre is, from the location endpoint.
+  const [locations, setLocations] = useState(() => new Map());
   const [search, setSearch] = useState('');
   const [includeInactive, setIncludeInactive] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -117,6 +145,8 @@ export default function BeneficiaryDirectoryPage() {
   const view = useTableView('beneficiaries', BENEFICIARY_COLUMNS);
   const current = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
 
+  const beneficiaries = useMemo(() => rows.map((b) => withLocation(b, locations.get(b.id))), [rows, locations]);
+
   const visibleBeneficiaries = useMemo(
     () => view.sortRows(beneficiaries.filter(current.test)),
     [beneficiaries, current, view],
@@ -126,21 +156,30 @@ export default function BeneficiaryDirectoryPage() {
     [beneficiaries],
   );
 
+  // A database without migration 050 has no locations: the page works
+  // without them, every centre simply shows no pin.
+  const readLocations = useCallback(() => listCentreLocations()
+    .then((list) => setLocations(new Map(list.map((l) => [l.id, l]))))
+    .catch(() => {}), []);
+
+  useEffect(() => { readLocations(); }, [readLocations]);
+
   const loadBeneficiaries = useCallback(async () => {
     setError(null);
     try {
-      setBeneficiaries(await beneficiaryAPI.getBeneficiaries({ includeInactive, search }));
+      setRows(await beneficiaryAPI.getBeneficiaries({ includeInactive, search }));
+      await readLocations();
     } catch (err) {
       setError(err.message || 'Could not load beneficiaries.');
     }
-  }, [includeInactive, search]);
+  }, [includeInactive, search, readLocations]);
 
   useEffect(() => {
     let cancelled = false;
     beneficiaryAPI.getBeneficiaries({ includeInactive, search })
       .then((rows) => {
         if (!cancelled) {
-          setBeneficiaries(rows);
+          setRows(rows);
           setError(null);
         }
       })
@@ -165,15 +204,25 @@ export default function BeneficiaryDirectoryPage() {
       setMode('list');
     } catch (err) { setError(err.message); }
   };
+  // The open centre with its location joined on.
+  const selectedFull = selected ? withLocation(selected, locations.get(selected.id)) : null;
   const startCreate = () => { setSelected(null); setMode('create'); };
   const startEdit = () => setMode('edit');
   // ?open=<id> from the admin Activity / Archive screens.
   useOpenFromQuery(open);
 
+  // The location is saved after the centre, and only when there is one
+  // (a new centre) or it changed (an edit).
+  const saveLocation = async (id, before, payload) => {
+    if (!locationChanged(before, payload)) return;
+    await setCentreLocation(id, locationOf(payload));
+  };
+
   const create = async (payload) => {
     setBusy(true); setError(null);
     try {
-      const created = await beneficiaryAPI.createBeneficiary(payload);
+      const created = await beneficiaryAPI.createBeneficiary(withoutLocation(payload));
+      await saveLocation(created.id, {}, payload);
       setMode('list');
       await loadBeneficiaries();
       await open(created.id);
@@ -183,7 +232,8 @@ export default function BeneficiaryDirectoryPage() {
   const save = async (payload) => {
     setBusy(true); setError(null);
     try {
-      await beneficiaryAPI.updateBeneficiary(selected.id, payload);
+      await beneficiaryAPI.updateBeneficiary(selected.id, withoutLocation(payload));
+      await saveLocation(selected.id, selectedFull, payload);
       setMode('list');
       await loadBeneficiaries();
       await open(selected.id);
@@ -293,7 +343,7 @@ export default function BeneficiaryDirectoryPage() {
       {mode === 'list' && selected ? (
         <BeneficiaryDetail
           key={selected.id}
-          beneficiary={selected}
+          beneficiary={selectedFull}
           canManage={canManage}
           onEdit={startEdit}
           onToggleActive={toggleActive}
@@ -312,7 +362,7 @@ export default function BeneficiaryDirectoryPage() {
       {mode === 'edit' && selected ? (
         <DetailPanel open onClose={() => setMode('list')} eyebrow="Edit" title={selected.name}>
           <BeneficiaryForm
-            initial={selected}
+            initial={selectedFull}
             submitLabel="Save changes"
             onSubmit={save}
             onCancel={() => setMode('list')}

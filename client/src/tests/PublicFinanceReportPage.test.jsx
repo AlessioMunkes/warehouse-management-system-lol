@@ -61,11 +61,11 @@ describe('PublicFinanceReportPage', () => {
   });
 
   it('shows public link failures in place', async () => {
-    api.getPublicFinanceReport.mockRejectedValueOnce(new Error('Finance report link is invalid or has been revoked.'));
+    api.getPublicFinanceReport.mockRejectedValueOnce(new Error('This finance report link has expired or been replaced. Ask the warehouse for a new one.'));
 
     renderPublicPage();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Finance report link is invalid or has been revoked.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('This finance report link has expired or been replaced. Ask the warehouse for a new one.');
     expect(screen.getByText('Warehouse Movement Report')).toBeInTheDocument();
   });
 });

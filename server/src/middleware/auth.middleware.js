@@ -6,6 +6,9 @@
 import jwt from 'jsonwebtoken';
 import { runInWarehouse, isValidWarehouseCode, currentWarehouse } from '../config/warehouseContext.js';
 import { isMultiWarehouse, warehouseCodes } from '../config/warehouses.js';
+import { AUTH_COOKIE, authCookieOptions } from '../config/cookie.js';
+import sessionRepo from '../repositories/session.repository.js';
+import { tokenSessionVersion } from '../utils/sessionVersion.js';
 
 export const ROLES = {
   WORKER:   'warehouse_worker',
@@ -47,6 +50,53 @@ const allowedWarehouses = (decoded) => {
   );
 };
 
+// ── The account behind the token, as it is now ───────────────
+// A token is a snapshot from when it was signed, up to 8 hours ago (12
+// for a guest). Trusting it alone meant a deactivated, archived or
+// demoted account kept its old access, and a changed or reset password
+// left every earlier session working, until the token ran out.
+//
+// So every request re-reads the account. Staff: it must still exist
+// and be active, its session_version must match the token's (see
+// utils/sessionVersion.js), and the role used is the one it has NOW.
+// Guests: the visit must not have been signed out.
+//
+// A database error is a 503 and keeps the cookie: the database being
+// briefly unreachable does not make the session invalid.
+const endSession = (res, message) => {
+  res.clearCookie(AUTH_COOKIE, authCookieOptions());
+  return res.status(401).json({ message });
+};
+
+const checkCurrentAccount = async (req, res, next, claims) => {
+  let refusal = null;
+  try {
+    if (req.user.role === ROLES.GUEST) {
+      const visit = await sessionRepo.findGuestSession(req.user.id);
+      if (!visit) refusal = 'Session expired. Please sign in again.';
+      else if (visit.signed_out_at) refusal = 'This visit has been signed out.';
+    } else {
+      const account = await sessionRepo.findStaffSession(req.user.id);
+      if (!account || account.archived_at) {
+        refusal = 'Session expired. Please log in again.';
+      } else if (account.is_active === false) {
+        refusal = 'This account has been deactivated.';
+      } else if ((account.session_version ?? 0) !== tokenSessionVersion(claims)) {
+        refusal = 'Your password or access changed. Please log in again.';
+      } else {
+        // users.role is NOT NULL, so this is always the role now.
+        req.user.role = account.role ?? req.user.role;
+        req.user.username = account.username ?? req.user.username;
+      }
+    }
+  } catch (err) {
+    console.error('[auth] session check failed:', err.message);
+    return res.status(503).json({ message: 'Could not check your session. Try again.' });
+  }
+  if (refusal) return endSession(res, refusal);
+  return next();
+};
+
 const enterWarehouse = (decoded, req, res, next) => {
   const asked = readRequestedWarehouse(req);
   if (asked && !isValidWarehouseCode(asked)) {
@@ -63,7 +113,7 @@ const enterWarehouse = (decoded, req, res, next) => {
       return res.status(403).json({ code: 'WAREHOUSE_FORBIDDEN', message: 'You do not have access to that warehouse.' });
     }
     req.user = { ...decoded, warehouse: code };
-    return runInWarehouse(code, next);
+    return runInWarehouse(code, () => checkCurrentAccount(req, res, next, decoded));
   }
 
   // ── Staff ──
@@ -96,7 +146,7 @@ const enterWarehouse = (decoded, req, res, next) => {
     warehouse:  code,
     warehouses: allowed,
   };
-  return runInWarehouse(code, next);
+  return runInWarehouse(code, () => checkCurrentAccount(req, res, next, site));
 };
 
 // Verifies the cookie and returns the decoded token, or sends the 401
@@ -123,9 +173,12 @@ const auth = (req, res, next) => {
   const decoded = verifySession(req, res);
   if (!decoded) return undefined;
 
+  // The token as signed, for re-signing it after the person changes
+  // their own password (session.route.js).
+  req.sessionClaims = decoded;
   if (!isMultiWarehouse()) {
     req.user = decoded;
-    return next();
+    return checkCurrentAccount(req, res, next, decoded);
   }
   return enterWarehouse(decoded, req, res, next);
 };

@@ -13,6 +13,7 @@ CREATE TABLE public.users (
   archived_at timestamp with time zone,
   archived_by integer,
   email text,
+  session_version integer NOT NULL DEFAULT 0,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES public.users(id)
 );
@@ -1013,6 +1014,9 @@ CREATE TABLE public.finance_report_access_links (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   revoked_at timestamp with time zone,
   revoked_by integer,
+  expires_at timestamp with time zone NOT NULL,
+  last_opened_at timestamp with time zone,
+  open_count integer NOT NULL DEFAULT 0,
   CONSTRAINT finance_report_access_links_pkey PRIMARY KEY (id),
   CONSTRAINT finance_report_access_links_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
   CONSTRAINT finance_report_access_links_revoked_by_fkey FOREIGN KEY (revoked_by) REFERENCES public.users(id)
@@ -1596,3 +1600,629 @@ UPDATE products
    SET is_decantable = true
  WHERE default_unit IN ('kg', 'g', 'l', 'ml')
    AND is_decantable = false;
+
+
+-- from 047_create_expiry_warning_dismissals
+-- ─────────────────────────────────────────────────────────────
+-- 047_create_expiry_warning_dismissals.sql
+--
+-- A manager dismissing an expiry warning that the stock estimate got wrong
+-- (the estimate assumes oldest-received stock goes out first). One row per
+-- dismissal of a delivery line; a restore is recorded on the same row so
+-- the history stays. Additive only: one new table and one index.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS expiry_warning_dismissals (
+  id                    SERIAL PRIMARY KEY,
+  delivery_note_item_id INTEGER     NOT NULL REFERENCES delivery_note_items(id),
+  reason                TEXT        NOT NULL CHECK (length(btrim(reason)) > 0),
+  dismissed_by          INTEGER     NOT NULL REFERENCES users(id),
+  dismissed_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  restored_by           INTEGER     REFERENCES users(id),
+  restored_at           TIMESTAMPTZ,
+  CONSTRAINT expiry_dismissal_restore_pair
+    CHECK ((restored_by IS NULL) = (restored_at IS NULL))
+);
+
+-- At most one active dismissal per delivery line.
+CREATE UNIQUE INDEX IF NOT EXISTS expiry_warning_dismissals_one_active
+  ON expiry_warning_dismissals (delivery_note_item_id)
+  WHERE restored_at IS NULL;
+
+-- from 048_create_warehouse_map
+-- ─────────────────────────────────────────────────────────────
+-- 048_create_warehouse_map.sql
+--
+-- The warehouse map: where stock is kept, drawn on a grid.
+--
+-- warehouse_areas
+--   One rectangle on the floor plan an admin draws: a dry store, a cold
+--   room, a floor area for pallets, or a door. Positions and sizes are
+--   in grid cells (constants/warehouseMap.js holds the grid's size).
+--   `levels` is how tall it is drawn in the 3D view (shelves high).
+--   An area taken off the plan is made inactive, not deleted, so the
+--   counts recorded against it keep their history; its stock shows as
+--   not placed again.
+--
+-- warehouse_area_counts
+--   What a manager saw in an area: one row per product per count. The
+--   newest row for an area and product is what the map shows. A count
+--   is a record, never a stock movement: it does not change
+--   stock_levels, and nothing on the floor waits for it. A difference
+--   from what is on hand is shown so the manager can adjust stock.
+--   on_hand_at_count is the balance when the count was saved, so the
+--   difference at that moment stays on record.
+--
+-- Each warehouse database holds its own plan: there is no warehouse
+-- column, the database is the warehouse (config/dbRouter.js).
+--
+-- Additive only: two new tables and their indexes.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS warehouse_areas (
+  id          SERIAL PRIMARY KEY,
+  name        TEXT        NOT NULL CHECK (char_length(btrim(name)) BETWEEN 1 AND 40),
+  kind        TEXT        NOT NULL CHECK (kind IN ('dry', 'cold', 'floor', 'door')),
+  grid_x      SMALLINT    NOT NULL CHECK (grid_x >= 0),
+  grid_y      SMALLINT    NOT NULL CHECK (grid_y >= 0),
+  grid_w      SMALLINT    NOT NULL CHECK (grid_w >= 1),
+  grid_h      SMALLINT    NOT NULL CHECK (grid_h >= 1),
+  levels      SMALLINT    NOT NULL DEFAULT 1 CHECK (levels BETWEEN 1 AND 4),
+  is_active   BOOLEAN     NOT NULL DEFAULT true,
+  created_by  INTEGER     REFERENCES users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by  INTEGER     REFERENCES users(id),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Two areas on the plan never share a name.
+CREATE UNIQUE INDEX IF NOT EXISTS warehouse_areas_active_name
+  ON warehouse_areas (lower(btrim(name))) WHERE is_active;
+
+CREATE TABLE IF NOT EXISTS warehouse_area_counts (
+  id                SERIAL PRIMARY KEY,
+  area_id           INTEGER     NOT NULL REFERENCES warehouse_areas(id),
+  product_id        INTEGER     NOT NULL REFERENCES products(id),
+  quantity          NUMERIC     NOT NULL CHECK (quantity >= 0),
+  unit              VARCHAR(20) NOT NULL,
+  on_hand_at_count  NUMERIC     NOT NULL,
+  counted_by        INTEGER     REFERENCES users(id),
+  counted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The newest count per area and product.
+CREATE INDEX IF NOT EXISTS warehouse_area_counts_latest
+  ON warehouse_area_counts (area_id, product_id, counted_at DESC, id DESC);
+
+
+-- from 049_warehouse_area_capacity
+-- ─────────────────────────────────────────────────────────────
+-- 049_warehouse_area_capacity.sql
+--
+-- The warehouse map's areas learn three things (migration 048 made them):
+--
+--   kind 'staging'         a pallet staging area: where packed pallets
+--                          wait for collection. The map puts every
+--                          packed, not yet dispatched pallet in one.
+--   capacity_kg            how much a dry store, cold room or floor area
+--                          holds, by weight. Empty: not set.
+--   pallet_spaces          how many pallets a staging area holds.
+--   preferred_product_ids  the stock an area is meant for, by product
+--   preferred_categories   or by product category. Stock nobody has
+--                          counted into an area is shown in the area it
+--                          is meant for, as expected rather than counted.
+--
+-- The product ids are not a foreign key: a preference for a product
+-- that is later archived is simply ignored by the map.
+--
+-- Additive only: one widened check, four new columns.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE warehouse_areas DROP CONSTRAINT IF EXISTS warehouse_areas_kind_check;
+ALTER TABLE warehouse_areas
+  ADD CONSTRAINT warehouse_areas_kind_check CHECK (kind IN ('dry', 'cold', 'floor', 'staging', 'door'));
+
+ALTER TABLE warehouse_areas
+  ADD COLUMN IF NOT EXISTS capacity_kg NUMERIC CHECK (capacity_kg IS NULL OR capacity_kg > 0);
+ALTER TABLE warehouse_areas
+  ADD COLUMN IF NOT EXISTS pallet_spaces INTEGER CHECK (pallet_spaces IS NULL OR pallet_spaces > 0);
+ALTER TABLE warehouse_areas
+  ADD COLUMN IF NOT EXISTS preferred_product_ids INTEGER[] NOT NULL DEFAULT '{}';
+ALTER TABLE warehouse_areas
+  ADD COLUMN IF NOT EXISTS preferred_categories TEXT[] NOT NULL DEFAULT '{}';
+
+
+-- from 050_add_ecd_centre_location
+-- ─────────────────────────────────────────────────────────────
+-- 050_add_ecd_centre_location.sql
+--
+-- Where each beneficiary centre is, for the manager's Impact map. An
+-- admin sets it on the Centre locations screen; a one-off script
+-- (scripts/locateEcdCentres.mjs) fills in what could be found.
+--
+--   address, suburb        as a person writes them
+--   latitude, longitude    the pin. Both or neither. South Africa only:
+--                          a pin outside the country is a typing error
+--   location_source        how the pin was set:
+--                            manual    an admin placed or moved it
+--                            geocoded  looked up from the address
+--                            imported  loaded from researched data
+--   location_note          where the address came from, for checking
+--   location_updated_at/by who last changed any of it
+--
+-- The old free-text `location` column stays as it is, unused.
+-- Nothing that reads ecd_centres today selects these columns (every
+-- query names its columns), so no existing screen, report or pallet
+-- changes.
+--
+-- Additive only: eight new columns and two checks.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS suburb TEXT;
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS latitude NUMERIC(9, 6);
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS longitude NUMERIC(9, 6);
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_source TEXT;
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_note TEXT;
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ;
+ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_updated_by INTEGER REFERENCES users(id);
+
+ALTER TABLE ecd_centres DROP CONSTRAINT IF EXISTS ecd_centres_pin_check;
+ALTER TABLE ecd_centres ADD CONSTRAINT ecd_centres_pin_check CHECK (
+  (latitude IS NULL AND longitude IS NULL)
+  OR (latitude BETWEEN -35 AND -22 AND longitude BETWEEN 16 AND 33)
+);
+
+ALTER TABLE ecd_centres DROP CONSTRAINT IF EXISTS ecd_centres_location_source_check;
+ALTER TABLE ecd_centres ADD CONSTRAINT ecd_centres_location_source_check CHECK (
+  location_source IS NULL OR location_source IN ('manual', 'geocoded', 'imported')
+);
+
+
+-- from 051_warehouse_gates
+-- ─────────────────────────────────────────────────────────────
+-- 051_warehouse_gates.sql
+--
+-- Two more kinds of area for the warehouse map (migrations 048, 049):
+--
+--   dispatch_gate    where pallets leave. A truck stands at it on the map
+--                    while packed pallets wait to be collected today.
+--   receiving_gate   where deliveries come in. A truck stands at it while
+--                    a purchase order is expected today, or is late.
+--
+-- They hold no stock and take no capacity, like a door. What happens at
+-- them is read from what the system already records (packed slips,
+-- purchase orders, delivery notes); nothing new is stored.
+--
+-- Additive only: one widened check.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE warehouse_areas DROP CONSTRAINT IF EXISTS warehouse_areas_kind_check;
+ALTER TABLE warehouse_areas
+  ADD CONSTRAINT warehouse_areas_kind_check
+  CHECK (kind IN ('dry', 'cold', 'floor', 'staging', 'door', 'dispatch_gate', 'receiving_gate'));
+
+
+-- from 052_create_product_barcodes
+-- ─────────────────────────────────────────────────────────────
+-- 052_create_product_barcodes.sql
+--
+-- The barcodes printed on stock, each pointing at one product, so a
+-- scan can stand in for picking the product by name.
+--
+-- A table and not a column on products, because:
+--   - the same product (1 kg rice) arrives from different suppliers
+--     under different barcodes, so one product can have many
+--   - most donated stock has none, so a product can have zero
+--   - a case and the single item inside it carry different barcodes:
+--     units_per_scan says how many of the product's own unit one scan
+--     of this code means (1 for the bag, 12 for the box of 12)
+--
+--   code            digits as printed (EAN-13, EAN-8, UPC-A, UPC-E,
+--                   GTIN-14) or a supplier's own Code 128 text. Stored
+--                   normalised by the server (productCode.js), so a
+--                   12-digit UPC and the same code read as EAN-13 are
+--                   one row. Unique: one code, one product.
+--   supplier_id     whose packaging it came on, when known
+--   created_by      who linked it (a worker linking a code at the bay,
+--                   or an admin on the product)
+--
+-- Nothing else reads it: every existing query names its tables, so no
+-- screen, report or pallet changes until it is used.
+--
+-- Additive only: one new table and an index.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS product_barcodes (
+  id              SERIAL PRIMARY KEY,
+  product_id      INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  code            VARCHAR(64) NOT NULL UNIQUE,
+  units_per_scan  NUMERIC(12, 3) NOT NULL DEFAULT 1 CHECK (units_per_scan > 0),
+  supplier_id     INTEGER REFERENCES suppliers(id),
+  created_by      INTEGER REFERENCES users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS product_barcodes_product_id_idx ON product_barcodes (product_id);
+
+
+-- from 053_create_barcode_scan_events
+-- ─────────────────────────────────────────────────────────────
+-- 053_create_barcode_scan_events.sql
+--
+-- What each barcode scan on the floor turned out to be, so reporting
+-- can say what scanning catches ("wrong items caught by scanning").
+--
+--   screen        where it was scanned:
+--                   receiving, donation, packing, stock_count
+--   outcome       what the scan was:
+--                   counted        matched a line and counted
+--                   not_on_list    a real product, but not one this
+--                                  order, pallet or list wants: the
+--                                  wrong item, caught
+--                   already_done   that line was already packed
+--                   unknown        a code no product has yet
+--                   linked         an unknown code linked on the spot
+--                   misread        not a barcode that can be read
+--   product_id    the product the code named, when it named one
+--   reference_id  the order, pallet or area it was scanned against,
+--                 read with `screen` (a purchase order on receiving, a
+--                 picking slip on packing, a warehouse area on a count)
+--
+-- A record of a scan, never of stock: nothing here changes a balance,
+-- and a scan made without signal is not recorded at all (the client
+-- drops it rather than queueing it), so the counts are a floor, not a
+-- census.
+--
+-- Additive only: one new table and an index.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS barcode_scan_events (
+  id            SERIAL PRIMARY KEY,
+  scanned_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  screen        VARCHAR(20) NOT NULL
+                CHECK (screen IN ('receiving', 'donation', 'packing', 'stock_count')),
+  outcome       VARCHAR(20) NOT NULL
+                CHECK (outcome IN ('counted', 'not_on_list', 'already_done', 'unknown', 'linked', 'misread')),
+  product_id    INTEGER REFERENCES products(id),
+  reference_id  INTEGER,
+  user_id       INTEGER REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS barcode_scan_events_scanned_at_idx ON barcode_scan_events (scanned_at);
+
+
+-- from 056_product_barcode_food_facts
+-- ─────────────────────────────────────────────────────────────
+-- 056_product_barcode_food_facts.sql
+--
+-- What the public Open Food Facts database says each linked barcode
+-- is, kept beside the link (product_barcodes, migration 052).
+--
+-- Why: when a barcode nobody has seen is scanned, the system suggests
+-- which stock item it belongs to (features/barcodeMatch). Brand B's
+-- beans are matched to the stock item that already holds Brand A's
+-- beans by comparing what Open Food Facts says about the two packs:
+-- the same kind of food, the same size. That needs what it said about
+-- Brand A's code, which is what these columns keep. They are filled
+-- when a code is linked, once, and never relied on: a code Open Food
+-- Facts does not know just has them empty.
+--
+--   food_name        its product name there, e.g. "Baked beans in tomato sauce"
+--   food_brand       the first brand it lists
+--   food_quantity    the pack size as printed, e.g. "410 g"
+--   food_weight_kg   that size in kg, when it is a weight
+--   food_categories  its category tags, most general first, without the
+--                    language prefix: {"canned-foods", "baked-beans"}
+--   food_checked_at  when it was asked, answered or not, so it is not
+--                    asked again on every scan
+--
+-- Additive only: six new nullable columns.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_name TEXT;
+ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_brand TEXT;
+ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_quantity TEXT;
+ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_weight_kg NUMERIC(10, 3);
+ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_categories TEXT[];
+ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_checked_at TIMESTAMPTZ;
+
+
+-- from 057_lock_down_data_api
+-- ─────────────────────────────────────────────────────────────
+-- 057_lock_down_data_api.sql
+--
+-- Closes Supabase's public Data API to this schema.
+--
+-- Supabase gives its API roles, anon and authenticated, full rights on
+-- every new table in public, and leaves row-level security off. With
+-- the Data API on, anyone holding the project URL and the anon key
+-- (which is designed to be public) could read, change or empty those
+-- tables. The app never uses that API: it connects straight to
+-- Postgres as the database owner, which bypasses row-level security,
+-- so none of this changes what the app can do.
+--
+--   1. Row-level security on for every table in public. No policies are
+--      added, so the API roles see no rows even if a grant comes back.
+--   2. The API roles lose every right on tables, views, sequences and
+--      functions in public.
+--   3. Tables, sequences and functions made later by this role no longer
+--      hand those rights out automatically.
+--
+-- A plain Postgres without Supabase has no anon or authenticated role;
+-- steps 2 and 3 are skipped there.
+-- ─────────────────────────────────────────────────────────────
+DO $$
+DECLARE
+  t record;
+BEGIN
+  FOR t IN
+    SELECT c.relname
+      FROM pg_class c
+     WHERE c.relnamespace = 'public'::regnamespace
+       AND c.relkind IN ('r', 'p')
+       AND NOT c.relrowsecurity
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.relname);
+  END LOOP;
+END
+$$;
+
+DO $$
+DECLARE
+  api_role text;
+BEGIN
+  FOREACH api_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
+      EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM %I', api_role);
+      EXECUTE format('REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM %I', api_role);
+      EXECUTE format('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM %I', api_role);
+      EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public REVOKE ALL ON TABLES FROM %I', current_user, api_role);
+      EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public REVOKE ALL ON SEQUENCES FROM %I', current_user, api_role);
+      EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM %I', current_user, api_role);
+    END IF;
+  END LOOP;
+END
+$$;
+
+
+-- from 058_runtime_schema_to_migration
+-- ─────────────────────────────────────────────────────────────
+-- 058_runtime_schema_to_migration.sql
+--
+-- Schema the app used to create for itself while running, moved here.
+--
+-- donation.repository.js ran ALTER TABLE donations ... ADD COLUMN IF
+-- NOT EXISTS on every Section 18A link save, open and submit, and
+-- gmail.repository.js ran CREATE TABLE / ALTER TABLE / CREATE INDEX on
+-- every Gmail read and write. Even when there is nothing to add, ALTER
+-- TABLE takes the strongest table lock, so each donor opening their
+-- public 18A link briefly blocked all work on donations, and the app
+-- needed owner rights to run at all.
+--
+-- Everything below already exists in a database the app has used; this
+-- makes sure every warehouse database has it, so the code can stop
+-- asking. Additive only, and a no-op where it is already there.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT;
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ;
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ;
+ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_donor_form JSONB;
+
+CREATE TABLE IF NOT EXISTS gmail_connections (
+  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gmail_email              VARCHAR(255),
+  display_name             VARCHAR(255),
+  token_type               VARCHAR(32) NOT NULL,
+  scope                    TEXT NOT NULL,
+  access_token_encrypted   TEXT NOT NULL,
+  refresh_token_encrypted  TEXT NOT NULL,
+  access_token_expires_at  TIMESTAMPTZ,
+  refresh_token_expires_at TIMESTAMPTZ,
+  connected_by_user_id     INTEGER REFERENCES users(id),
+  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE gmail_connections ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_gmail_connections_connected_by_user_id
+  ON gmail_connections (connected_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_gmail_connections_updated_at
+  ON gmail_connections (updated_at);
+ALTER TABLE gmail_connections ENABLE ROW LEVEL SECURITY;
+
+
+-- from 059_tidy_indexes
+-- ─────────────────────────────────────────────────────────────
+-- 059_tidy_indexes.sql
+--
+-- Duplicate indexes out, one missing index in.
+--
+-- Over time the same columns were indexed two or three times under
+-- different names (idx_pks_status and idx_pslip_status, for example).
+-- A copy speeds nothing up and makes every write maintain it. Each
+-- index dropped here has a twin on exactly the same columns that stays:
+-- where one of the pair backs a primary key or unique constraint, that
+-- one is kept; otherwise the one queries were already using is kept.
+--
+--   dropped                               kept
+--   idx_attendance_booking_id             uq_attendance_booking (unique)
+--   idx_certificate_settings_id           certificate_settings_pkey
+--   idx_dl_decanting                      idx_dl_record
+--   idx_dr_week, idx_dr_week_of           idx_decanting_records_week_of
+--   idx_dispatch_events_slip              dispatch_events_picking_slip_id_key (unique)
+--   idx_donation_email_logs_created_desc  idx_donation_email_logs_created
+--   idx_di_donation                       idx_donation_items_donation
+--   idx_di_product,
+--   idx_donation_items_product            idx_donation_items_product_id
+--   idx_donations_s18a_status             idx_donations_section_18a_status
+--   idx_donations_programme               idx_donations_programme_id
+--   idx_pke_slip                          idx_pevent_slip
+--   idx_pksi_slip                         idx_psi_slip
+--   idx_pksi_product                      idx_psi_product
+--   idx_pks_dispatch_date, idx_pslip_date idx_picking_slips_dispatch_date
+--   idx_pks_status                        idx_pslip_status
+--   idx_pks_assigned_to                   idx_pslip_assigned
+--   idx_reporting_factors_lookup          reporting_factors_factor_key_effective_from_key (unique)
+--   idx_reporting_queries_outcome         idx_reporting_queries_outcome_date
+--   idx_stock_count_lines_count_product   scl_one_line_per_product (unique)
+--   idx_stock_counts_date                 idx_sc_date
+--   idx_sm_created                        idx_sm_created_at
+--   idx_sm_reference                      idx_sm_ref
+--   idx_users_username                    users_username_key (unique)
+--
+-- Added: dispatch_event_lines.picking_slip_item_id, a foreign key on a
+-- table of about 24,000 rows that had no index, so deleting or
+-- checking a picking slip line scanned the whole table.
+-- ─────────────────────────────────────────────────────────────
+-- A copy is dropped only where its twin exists, so a database that
+-- drifted and has just one of the pair keeps it.
+DO $$
+DECLARE
+  pair text[];
+BEGIN
+  FOREACH pair SLICE 1 IN ARRAY ARRAY[
+    ['idx_attendance_booking_id', 'uq_attendance_booking'],
+    ['idx_certificate_settings_id', 'certificate_settings_pkey'],
+    ['idx_dl_decanting', 'idx_dl_record'],
+    ['idx_dr_week', 'idx_decanting_records_week_of'],
+    ['idx_dr_week_of', 'idx_decanting_records_week_of'],
+    ['idx_dispatch_events_slip', 'dispatch_events_picking_slip_id_key'],
+    ['idx_donation_email_logs_created_desc', 'idx_donation_email_logs_created'],
+    ['idx_di_donation', 'idx_donation_items_donation'],
+    ['idx_di_product', 'idx_donation_items_product_id'],
+    ['idx_donation_items_product', 'idx_donation_items_product_id'],
+    ['idx_donations_s18a_status', 'idx_donations_section_18a_status'],
+    ['idx_donations_programme', 'idx_donations_programme_id'],
+    ['idx_pke_slip', 'idx_pevent_slip'],
+    ['idx_pksi_slip', 'idx_psi_slip'],
+    ['idx_pksi_product', 'idx_psi_product'],
+    ['idx_pks_dispatch_date', 'idx_picking_slips_dispatch_date'],
+    ['idx_pslip_date', 'idx_picking_slips_dispatch_date'],
+    ['idx_pks_status', 'idx_pslip_status'],
+    ['idx_pks_assigned_to', 'idx_pslip_assigned'],
+    ['idx_reporting_factors_lookup', 'reporting_factors_factor_key_effective_from_key'],
+    ['idx_reporting_queries_outcome', 'idx_reporting_queries_outcome_date'],
+    ['idx_stock_count_lines_count_product', 'scl_one_line_per_product'],
+    ['idx_stock_counts_date', 'idx_sc_date'],
+    ['idx_sm_created', 'idx_sm_created_at'],
+    ['idx_sm_reference', 'idx_sm_ref'],
+    ['idx_users_username', 'users_username_key']
+  ] LOOP
+    IF to_regclass('public.' || pair[2]) IS NOT NULL THEN
+      EXECUTE format('DROP INDEX IF EXISTS public.%I', pair[1]);
+    END IF;
+  END LOOP;
+END
+$$;
+
+CREATE INDEX IF NOT EXISTS idx_dispatch_event_lines_slip_item
+  ON dispatch_event_lines (picking_slip_item_id);
+
+
+-- from 060_drop_unused_schema
+-- ─────────────────────────────────────────────────────────────
+-- 060_drop_unused_schema.sql
+--
+-- Tables, views, a type and columns that no code reads or writes.
+--
+-- Each one was checked against the server, the client, the scripts and
+-- the tests (October 2026 database audit). None appears in any query or
+-- any field the client shows. Kept on purpose although unused today:
+-- volunteers.consent_given and volunteers.retention_delete_after (for a
+-- POPIA retention job) and pending_donations.commit_incomplete_at (the
+-- Reconciliation tab shows it).
+--
+-- Not reversible: the columns' contents go with them. In the dev
+-- database the only filled ones were picking_slip_items.dispatched_quantity,
+-- purchase_orders.status_changed_by, storage_locations.capacity_note,
+-- supplier_products.added_at, stock_count_lines.client_uuid,
+-- stock_counts.submitted_at, quickbooks_sync_queue.next_attempt_at and
+-- donations.quickbooks_sync_status (always 'unsynced').
+--
+-- No CASCADE anywhere: if anything still depends on one of these in some
+-- warehouse database, the migration stops there and changes nothing.
+-- ─────────────────────────────────────────────────────────────
+
+-- Views nothing queries.
+DROP VIEW IF EXISTS vw_ecd_collection_history;
+DROP VIEW IF EXISTS vw_low_stock;
+
+-- operational_goals: its feature was removed. schema_migration_provenance:
+-- notes from manual alignments before the migration runner existed.
+DROP TABLE IF EXISTS operational_goals;
+DROP TABLE IF EXISTS schema_migration_provenance;
+
+-- The donation_category enum: donations.donation_category is a text
+-- column, and no column uses the type. Left alone if one ever does.
+DO $$
+BEGIN
+  IF to_regtype('public.donation_category') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_attribute a
+        WHERE a.atttypid = 'public.donation_category'::regtype
+          AND a.attnum > 0 AND NOT a.attisdropped
+     ) THEN
+    DROP TYPE public.donation_category;
+  END IF;
+END
+$$;
+
+-- Donor address and identity fields the intake form never saved. The
+-- Section 18A form keeps what the donor enters in section_18a_donor_form.
+-- The QuickBooks columns were never written: syncing uses
+-- quickbooks_sync_queue and quickbooks_object_map.
+ALTER TABLE donations
+  DROP COLUMN IF EXISTS donor_cellphone,
+  DROP COLUMN IF EXISTS donor_address_line1,
+  DROP COLUMN IF EXISTS donor_address_line2,
+  DROP COLUMN IF EXISTS donor_city_suburb,
+  DROP COLUMN IF EXISTS donor_province,
+  DROP COLUMN IF EXISTS donor_postal_code,
+  DROP COLUMN IF EXISTS donor_country,
+  DROP COLUMN IF EXISTS donor_identification_type,
+  DROP COLUMN IF EXISTS donor_identification_number,
+  DROP COLUMN IF EXISTS donor_identification_country_of_issue,
+  DROP COLUMN IF EXISTS quickbooks_sync_status,
+  DROP COLUMN IF EXISTS quickbooks_sync_reference_id,
+  DROP COLUMN IF EXISTS quickbooks_sync_error,
+  DROP COLUMN IF EXISTS quickbooks_synced_at,
+  DROP COLUMN IF EXISTS quickbooks_sync_attempted_at,
+  DROP COLUMN IF EXISTS section_18a_deemed_value_zar;
+
+ALTER TABLE pending_donations
+  DROP COLUMN IF EXISTS donor_cellphone,
+  DROP COLUMN IF EXISTS donor_address_line1,
+  DROP COLUMN IF EXISTS donor_address_line2,
+  DROP COLUMN IF EXISTS donor_city_suburb,
+  DROP COLUMN IF EXISTS donor_province,
+  DROP COLUMN IF EXISTS donor_postal_code,
+  DROP COLUMN IF EXISTS donor_country,
+  DROP COLUMN IF EXISTS donor_identification_type,
+  DROP COLUMN IF EXISTS donor_identification_number,
+  DROP COLUMN IF EXISTS donor_identification_country_of_issue;
+
+ALTER TABLE donors
+  DROP COLUMN IF EXISTS tax_reference,
+  DROP COLUMN IF EXISTS consent_given;
+
+-- A cohort-override flow on delivery receipts that was never built. Its
+-- check (an override needs a reason and an approver) goes with it;
+-- override_reason itself stays, it is used.
+ALTER TABLE delivery_receipts DROP CONSTRAINT IF EXISTS dr_override_requires_reason;
+ALTER TABLE delivery_receipts
+  DROP COLUMN IF EXISTS collector_contact,
+  DROP COLUMN IF EXISTS is_cohort_override,
+  DROP COLUMN IF EXISTS override_approved_by,
+  DROP COLUMN IF EXISTS auto_flagged_at;
+
+ALTER TABLE donation_allocations
+  DROP COLUMN IF EXISTS allocation_status,
+  DROP COLUMN IF EXISTS stock_movement_id;
+
+ALTER TABLE donation_items             DROP COLUMN IF EXISTS source_reference;
+ALTER TABLE picking_slip_items         DROP COLUMN IF EXISTS dispatched_quantity;
+ALTER TABLE purchase_orders            DROP COLUMN IF EXISTS status_changed_by;
+ALTER TABLE quickbooks_sync_queue      DROP COLUMN IF EXISTS next_attempt_at;
+ALTER TABLE recipe_own_order_centres   DROP COLUMN IF EXISTS added_at;
+ALTER TABLE stock_counts               DROP COLUMN IF EXISTS submitted_at;
+ALTER TABLE storage_locations          DROP COLUMN IF EXISTS capacity_note;
+ALTER TABLE supplier_products          DROP COLUMN IF EXISTS added_at;
+ALTER TABLE stock_count_lines
+  DROP COLUMN IF EXISTS client_uuid,
+  DROP COLUMN IF EXISTS adjustment_movement_id;
+
+-- The free-text location from before migration 050 added the address,
+-- suburb and pin. Empty, and nothing reads it.
+ALTER TABLE ecd_centres                DROP COLUMN IF EXISTS location;

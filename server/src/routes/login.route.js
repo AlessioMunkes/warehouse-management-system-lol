@@ -16,17 +16,14 @@
 // auth.middleware.js for how a request then picks one.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import jwt     from 'jsonwebtoken';
 import bcrypt  from 'bcrypt';
 import pool    from '../config/db.js';
 import accountRepository from '../repositories/account.repository.js';
-import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
+import { AUTH_COOKIE, authCookieOptions, setStaffSessionCookie as setSessionCookie } from '../config/cookie.js';
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { parseWarehouseNames, warehouseName } from '../config/warehouses.js';
 
 const router = express.Router();
-
-const SESSION_HOURS = 8;
 
 // A bad WAREHOUSE_NAMES should stop the deploy, not the first login.
 if (pool.isMultiWarehouse) {
@@ -37,18 +34,6 @@ if (pool.isMultiWarehouse) {
     process.exit(1);
   }
 }
-
-const setSessionCookie = (res, claims) => {
-  const token = jwt.sign(claims, process.env.JWT_SECRET, { expiresIn: `${SESSION_HOURS}h` });
-
-  // ── Set the token as an httpOnly cookie ───────────────────
-  // The browser stores and sends this automatically.
-  // JavaScript on the page (including any XSS attack) cannot read it.
-  res.cookie(AUTH_COOKIE, token, {
-    ...authCookieOptions(),
-    maxAge: sessionMaxAge(SESSION_HOURS), // matches the token's own expiry
-  });
-};
 
 // ── Single warehouse: unchanged behaviour ─────────────────────
 const loginSingle = async (req, res, username, password) => {
@@ -74,7 +59,11 @@ const loginSingle = async (req, res, username, password) => {
     return res.status(403).json({ message: 'This account has been deactivated. Speak to your manager.' });
   }
 
-  setSessionCookie(res, { id: user.id, username: user.username, role: user.role });
+  // sv: the account's session version, checked on every request
+  // (auth.middleware.js), so a password change ends this session.
+  setSessionCookie(res, {
+    id: user.id, username: user.username, role: user.role, sv: user.session_version ?? 0,
+  });
 
   // Return the safe user info (no token in the body anymore)
   return res.json({
@@ -143,7 +132,7 @@ const loginMulti = async (req, res, username, password) => {
   setSessionCookie(res, {
     username:   primary.user.username,
     warehouses: Object.fromEntries(
-      active.map(({ code, user }) => [code, { id: user.id, role: user.role }])
+      active.map(({ code, user }) => [code, { id: user.id, role: user.role, sv: user.session_version ?? 0 }])
     ),
   });
 

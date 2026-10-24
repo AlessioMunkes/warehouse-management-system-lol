@@ -6,10 +6,16 @@
 // push.service.js.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF } from '../constants/permissions.js';
 import pushService from '../services/push.service.js';
 
 const router = express.Router();
+
+// Staff only. A subscription is saved against a users row, and a
+// guest's id is a volunteers row: saving it would attach the phone to
+// whichever staff member happens to share that number.
+router.use(auth, requireRole(...ALL_STAFF));
 
 const respondError = (res, err, label) => {
   const status = err.status || 500;
@@ -21,12 +27,12 @@ const respondError = (res, err, label) => {
 };
 
 // GET /api/push/public-key → { publicKey } (null when push is off)
-router.get('/public-key', auth, (_req, res) => {
+router.get('/public-key', (_req, res) => {
   res.status(200).json({ success: true, data: { publicKey: pushService.publicKey() } });
 });
 
 // POST /api/push/subscribe  { subscription }
-router.post('/subscribe', auth, async (req, res) => {
+router.post('/subscribe', async (req, res) => {
   try {
     await pushService.subscribe(req.user, req.body?.subscription, req.get('user-agent'));
     res.status(200).json({ success: true, data: null });
@@ -36,7 +42,7 @@ router.post('/subscribe', auth, async (req, res) => {
 });
 
 // POST /api/push/unsubscribe  { endpoint }
-router.post('/unsubscribe', auth, async (req, res) => {
+router.post('/unsubscribe', async (req, res) => {
   try {
     await pushService.unsubscribe(req.user, req.body?.endpoint);
     res.status(200).json({ success: true, data: null });

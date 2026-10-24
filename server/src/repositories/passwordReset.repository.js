@@ -138,7 +138,8 @@ const confirmReset = async ({ resetId, userId, passwordHash }) => {
     }
 
     const { rows: userRows } = await client.query(
-      `UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id`,
+      // Ends every session signed in with the old password (055).
+      `UPDATE users SET password_hash = $2, session_version = session_version + 1 WHERE id = $1 RETURNING id`,
       [userId, passwordHash]
     );
 

@@ -77,9 +77,17 @@ export const validOptionalEmail = (value) => {
   return email;
 };
 
+// bcrypt reads only the first 72 bytes and ignores the rest, so two
+// long passwords that share those bytes would both open the account.
+// Bytes, not characters: an accented letter or emoji takes several.
+export const MAX_PASSWORD_BYTES = 72;
+
 export const validPassword = (value) => {
   if (typeof value !== 'string' || value.length < MIN_PASSWORD_LENGTH) {
     throw fail(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+  }
+  if (Buffer.byteLength(value, 'utf8') > MAX_PASSWORD_BYTES) {
+    throw fail(400, 'Password is too long. Use 72 characters or fewer.');
   }
   return value;
 };

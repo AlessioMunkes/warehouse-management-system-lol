@@ -164,7 +164,7 @@ const ARCHIVE = `
          COALESCE(s.archived_at, s.deactivated_at), s.archived_by
     FROM suppliers s WHERE s.is_active = false OR s.archived_at IS NOT NULL
   UNION ALL
-  SELECT 'beneficiary', e.id::text, e.name, e.location, 'deactivated', NULL, NULL
+  SELECT 'beneficiary', e.id::text, e.name, e.suburb, 'deactivated', NULL, NULL
     FROM ecd_centres e WHERE e.is_active = false
   UNION ALL
   SELECT 'programme', pr.id::text, pr.name, pr.code, 'deactivated', NULL, NULL

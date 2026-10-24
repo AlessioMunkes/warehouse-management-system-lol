@@ -39,7 +39,7 @@
 // weight for.
 import {
   Archive, Bank, Basket, BowlFood, CalendarDots, ChartBar, ChatCircleText,
-  ClipboardText, Flask, Gear, Gift, HandCoins, HandHeart, Package, PhoneCall, Plant,
+  ClipboardText, Flask, Gear, Gift, HandCoins, HandHeart, MapPin, MapTrifold, Package, PhoneCall, Plant,
   Pulse, Receipt, Scroll, ShoppingCart, SquaresFour, Storefront, Tray, TrayArrowDown,
   Truck, UsersThree, Warehouse,
 } from '@phosphor-icons/react';
@@ -149,6 +149,8 @@ export const ROUTES = [
     nav: [nav('manager', 'Insights', 'Operations reports', ChartBar)] },
   { id: 'impactReport', path: STAFF.impactReport, roles: MANAGER_ONLY, shell: true,
     nav: [nav('manager', 'Insights', 'Impact report', BowlFood)] },
+  { id: 'impactMap', path: STAFF.impactMap, roles: MANAGER_ONLY, shell: true,
+    nav: [nav('manager', 'Insights', 'Impact map', MapPin)] },
 
   // ── Admin ──────────────────────────────────────────────────
   { id: 'users', path: ADMIN.users, roles: ADMIN_ONLY, shell: true,
@@ -188,6 +190,8 @@ export const ROUTES = [
   { id: 'financeReport', path: ADMIN.financeReport, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Overview', 'Finance report', Bank)] },
 
+  { id: 'warehouseLayout', path: ADMIN.warehouseLayout, roles: ADMIN_ONLY, shell: true,
+    nav: [nav('admin', 'Setup', 'Warehouse layout', MapTrifold)] },
   { id: 'settings', path: ADMIN.settings, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Setup', 'Settings', Gear)] },
 

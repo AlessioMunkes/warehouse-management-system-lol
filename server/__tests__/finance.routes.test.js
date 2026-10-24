@@ -146,12 +146,12 @@ describe('finance public report link', () => {
   });
 
   it('returns 404 for an invalid or revoked link', async () => {
-    serviceMock.getPublicFinanceSummary.mockRejectedValueOnce(withStatus(404, 'Finance report link is invalid or has been revoked.'));
+    serviceMock.getPublicFinanceSummary.mockRejectedValueOnce(withStatus(404, 'This finance report link has expired or been replaced. Ask the warehouse for a new one.'));
 
     const res = await request(app).get('/api/finance/public/revoked/report');
 
     expect(res.status).toBe(404);
-    expect(res.body.message).toBe('Finance report link is invalid or has been revoked.');
+    expect(res.body.message).toBe('This finance report link has expired or been replaced. Ask the warehouse for a new one.');
   });
 });
 
