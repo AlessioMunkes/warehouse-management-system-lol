@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { normaliseBarcode, gs1CheckDigitOk, expandUpcE, parseGs1, ownBagCode } from '../src/utils/barcode.js';
+import { normaliseBarcode, gs1CheckDigitOk, expandUpcE, parseGs1, ownBagCode, ownLabelCode } from '../src/utils/barcode.js';
 
 describe('normaliseBarcode', () => {
   it('keeps a valid EAN-13 as it is', () => {
@@ -104,6 +104,26 @@ describe('ownBagCode', () => {
     expect(ownBagCode(12, 2)).toBe('LOL12K2000');
     expect(ownBagCode(12, 0.5)).toBe('LOL12K500');
     expect(normaliseBarcode(ownBagCode(12, 2))).toEqual({ code: 'LOL12K2000', format: 'text' });
+  });
+});
+
+describe('ownLabelCode', () => {
+  it('gives a weighed item the same code as a decanted bag of that size', () => {
+    expect(ownLabelCode(12, 2, 'kg')).toBe(ownBagCode(12, 2));
+    expect(ownLabelCode(12, 500, 'g')).toBe('LOL12K500');
+    expect(ownLabelCode(7, 2, 'l')).toBe('LOL7K2000');
+  });
+
+  it('counts a counted item: one crate, a box of six', () => {
+    expect(ownLabelCode(4, 1, 'crate')).toBe('LOL4N1');
+    expect(ownLabelCode(4, 6, 'each')).toBe('LOL4N6');
+    expect(normaliseBarcode(ownLabelCode(4, 1, 'crate'))).toEqual({ code: 'LOL4N1', format: 'text' });
+  });
+
+  it('has no code for nothing, or part of a counted item', () => {
+    expect(ownLabelCode(4, 0, 'crate')).toBeNull();
+    expect(ownLabelCode(4, 1.5, 'crate')).toBeNull();
+    expect(ownLabelCode(4, 'x', 'kg')).toBeNull();
   });
 });
 

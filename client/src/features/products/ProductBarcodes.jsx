@@ -18,6 +18,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { listBarcodes, linkBarcode, removeBarcode } from '@/services/productBarcodeAPI';
 import { normaliseBarcode } from '@/features/scan/productCode';
 import useCameraScan from '@/features/scan/useCameraScan';
+import PrintLabels from './PrintLabels';
 
 export default function ProductBarcodes({ product, canManage, onChanged }) {
   const [rows, setRows] = useState(null);
@@ -105,7 +106,7 @@ export default function ProductBarcodes({ product, canManage, onChanged }) {
       ) : null}
 
       {canManage ? (
-        <form onSubmit={add} className="grid grid-cols-[8rem_auto] items-start gap-4">
+        <form onSubmit={add} noValidate className="grid grid-cols-[8rem_auto] items-start gap-4">
           {/* The code on its own row: the panel is narrow, and a code is long. */}
           <Field className="col-span-2" data-invalid={codeInvalid || codeMissing || undefined}>
             <FieldLabel htmlFor="product-barcode-code">Barcode</FieldLabel>
@@ -138,6 +139,18 @@ export default function ProductBarcodes({ product, canManage, onChanged }) {
             Add barcode
           </Button>
         </form>
+      ) : null}
+
+      {/* Its own stickers, for stock with no barcode of its own. The code
+          it links shows in the list above straight away. */}
+      {canManage ? (
+        <PrintLabels
+          product={product}
+          onLinked={(row) => {
+            setRows((list) => [...(list ?? []).filter((r) => r.id !== row.id), row]);
+            onChanged?.();
+          }}
+        />
       ) : null}
     </section>
   );

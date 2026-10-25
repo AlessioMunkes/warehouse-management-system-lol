@@ -209,4 +209,23 @@ export const normaliseBarcode = (raw) => {
 export const ownBagCode = (productId, sizeKg) =>
   `LOL${Number(productId)}K${Math.round(Number(sizeKg) * 1000)}`;
 
-export default { normaliseBarcode, gs1CheckDigitOk, expandUpcE, parseGs1, ownBagCode };
+// The code on a label the system prints for any stock item, for one
+// label's worth of it in the item's own unit:
+//   weighed or poured (kg, l)  as a bag code: 2 kg of rice is LOL12K2000,
+//                              the same code a 2 kg decanted bag carries
+//   g, ml                      the same, from grams: 500 g is LOL12K500
+//   counted (each, crate, ...) LOL<id>N<how many>: one crate of
+//                              butternut is LOL4N1, a box of 6 LOL4N6
+// null for a quantity that cannot be one (none, or part of a counted one).
+const LOOSE_KG = ['kg', 'l'];
+const LOOSE_G = ['g', 'ml'];
+export const ownLabelCode = (productId, quantity, unit) => {
+  const qty = Number(quantity);
+  if (!Number.isFinite(qty) || qty <= 0) return null;
+  if (LOOSE_KG.includes(unit)) return ownBagCode(productId, qty);
+  if (LOOSE_G.includes(unit)) return ownBagCode(productId, qty / 1000);
+  if (!Number.isInteger(qty)) return null;
+  return `LOL${Number(productId)}N${qty}`;
+};
+
+export default { normaliseBarcode, gs1CheckDigitOk, expandUpcE, parseGs1, ownBagCode, ownLabelCode };
