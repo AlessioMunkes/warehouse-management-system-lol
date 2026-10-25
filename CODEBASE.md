@@ -38,13 +38,15 @@ server/                     The API (Node, Express, Postgres)
     constants/              Fixed lists: roles, order statuses, movement types
     config/                 Database connection, environment, cookies, multi-warehouse
     jobs/                   Work that runs on a timer
-    integrations/           Everything that talks to an outside system: email, PDFs, the volunteer system (VMS)
-    utils/                  Small shared helpers: email layout, donation validation and routing, transactions
+    integrations/           Everything that talks to an outside system: email, PDFs, the volunteer system (VMS), Open Food Facts
+    utils/                  Small shared helpers: email layout, donation validation and routing, transactions, barcodes
   database/
     schema.sql              Every table, for reference. Not a script to run
     migrations/             Numbered changes to the database, applied in order
-  scripts/                  Command-line tools (migrate, load data, admin tasks)
+  scripts/                  Command-line tools (migrate, export the new-database file, load data, admin tasks)
   __tests__/                Every server test (Vitest + Supertest)
+
+docs/new-database.sql       Builds a new, empty database. Written by `npm run export-database`
 
 render.yaml                 How it is deployed on Render
 .github/workflows/ci.yml    Lint, build and test on every push
@@ -111,7 +113,11 @@ the classification queue and Section 18A.
 | `decanting` | Weighing bulk stock into bags, the decanting sheet | Staff |
 | `dispatch` | The gate queue, checking a pallet out, the dispatch note | Staff |
 | `donation` | Recording a donation and its review screen | Staff |
-| `staff` | What every floor screen is built from: step screens, lists, drafts, photos, the language picker | Staff |
+| `staff` | What every floor screen is built from: step screens, lists, drafts, photos, the language picker, and `useWorkingChrome.js` (the bars that slide away on a phone while a task is worked) | Staff |
+| `scan` | Scanning: the camera (`PalletScanner.jsx`, `useCameraScan.jsx`), reading a product barcode (`useBarcodeReader.js`, `ProductScanBar.jsx`), the green tick (`ScanFlash.jsx`), and `productCode.js`, the barcode rules | Staff, Admin |
+| `labels` | The printable sheet of barcode stickers (`labelSheetPdf.js`) | Manager, Admin |
+| `onboarding` | The welcome card each role sees on first sign-in | Everyone |
+| `legal` | The privacy and terms pages | Everyone |
 | `guest` | The volunteer screens' building blocks | Guests |
 | `purchaseOrders` | The order list, form, detail and timeline; the QuickBooks import | Manager |
 | `inventory` | Stock on hand, adjustments, the ledger, reconciliation | Manager |
@@ -129,7 +135,7 @@ the classification queue and Section 18A.
 | `notifications` | The bell, the notification list, phone alerts | Everyone |
 | `assistant` | The chat helper | Everyone |
 | `users` | Inviting and editing users | Admin |
-| `products` | The product form | Admin |
+| `products` | The product form, its barcodes (`ProductBarcodes.jsx`), Add product from a barcode (`ProductBarcodeStart.jsx`) and Print labels (`PrintLabels.jsx`) | Admin |
 | `suppliers` | The supplier form | Admin |
 | `settings` | Recipes, unit sizes, email and certificate settings | Admin |
 | `activityLog` | Staff activity, the volunteer sign-in log, links from a log line to its record | Admin |
@@ -251,6 +257,9 @@ wording. One flat folder per area, with no folders inside.
 | `privacy` | Removing personal details from logs |
 | `warehouseMap` | What each area of the map holds now, worked out from the counts (`placement.js`), and the checks on a floor plan (`layout.js`) |
 | `impactMap` | The Impact map's period in South African days (`impactRange.js`) |
+| `stock` | How long stock lasts and when to reorder (`stockCover.js`), and which deliveries are probably still on the shelf (`shelfLots.js`, `fifoQueue.js`) |
+| `quickbooks` | Every call to QuickBooks Online (`client.js`) |
+| `barcodeMatch` | Which stock item a new barcode probably belongs to (`matchProducts.js`): plain rules on pack size, name and kind of food, never a guess it applies itself |
 
 ### Things worth knowing
 
@@ -268,6 +277,13 @@ wording. One flat folder per area, with no folders inside.
   announce (`features/communications/notices.js`).
 - **Repeat requests** from a phone that lost signal are recognised by
   `middleware/idempotency.middleware.js` and answered without doing the work twice.
+- **Barcodes** are stored in one form whatever the scanner reads (UPC-A, UPC-E and GTIN-14
+  become EAN-13), by `utils/barcode.js`. The client's `features/scan/productCode.js` is the
+  same code, and a test fails if the two drift apart. Labels the warehouse prints itself read
+  `LOL<product id>K<grams>` or `LOL<product id>N<count>`. Links live in `product_barcodes`
+  and every scan is recorded in `barcode_scan_events` (migrations 052, 053, 056).
+  `productBarcode.service.js` holds the rules; `integrations/openFoodFacts.js` asks Open Food
+  Facts about a barcode nobody has linked, sending only the barcode.
 - **Approving a purchase order emails Finance.** Tests that approve one through the API send a
   real email if Gmail is connected. (Creating one sends nothing.)
 
@@ -282,7 +298,11 @@ instead, defined in `features/settings/settingsDefinitions.js`.
 
 `database/schema.sql` describes every table. To change the database, add the next numbered
 file to `database/migrations/` and append the same change to `schema.sql`, then run
-`npm run migrate` in `server/`.
+`npm run migrate -- up` in `server/`. Then run `npm run export-database`, which reads the
+updated database and writes `docs/new-database.sql` again, so a new database starts with the
+change. `scripts/export-new-database.mjs` says what goes in that file (the schema, the six
+starter tables, the migration record) and what never does (any warehouse's data).
+`npm run migrate -- init <code>` runs that file against a new database.
 
 ## Walking someone through the code
 

@@ -8,6 +8,7 @@
 //   npm run migrate -- status            what is applied and pending, per database
 //   npm run migrate -- up                apply pending migrations to EVERY database
 //   npm run migrate -- init <code>       build a NEW, empty warehouse database
+//                                        from docs/new-database.sql
 //   npm run migrate -- mark-baseline     one-off, for a database that predates
 //                                        this runner: record the migrations
 //                                        baseline.sql already contains
@@ -45,8 +46,9 @@ import { dbSslConfig } from '../src/config/dbSsl.js';
 const here      = path.dirname(fileURLToPath(import.meta.url));
 const DB_DIR    = path.resolve(here, '..', 'database');
 const MIG_DIR   = path.join(DB_DIR, 'migrations');
-const BASELINE  = path.join(DB_DIR, 'baseline.sql');
-const SEED      = path.join(DB_DIR, 'seed.sql');
+// The whole schema plus starter rows, written by `npm run export-database`.
+// It records the migrations it contains itself.
+const NEW_DB    = path.resolve(here, '..', '..', 'docs', 'new-database.sql');
 const MANIFEST  = path.join(DB_DIR, 'baseline-migrations.txt');
 
 const ssl = dbSslConfig();
@@ -199,19 +201,16 @@ const init = async () => {
   const target = allTargets().find((t) => t.code === code);
   if (!target) fail(`No database "${code}" in WAREHOUSE_DB_URLS. Add it there first.`);
 
-  for (const f of [BASELINE, SEED, MANIFEST]) {
-    if (!fs.existsSync(f)) fail(`Missing ${path.relative(process.cwd(), f)}.`);
-  }
+  if (!fs.existsSync(NEW_DB)) fail(`Missing ${path.relative(process.cwd(), NEW_DB)}. Run npm run export-database.`);
   const migrations = loadMigrations();
-  const manifest = readManifest(MANIFEST);
 
   await withClients([target], async ([{ client }]) => {
-    console.log(`\n[${code}] building from baseline.sql + seed.sql ...`);
+    console.log(`\n[${code}] building from docs/new-database.sql ...`);
     try {
       await initialiseDatabase(client, {
-        baselineSql: fs.readFileSync(BASELINE, 'utf8'),
-        seedSql:     fs.readFileSync(SEED, 'utf8'),
-        manifest,
+        baselineSql: fs.readFileSync(NEW_DB, 'utf8'),
+        seedSql:     '',
+        manifest:    [],
       });
     } catch (err) {
       fail(`[${code}] ${err.message}\n  Nothing was created (the whole init is one transaction).`);
