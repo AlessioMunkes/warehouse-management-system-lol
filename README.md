@@ -38,6 +38,10 @@ server/                 Express API
   scripts/              Command-line tools (see below)
   __tests__/            Vitest + Supertest
 
+docs/
+  new-database.sql      Builds a new, empty database (see The database)
+  *.pdf                 The handover notes and the how-to-use guide
+
 render.yaml             Deployment to Render
 .github/workflows/      Lint, build and test on every push
 ```
@@ -82,19 +86,45 @@ features are switched off and everything else works.
 
 ## The database
 
-The database lives in Supabase and is the real thing; this repository does not hold a script
-that builds it from nothing.
+The database lives in Supabase (PostgreSQL 17).
 
+### Starting a new database
+
+`docs/new-database.sql` builds a new, empty database the app can run on: every table, type,
+key, index and sequence, row-level security, the starter settings every warehouse shares
+(programmes, reporting factors, storage locations, picking and donation settings), and a
+record of the migrations it already contains. It holds no warehouse's data: no people, stock,
+donations, centres, connections or contact details.
+
+1. Create a new Supabase project.
+2. Open SQL Editor, then New query, and paste the whole file.
+3. Optional: near the end of the file, set `admin_username`, `admin_first_name`,
+   `admin_last_name` and `admin_password` (8 to 72 characters) to create the first admin.
+   Left as `CHANGE-ME`, no admin is made; create one later with
+   `npm run warehouse-admin -- create-admin`.
+4. Press Run. Put the project's connection string (Connect, then Session pooler) in
+   `server/.env` as `DATABASE_URL`.
+
+It stops without changing anything if the database already has tables. Two other ways to run
+it, both as one transaction:
+
+```
+psql "<connection string>" --single-transaction -f docs/new-database.sql
+cd server && npm run migrate -- init <code>     # a database listed in WAREHOUSE_DB_URLS
+```
+
+### Changing the database
+
+- Put the change in a new file `server/database/migrations/NNN_what_it_does.sql` (the next
+  number up), run `cd server` and `npm run migrate -- up`, and make the same change in
+  `server/database/schema.sql`.
+- Then run `npm run export-database` in `server/` to write `docs/new-database.sql` again from
+  the updated database, so a new database starts with the change too. It only reads.
 - `server/database/schema.sql` is a reference copy of every table, for reading. It is not
-  meant to be run (its first line says so).
-- A second database (a test copy, another warehouse) is made by copying the existing one in
-  Supabase, not from this repository.
+  meant to be run (its first line says so); `docs/new-database.sql` is the one to run.
 - The numbered migration files that built the database up (019 to 039) were removed at
-  handover: it already has all of them, recorded in its `schema_migrations` table. The ones in
-  `server/database/migrations/` now are changes made since, and are applied too.
-- When you change the database: put the change in a new file
-  `server/database/migrations/NNN_what_it_does.sql` (the next number up), run
-  `cd server` and `npm run migrate -- up`, and make the same change in `schema.sql`.
+  handover: the database already has them, recorded in its `schema_migrations` table. The ones
+  in `server/database/migrations/` now are changes made since, and are applied too.
 
 ## Tests
 
@@ -111,6 +141,7 @@ When you add or change a route, that test fails until the file is updated: that 
 | Script | What it does |
 |---|---|
 | `npm run migrate` | Applies new database changes from `database/migrations/` (see The database) |
+| `npm run export-database` | Writes `docs/new-database.sql` from the database in `.env`. Only reads |
 | `npm run warehouse-admin` | Looks up and manages people across warehouses, when running more than one |
 | `seedWesternCapeSupply.mjs` | Loads the sponsor's supply sheet: centres, products, standing orders |
 | `loadRealData.mjs` | Loads the summer menu into the Summer recipe and the July 2026 stock count |
@@ -144,6 +175,19 @@ pasted into the Render dashboard, not stored here. It currently deploys the
   about 1280 pixels first. They are stored in the database (`photos` table), which has room for
   a few thousand; `server/src/repositories/photo.repository.js` is the one place to change to
   move them to file storage.
+- Barcodes are a second way to count stock, beside choosing items from the list. Staff scan
+  with the phone camera, or a USB or Bluetooth scanner, in Receiving, Donation intake, Packing
+  (to check an item before confirming it) and when counting an area on the warehouse map. An
+  admin links barcodes to a product on the product screen, scanning or typing them. Loose stock
+  with no barcode gets one from Print labels, on the product screen or on a stock item in
+  Inventory: a sheet of stickers to print. A barcode nobody has linked yet is looked up in the public Open
+  Food Facts database, which suggests which stock item it probably is and fills in the name,
+  brand and pack size; a person confirms every link. Only the barcode is sent. Set
+  `OPEN_FOOD_FACTS_ENABLED=false` in `server/.env` to switch the lookup off.
+- On a phone, the floor's top bar, tab bar and a task's pinned header and Finish bar slide out
+  of the way while a worker scrolls down a task or types, and come back when they scroll up.
+- A worker, manager or admin sees a short welcome card the first time they sign in, ending
+  with where to find the round Help button.
 - Stock is taken off at dispatch, not at packing. A packed pallet waiting for collection counts
   as committed, not gone.
 - Picking slips are made from the recipe in use (Settings -> Recipes). With no recipe filled

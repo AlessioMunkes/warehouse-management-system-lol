@@ -76,6 +76,7 @@ import { STANDARD_SIZES, sizesToKg, sizeLabelToKg } from './BagSizes';
 import BagSizeToggle from './BagSizeToggle';
 import DecantingSheetPDF from './DecantingSheetPDF';
 import { openBagLabelPdf } from './bagLabelPdf';
+import { openBlankForSheet, todaySast } from '../labels/labelSheetPdf';
 import { linkBarcode } from '../../services/productBarcodeAPI';
 import { ownBagCode } from '../scan/productCode';
 import SuccessDialog from '../staff/SuccessDialog';
@@ -94,8 +95,6 @@ const productText = (product) => [product?.name, product?.sku].filter(Boolean).j
 // a product counted in g or ml takes a thousand of them per kg.
 const unitsPerBag = (sizeKg, unit) => (unit === 'g' || unit === 'ml' ? sizeKg * 1000 : sizeKg);
 
-// Today in Cape Town, as 'YYYY-MM-DD'.
-const todaySast = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(new Date());
 
 const MODE_KEY = 'stf_decanting_view_mode';
 const MODES = [
@@ -490,6 +489,9 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   // the right amount. Linking twice is harmless: the server treats the
   // same link as done.
   const printBagLabels = async () => {
+    // Opened now, on the tap: a window opened after waiting for the
+    // server is blocked as a pop-up.
+    const win = openBlankForSheet();
     setLabelsBusy(true);
     setLabelsError(null);
     try {
@@ -500,9 +502,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       await Promise.all(bags.map((b) => linkBarcode(product.id, {
         code: b.code, unitsPerScan: unitsPerBag(b.sizeKg, product.default_unit),
       })));
-      const { opened } = openBagLabelPdf({ productName: product.name, bags, decantedOn: todaySast() });
+      const { opened } = openBagLabelPdf({ productName: product.name, bags, decantedOn: todaySast() }, win);
       if (!opened) setLabelsError('The labels could not open. Allow pop-ups for this site and try again.');
     } catch (err) {
+      win?.close?.();
       setLabelsError(err.message);
     } finally {
       setLabelsBusy(false);

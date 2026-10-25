@@ -840,7 +840,10 @@ export const TOPICS = [
       'are linked on the floor the first time a box is scanned. Open the product on ' +
       'Products to see them, add one, or remove one that was linked to the wrong product. ' +
       'When adding a product, Start from a barcode looks the pack up in the public Open Food ' +
-      'Facts database and fills in what it knows, for you to check. Only the barcode is sent.',
+      'Facts database and fills in what it knows, for you to check. Only the barcode is sent. ' +
+      'For stock with no barcode of its own, Print labels on the same panel makes stickers: say ' +
+      'how much one label is (1 crate, a 10 kg sack) and how many, and scanning a sticker counts ' +
+      'that amount.',
     followUp: {
       question: 'Would you like to know what the other product fields do?',
       topic: 'product-fields',
@@ -1467,6 +1470,23 @@ export const TOPICS = [
       topic: 'stock-adjustment',
     },
     related: ['stock-adjustment'],
+  },
+  {
+    id: 'print-labels-manager',
+    title: 'Printing barcode labels for loose stock',
+    roles: MANAGERS_UP,
+    screens: ['inventory'],
+    asks: ['print labels', 'barcode stickers', 'make a barcode', 'label loose stock', 'create a barcode', 'stickers for crates'],
+    body:
+      'Open a product on Inventory and use Print labels to make barcode stickers for stock that has ' +
+      'none, like crates of produce or bulk sacks. Say how much one label is (1 crate, a 10 kg sack) and ' +
+      'how many you need. The sheet fits a standard 21-label A4 sheet, or plain paper you cut up. ' +
+      'Scanning a sticker anywhere in the system counts the amount it says.',
+    followUp: {
+      question: 'Would you like to know about scanning during a stock count?',
+      topic: 'stock-count-scanning',
+    },
+    related: ['stock-count-scanning'],
   },
   {
     id: 'inventory-low-stock',

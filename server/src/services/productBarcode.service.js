@@ -68,6 +68,10 @@ const lookup = async (raw) => {
   const parsed = normaliseBarcode(raw);
   if (!parsed) fail(400, NOT_A_BARCODE);
   const row = await barcodeRepo.findByCode(parsed.code);
+  // A linked code Open Food Facts has never answered for (it was down,
+  // or limiting requests, when the code was linked): ask again, in the
+  // background, now that it is being scanned.
+  if (row && !row.food_checked_at) rememberFoodFacts(row.id, parsed.code);
   return {
     code: parsed.code,
     format: parsed.format,
@@ -87,10 +91,40 @@ const listForProduct = async (productId) => {
 // What Open Food Facts says a newly linked code is, kept on the link
 // (migration 056) so the next brand of the same food can be matched to
 // this stock item. Best effort: any failure leaves the columns empty.
-export const rememberFoodFacts = (barcodeId, code) => Promise.resolve()
-  .then(() => openFoodFacts.lookupProduct(code))
-  .then((food) => barcodeRepo.saveFoodFacts(barcodeId, food ?? null))
-  .catch((err) => console.error('[productBarcode] food facts not kept:', err.message));
+//
+// Only a real answer is kept: the product, or "it does not know this
+// code". A failed lookup (Open Food Facts timing out, or refusing while
+// it limits requests) is tried twice more, a little later each time,
+// and if it still fails nothing is kept, so the code is asked about
+// again the next time it is scanned (lookup, below). Keeping a failure
+// as "unknown" used to mark the code as checked for good.
+const RETRY_AFTER_MS = [5000, 20000];
+const pause = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+// Links being asked about right now: a code scanned again while its
+// question is still out (and being retried) does not start another.
+const asking = new Set();
+
+export const rememberFoodFacts = async (barcodeId, code, { retryAfter = RETRY_AFTER_MS } = {}) => {
+  if (asking.has(barcodeId)) return 'asking';
+  asking.add(barcodeId);
+  try {
+    for (let attempt = 0; attempt <= retryAfter.length; attempt += 1) {
+      const { outcome, food } = await openFoodFacts.fetchProduct(code);
+      if (outcome !== 'failed') {
+        await barcodeRepo.saveFoodFacts(barcodeId, food);
+        return outcome;
+      }
+      if (attempt < retryAfter.length) await pause(retryAfter[attempt]);
+    }
+    return 'failed';
+  } catch (err) {
+    console.error('[productBarcode] food facts not kept:', err.message);
+    return 'failed';
+  } finally {
+    asking.delete(barcodeId);
+  }
+};
 
 const link = async (productId, data = {}, actorId = null) => {
   const id = validateId(productId, 'Product ID');
@@ -179,6 +213,7 @@ const matchesFor = async (food) => {
     id: r.id,
     name: r.name,
     sku: r.sku,
+    unit: r.default_unit,
     weightKg: r.weight_kg === null || r.weight_kg === undefined ? null : Number(r.weight_kg),
     barcodes: (r.barcodes ?? []).map((b) => ({
       ...b, foodWeightKg: b.foodWeightKg === null || b.foodWeightKg === undefined ? null : Number(b.foodWeightKg),

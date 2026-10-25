@@ -5,9 +5,9 @@
 // is shaped into a suggestion, and every failure is "no suggestion".
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { lookupProduct, setFetch } from '../src/integrations/openFoodFacts.js';
+import { lookupProduct, fetchProduct, setFetch } from '../src/integrations/openFoodFacts.js';
 
-const reply = (body, ok = true) => vi.fn(async () => ({ ok, json: async () => body }));
+const reply = (body, ok = true, status = ok ? 200 : 500) => vi.fn(async () => ({ ok, status, json: async () => body }));
 
 afterEach(() => { setFetch(null); delete process.env.OPEN_FOOD_FACTS_ENABLED; });
 
@@ -50,5 +50,15 @@ describe('Open Food Facts lookup', () => {
     process.env.OPEN_FOOD_FACTS_ENABLED = 'false';
     expect(await lookupProduct('6001059920014')).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('tells a code it does not know from a lookup that failed', async () => {
+    setFetch(reply({ status: 0 }, false, 404));
+    expect(await fetchProduct('6001059920014')).toEqual({ outcome: 'unknown', food: null });
+    setFetch(reply({}, false, 503));
+    expect(await fetchProduct('6001059920014')).toEqual({ outcome: 'failed', food: null });
+    // Its "temporarily unavailable" page is HTML, not JSON.
+    setFetch(vi.fn(async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token <'); } })));
+    expect(await fetchProduct('6001059920014')).toEqual({ outcome: 'failed', food: null });
   });
 });

@@ -33,6 +33,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pencil, SlidersHorizontal } from 'lucide-react';
 import DetailPanel from '@/components/ui/detail-panel';
+import PrintLabels from '../products/PrintLabels';
 import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -360,6 +361,9 @@ export default function StockDetailPanel({
           </>
         )}
       </Section>
+
+      {/* Barcode stickers for loose stock (products/PrintLabels.jsx). */}
+      <PrintLabels product={product} />
 
       <Section title="Catalogue">
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">

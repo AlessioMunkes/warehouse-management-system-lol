@@ -19,7 +19,10 @@
 //          Within 1% is the same size (a rounding difference). More
 //          than 2% apart rules the item out altogether: a 400 g tin is
 //          not the 410 g stock item, and 410 g beans are not the 800 g
-//          one, however alike the names.
+//          one, however alike the names. Only for items counted by the
+//          pack (a tin, "each"): an item counted by weight or volume (kg,
+//          g, l, ml) is the same stock item in any pack, so a 5 kg bag of
+//          rice is still Rice, whatever size its other barcodes are.
 //   name   the words that say what the food IS, against the stock
 //          item's name and the names of its other barcodes. Brand,
 //          sizes and filler words are taken out, and so is everything
@@ -59,6 +62,9 @@ const STOPWORDS = new Set([
 const SAME_SIZE = 0.01;
 const OTHER_SIZE = 0.02;
 const SHOW_AT = 3;
+// Counted by weight or volume: the pack size says nothing about which
+// stock item it is.
+const WEIGHED = ['kg', 'g', 'l', 'ml'];
 const LIMIT = 3;
 
 // "Baked Beans in Tomato Sauce 410g" → {'baked', 'bean'}
@@ -90,7 +96,7 @@ const nameOverlap = (a, b) => {
 const sizeGap = (a, b) => Math.abs(a - b) / Math.max(a, b);
 
 // food:       { productName, brand, weightKg, categories }
-// candidates: [{ id, name, sku, weightKg, barcodes: [{ foodName, foodBrand,
+// candidates: [{ id, name, sku, unit, weightKg, barcodes: [{ foodName, foodBrand,
 //               foodWeightKg, foodCategories }] }]
 // → [{ productId, productName, sku, score, reasons: ['size'|'name'|'kind'] }]
 export const matchProducts = (food, candidates) => {
@@ -109,7 +115,7 @@ export const matchProducts = (food, candidates) => {
     const sizes = [c.weightKg, ...barcodes.map((b) => b.foodWeightKg)]
       .map(Number).filter((n) => Number.isFinite(n) && n > 0);
     let sameSize = false;
-    if (food.weightKg && sizes.length) {
+    if (food.weightKg && sizes.length && !WEIGHED.includes(c.unit)) {
       sameSize = sizes.some((s) => sizeGap(s, food.weightKg) <= SAME_SIZE);
       if (!sameSize && sizes.every((s) => sizeGap(s, food.weightKg) > OTHER_SIZE)) continue;
     }

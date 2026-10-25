@@ -24,10 +24,10 @@ const productRepoMock = { getProductById: vi.fn() };
 vi.mock('../src/repositories/productBarcode.repository.js', () => ({ default: barcodeRepoMock }));
 vi.mock('../src/repositories/product.repository.js', () => ({ default: productRepoMock }));
 
-const offMock = { lookupProduct: vi.fn() };
+const offMock = { lookupProduct: vi.fn(), fetchProduct: vi.fn() };
 vi.mock('../src/integrations/openFoodFacts.js', () => ({ default: offMock }));
 
-const { default: service } = await import('../src/services/productBarcode.service.js');
+const { default: service, rememberFoodFacts } = await import('../src/services/productBarcode.service.js');
 
 const RICE = { id: 7, name: 'Rice 1kg', is_active: true, archived_at: null };
 
@@ -38,7 +38,7 @@ const linkedRow = (over = {}) => ({
 });
 
 beforeEach(() => {
-  for (const fn of [...Object.values(barcodeRepoMock), ...Object.values(productRepoMock), offMock.lookupProduct]) fn.mockReset();
+  for (const fn of [...Object.values(barcodeRepoMock), ...Object.values(productRepoMock), offMock.lookupProduct, offMock.fetchProduct]) fn.mockReset();
 });
 
 describe('lookup', () => {
@@ -216,8 +216,43 @@ describe('remembering what a linked code is', () => {
   it('keeps what Open Food Facts says about a code once it is linked, without holding up the link', async () => {
     productRepoMock.getProductById.mockResolvedValue(RICE);
     barcodeRepoMock.create.mockResolvedValue({ id: 40 });
-    offMock.lookupProduct.mockResolvedValue(BRAND_B);
+    offMock.fetchProduct.mockResolvedValue({ outcome: 'found', food: BRAND_B });
     await service.link(7, { code: '4006381333931' }, 1);
     await vi.waitFor(() => expect(barcodeRepoMock.saveFoodFacts).toHaveBeenCalledWith(40, BRAND_B));
+  });
+
+  it('keeps "not known" as an answer', async () => {
+    offMock.fetchProduct.mockResolvedValue({ outcome: 'unknown', food: null });
+    expect(await rememberFoodFacts(41, '4006381333931', { retryAfter: [] })).toBe('unknown');
+    expect(barcodeRepoMock.saveFoodFacts).toHaveBeenCalledWith(41, null);
+  });
+
+  // Open Food Facts refusing while it limits requests is not "unknown".
+  it('tries a failed lookup again, and keeps nothing if it still fails', async () => {
+    offMock.fetchProduct.mockResolvedValue({ outcome: 'failed', food: null });
+    expect(await rememberFoodFacts(42, '4006381333931', { retryAfter: [1, 1] })).toBe('failed');
+    expect(offMock.fetchProduct).toHaveBeenCalledTimes(3);
+    expect(barcodeRepoMock.saveFoodFacts).not.toHaveBeenCalled();
+  });
+
+  it('keeps the answer when a retry gets through', async () => {
+    offMock.fetchProduct
+      .mockResolvedValueOnce({ outcome: 'failed', food: null })
+      .mockResolvedValueOnce({ outcome: 'found', food: BRAND_B });
+    expect(await rememberFoodFacts(43, '4006381333931', { retryAfter: [1, 1] })).toBe('found');
+    expect(barcodeRepoMock.saveFoodFacts).toHaveBeenCalledWith(43, BRAND_B);
+  });
+
+  it('asks again when a linked code that was never answered is scanned', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(linkedRow({ id: 44, food_checked_at: null }));
+    offMock.fetchProduct.mockResolvedValue({ outcome: 'found', food: BRAND_B });
+    await service.lookup('036000291452');
+    await vi.waitFor(() => expect(barcodeRepoMock.saveFoodFacts).toHaveBeenCalledWith(44, BRAND_B));
+  });
+
+  it('does not ask again for a code already answered', async () => {
+    barcodeRepoMock.findByCode.mockResolvedValue(linkedRow({ food_checked_at: '2026-10-25T10:00:00Z' }));
+    await service.lookup('036000291452');
+    expect(offMock.fetchProduct).not.toHaveBeenCalled();
   });
 });

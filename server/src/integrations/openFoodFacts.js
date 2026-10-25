@@ -45,13 +45,22 @@ const weightKgOf = (amount, unit) => {
   return null;
 };
 
-// { name, productName, brand, quantity, weightKg, category, categories } | null
+// What Open Food Facts said about one code:
+//   { outcome: 'found',   food }   it knows the product
+//   { outcome: 'unknown', food: null }   it answered, and does not
+//   { outcome: 'failed',  food: null }   no real answer: a timeout, the
+//                         network, an error, or its "temporarily
+//                         unavailable" page when it is limiting requests
+// The difference matters to anything that remembers the answer: unknown
+// is worth keeping, failed is worth asking again later.
+//
+// food: { name, productName, brand, quantity, weightKg, category, categories }
 //   name         brand + product name + pack size, for showing
 //   productName  the product name alone, for matching
 //   categories   every category tag, most general first, without the
 //                language prefix ('en:canned-foods' → 'canned-foods')
-export const lookupProduct = async (code) => {
-  if (!isEnabled() || !/^\d{8,14}$/.test(String(code))) return null;
+export const fetchProduct = async (code) => {
+  if (!isEnabled() || !/^\d{8,14}$/.test(String(code))) return { outcome: 'unknown', food: null };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -59,10 +68,12 @@ export const lookupProduct = async (code) => {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
       signal: controller.signal,
     });
-    if (!res.ok) return null;
-    const body = await res.json();
+    // Its answer for a code it has never seen is a 404 with status 0.
+    if (res.status === 404) return { outcome: 'unknown', food: null };
+    if (!res.ok) return { outcome: 'failed', food: null };
+    const body = await res.json();     // the rate-limit page is HTML: throws, so failed
     const p = body?.product;
-    if (body?.status !== 1 || !p?.product_name) return null;
+    if (body?.status !== 1 || !p?.product_name) return { outcome: 'unknown', food: null };
 
     const brand = String(p.brands ?? '').split(',')[0].trim();
     const quantity = String(p.quantity ?? '').trim();
@@ -72,20 +83,27 @@ export const lookupProduct = async (code) => {
       ? `${brand} ${p.product_name}` : p.product_name;
     const tags = (p.categories_tags ?? []).map((tag) => String(tag).replace(/^[a-z]{2}:/, '')).filter(Boolean);
     return {
-      name: [base, quantity].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim(),
-      productName: String(p.product_name).trim(),
-      brand: brand || null,
-      quantity: quantity || null,
-      weightKg: weightKgOf(p.product_quantity, p.product_quantity_unit),
-      category: categoryLabel(tags.at(-1)) || null,
-      categories: tags,
+      outcome: 'found',
+      food: {
+        name: [base, quantity].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim(),
+        productName: String(p.product_name).trim(),
+        brand: brand || null,
+        quantity: quantity || null,
+        weightKg: weightKgOf(p.product_quantity, p.product_quantity_unit),
+        category: categoryLabel(tags.at(-1)) || null,
+        categories: tags,
+      },
     };
   } catch (err) {
-    console.error('[openFoodFacts] no suggestion:', err.name === 'AbortError' ? 'timed out' : err.message);
-    return null;
+    console.error('[openFoodFacts] no answer:', err.name === 'AbortError' ? 'timed out' : err.message);
+    return { outcome: 'failed', food: null };
   } finally {
     clearTimeout(timer);
   }
 };
 
-export default { lookupProduct, isEnabled, setFetch };
+// The food, or null for unknown and failed alike: for a screen asking
+// now, both mean "no suggestion".
+export const lookupProduct = async (code) => (await fetchProduct(code)).food;
+
+export default { lookupProduct, fetchProduct, isEnabled, setFetch };
