@@ -5,11 +5,11 @@
 // warehouseMap.service.js; a refusal arrives carrying its status.
 // ─────────────────────────────────────────────────────────────
 import mapService from '../services/warehouseMap.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const send = (res, label, fallback) => (err) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  res.status(status).json({ success: false, message: status < 500 || status === 503 ? err.message : fallback });
+  sendError(res, err, fallback, { passThrough: [503] });
 };
 
 // GET /api/warehouse-map

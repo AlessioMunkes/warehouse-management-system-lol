@@ -5,11 +5,11 @@
 // the screen never has to piece a change back together.
 // ─────────────────────────────────────────────────────────────
 import recipeService from '../services/recipe.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const respond = (res, err, where, fallback) => {
   console.error(`[${where}]`, err.message);
-  const status = err.status || 500;
-  res.status(status).json({ success: false, message: status < 500 ? err.message : fallback });
+  sendError(res, err, fallback);
 };
 
 const send = (work, where, fallback, okStatus = 200) => async (req, res) => {

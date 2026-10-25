@@ -1,4 +1,5 @@
 import decantingService from '../services/decanting.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // POST /api/decanting/calculate
 const calculatePlan = async (req, res) => {
@@ -39,7 +40,7 @@ const getRecords = async (req, res) => {
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('[getRecords]', err.message);
-    res.status(500).json({ success: false, message: 'Failed to retrieve decanting records.' });
+    sendError(res, err, 'Failed to retrieve decanting records.');
   }
 };
 

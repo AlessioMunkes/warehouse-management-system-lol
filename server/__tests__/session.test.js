@@ -159,13 +159,13 @@ describe('GET /api/me — guests', () => {
 
 // ── Database failure ──────────────────────────────────────────
 describe('GET /api/me — database failure', () => {
-  it('returns 500 and does NOT clear the cookie', async () => {
+  it('returns 503 and does NOT clear the cookie', async () => {
     // A blip is not an invalid session. Logging every user out over a
     // brief outage would be worse than the outage itself.
     queryMock.mockRejectedValue(new Error('connection terminated unexpectedly'));
     const res = await request(app).get('/api/me').set('Cookie', cookieFor(STAFF));
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     expect(res.headers['set-cookie']).toBeUndefined();
   });
 

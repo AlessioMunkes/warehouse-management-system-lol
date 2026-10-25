@@ -70,6 +70,6 @@ describe('ECD collection reminder WhatsApp routes', () => {
       .set('Cookie', cookieFor(ROLES.MANAGER));
 
     expect(res.status).toBe(500);
-    expect(res.body.message).toBe('Failed to retrieve WhatsApp reminders.');
+    expect(res.body.message).toBe('Could not load WhatsApp reminders. Try again, and if it keeps happening, tell an administrator.');
   });
 });

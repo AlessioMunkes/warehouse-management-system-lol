@@ -77,6 +77,6 @@ describe('dismissal routes — what they pass on', () => {
     dismissalMock.restore.mockRejectedValueOnce(new Error('connection lost'));
     const broken = await request(app).delete(URL).set('Cookie', cookieFor(ROLES.MANAGER));
     expect(broken.status).toBe(500);
-    expect(broken.body.message).toBe('Failed to restore the expiry warning.');
+    expect(broken.body.message).toBe('Could not restore the expiry warning. Try again, and if it keeps happening, tell an administrator.');
   });
 });

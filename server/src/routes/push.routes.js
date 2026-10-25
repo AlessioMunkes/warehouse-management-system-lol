@@ -9,6 +9,7 @@ import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { ALL_STAFF } from '../constants/permissions.js';
 import pushService from '../services/push.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = express.Router();
 
@@ -18,12 +19,10 @@ const router = express.Router();
 router.use(auth, requireRole(...ALL_STAFF));
 
 const respondError = (res, err, label) => {
-  const status = err.status || 500;
-  if (status >= 500) console.error(`[${label}]`, err.message);
-  res.status(status).json({
-    success: false,
-    message: status < 500 || err.status ? err.message : 'Could not update phone notifications.',
-  });
+  if (!err.status || err.status >= 500) console.error(`[${label}]`, err.message);
+  // A status the service set means its message was written for the
+  // reader, 5xx included (push being switched off, say).
+  sendError(res, err, 'Could not update phone notifications.', { passThrough: err.status ? [err.status] : [] });
 };
 
 // GET /api/push/public-key → { publicKey } (null when push is off)

@@ -49,7 +49,7 @@ describe('collectionKit.controller', () => {
   });
 
   it('hides a raw 500\'s message behind the fallback', async () => {
-    service.listRecords.mockRejectedValueOnce(new Error('connection terminated unexpectedly'));
+    service.listRecords.mockRejectedValueOnce(new Error('something unexpected broke'));
     const res = response();
 
     await controller.listRecords({ query: {} }, res);
@@ -57,7 +57,7 @@ describe('collectionKit.controller', () => {
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({
       success: false,
-      message: 'Failed to load compost records.',
+      message: 'Could not load compost records. Try again, and if it keeps happening, tell an administrator.',
     });
   });
 

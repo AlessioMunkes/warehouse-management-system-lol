@@ -5,6 +5,7 @@
 // its own small file rather than a route on reporting.routes.js.
 // ─────────────────────────────────────────────────────────────
 import publicImpactService from '../services/publicImpact.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // GET /api/public/impact-summary
 const getSummary = async (req, res) => {
@@ -16,7 +17,8 @@ const getSummary = async (req, res) => {
     // fundamental (the database itself unreachable) — no message
     // detail is safe to show an unauthenticated caller for that.
     console.error('[publicImpact.getSummary]', err.message);
-    res.status(500).json({ success: false, message: 'Could not load impact summary.' });
+    // Status and wording only (utils/httpError.js): nothing from the error.
+    sendError(res, { status: err.status >= 500 ? err.status : 500, code: err.code, message: err.message }, 'Could not load the impact summary.');
   }
 };
 

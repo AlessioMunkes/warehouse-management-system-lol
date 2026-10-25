@@ -6,6 +6,7 @@
 import donationIntakeService from '../services/donation.intake.service.js';
 import { MANAGERS_UP } from '../constants/permissions.js';
 import { DONATION_CATEGORIES } from '../constants/donationCategories.js';
+import { sendError } from '../utils/httpError.js';
 
 /**
  * POST /api/donations/intake
@@ -116,10 +117,7 @@ export const handleDonationIntake = async (req, res, next) => {
       timestamp: new Date().toISOString(),
     });
 
-    return res.status(500).json({
-      success: false,
-      message: 'An internal error occurred while processing the donation intake.',
-    });
+    return sendError(res, error, 'Could not record the donation.');
   }
 };
 
@@ -174,11 +172,7 @@ export const handleUnrecognizedDonationIntake = async (req, res, next) => {
       ip: req.ip,
       timestamp: new Date().toISOString(),
     });
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'An internal error occurred while logging the unrecognized item.',
-    });
+    return sendError(res, error, 'An internal error occurred while logging the unrecognized item.');
   }
 };
 

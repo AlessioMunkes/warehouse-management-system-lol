@@ -5,10 +5,10 @@
 // GET /api/admin/archive                   — deactivated and deleted items
 // ─────────────────────────────────────────────────────────────
 import service from '../services/adminActivity.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const send = (res, err, fallback) => {
-  const status = err.status || 500;
-  res.status(status).json({ success: false, message: status < 500 ? err.message : fallback });
+  sendError(res, err, fallback);
 };
 
 const activity = async (req, res) => {

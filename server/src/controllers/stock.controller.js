@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────
 import stockService from '../services/stock.service.js';
 import expiryDismissalService from '../services/expiryDismissal.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // ── Get the current manifest ─────────────────────────────────────
 // GET /api/stock
@@ -27,11 +28,7 @@ const getManifest = async (req, res) => {
     res.status(200).json({ success: true, data: manifest });
   } catch (err) {
     console.error('[getManifest]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve stock manifest.',
-    });
+    sendError(res, err, 'Failed to retrieve stock manifest.');
   }
 };
 
@@ -44,11 +41,7 @@ const getMovements = async (req, res) => {
     res.status(200).json({ success: true, data: movements });
   } catch (err) {
     console.error('[getMovements]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve stock movement history.',
-    });
+    sendError(res, err, 'Failed to retrieve stock movement history.');
   }
 };
 
@@ -74,11 +67,7 @@ const adjustManually = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[adjustManually]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to adjust stock.',
-    });
+    sendError(res, err, 'Failed to adjust stock.');
   }
 };
 
@@ -94,11 +83,7 @@ const getLedger = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[getLedger]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve the stock ledger.',
-    });
+    sendError(res, err, 'Failed to retrieve the stock ledger.');
   }
 };
 
@@ -112,11 +97,7 @@ const getReconciliation = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[getReconciliation]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to reconcile stock balances.',
-    });
+    sendError(res, err, 'Failed to reconcile stock balances.');
   }
 };
 
@@ -128,11 +109,7 @@ const getLedgerActors = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[getLedgerActors]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve ledger users.',
-    });
+    sendError(res, err, 'Failed to retrieve ledger users.');
   }
 };
 
@@ -145,11 +122,7 @@ const getStockTrends = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[getStockTrends]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve stock trends.',
-    });
+    sendError(res, err, 'Failed to retrieve stock trends.');
   }
 };
 
@@ -164,11 +137,7 @@ const getExpiryBatches = async (req, res) => {
     res.status(200).json({ success: true, data: batches });
   } catch (err) {
     console.error('[getExpiryBatches]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve expiry dates for this product.',
-    });
+    sendError(res, err, 'Failed to retrieve expiry dates for this product.');
   }
 };
 
@@ -186,11 +155,7 @@ const dismissExpiryWarning = async (req, res) => {
     res.status(201).json({ success: true, data: row });
   } catch (err) {
     console.error('[dismissExpiryWarning]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to dismiss the expiry warning.',
-    });
+    sendError(res, err, 'Failed to dismiss the expiry warning.');
   }
 };
 
@@ -203,11 +168,7 @@ const restoreExpiryWarning = async (req, res) => {
     res.status(200).json({ success: true, data: row });
   } catch (err) {
     console.error('[restoreExpiryWarning]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to restore the expiry warning.',
-    });
+    sendError(res, err, 'Failed to restore the expiry warning.');
   }
 };
 

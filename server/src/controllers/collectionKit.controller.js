@@ -5,6 +5,7 @@
 // convention as communityRequest.controller.js.
 // ─────────────────────────────────────────────────────────────
 import kitService from '../services/collectionKit.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // PASS_THROUGH matches reporting.controller.js's own convention: a
 // raw 500 hides its message because it might leak internals, but 503
@@ -15,11 +16,7 @@ import kitService from '../services/collectionKit.service.js';
 // a bare "Failed to load" — was silently thrown away.
 const PASS_THROUGH = new Set([502, 503, 504]);
 
-const send = (res, err, fallback) => {
-  const status = err.status || 500;
-  const showMessage = status < 500 || PASS_THROUGH.has(status);
-  res.status(status).json({ success: false, message: showMessage ? err.message : fallback });
-};
+const send = (res, err, fallback) => sendError(res, err, fallback, { passThrough: [...PASS_THROUGH] });
 
 // POST /api/collection-kits — assign a new kit to an owner
 const createKit = async (req, res) => {

@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import certificateSettingsService from '../services/certificateSettings.service.js';
 import { MANAGERS_UP, ADMIN_ONLY } from '../constants/permissions.js';
+import { sendError } from '../utils/httpError.js';
 // Admin and manager roles can modify certificate settings.
 
 // ── getSettings ────────────────────────────────────────────────
@@ -26,11 +27,7 @@ const getSettings = async (req, res) => {
     res.status(200).json({ success: true, data: settings });
   } catch (err) {
     console.error('[getSettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve certificate settings.',
-    });
+    sendError(res, err, 'Failed to retrieve certificate settings.');
   }
 };
 
@@ -56,11 +53,7 @@ const createSettings = async (req, res) => {
     res.status(201).json({ success: true, data: settings });
   } catch (err) {
     console.error('[createSettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to create certificate settings.',
-    });
+    sendError(res, err, 'Failed to create certificate settings.');
   }
 };
 
@@ -86,11 +79,7 @@ const updateSettings = async (req, res) => {
     res.status(200).json({ success: true, data: settings });
   } catch (err) {
     console.error('[updateSettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to update certificate settings.',
-    });
+    sendError(res, err, 'Failed to update certificate settings.');
   }
 };
 
@@ -116,11 +105,7 @@ const deleteSettings = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[deleteSettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to delete certificate settings.',
-    });
+    sendError(res, err, 'Failed to delete certificate settings.');
   }
 };
 

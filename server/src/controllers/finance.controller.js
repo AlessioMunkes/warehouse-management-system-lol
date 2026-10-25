@@ -1,4 +1,5 @@
 import financeService from '../services/finance.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const getFinanceReport = async (req, res) => {
   try {
@@ -6,11 +7,7 @@ const getFinanceReport = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[getFinanceReport]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve finance report.',
-    });
+    sendError(res, err, 'Failed to retrieve finance report.');
   }
 };
 
@@ -20,11 +17,7 @@ const getPublicFinanceReport = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[getPublicFinanceReport]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve finance report.',
-    });
+    sendError(res, err, 'Failed to retrieve finance report.');
   }
 };
 
@@ -34,11 +27,7 @@ const regenerateFinanceReportLink = async (req, res) => {
     res.status(201).json({ success: true, data });
   } catch (err) {
     console.error('[regenerateFinanceReportLink]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to regenerate finance report link.',
-    });
+    sendError(res, err, 'Failed to regenerate finance report link.');
   }
 };
 
@@ -48,11 +37,7 @@ const revokeFinanceReportLink = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[revokeFinanceReportLink]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to revoke finance report link.',
-    });
+    sendError(res, err, 'Failed to revoke finance report link.');
   }
 };
 
@@ -62,11 +47,7 @@ const getFinanceEmailSettings = async (_req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[getFinanceEmailSettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve finance email settings.',
-    });
+    sendError(res, err, 'Failed to retrieve finance email settings.');
   }
 };
 
@@ -79,11 +60,7 @@ const saveFinanceEmailSettings = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[saveFinanceEmailSettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to save finance email settings.',
-    });
+    sendError(res, err, 'Failed to save finance email settings.');
   }
 };
 
@@ -93,11 +70,7 @@ const sendFinanceReportLink = async (req, res) => {
     res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('[sendFinanceReportLink]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to send finance report link.',
-    });
+    sendError(res, err, 'Failed to send finance report link.');
   }
 };
 

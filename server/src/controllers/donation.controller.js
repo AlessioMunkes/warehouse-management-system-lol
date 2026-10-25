@@ -13,6 +13,7 @@
 // 500 with a generic message so we never leak internals to the client.
 // ─────────────────────────────────────────────────────────────
 import donationService from '../services/donation.service.js';
+import { sendError, errorReply } from '../utils/httpError.js';
 
 // ── List donations ───────────────────────────────────────────
 // GET /api/donations?range=today|week|month|all
@@ -24,11 +25,7 @@ const listDonations = async (req, res) => {
     res.status(200).json({ success: true, data: donations });
   } catch (err) {
     console.error('[listDonations]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve donations.',
-    });
+    sendError(res, err, 'Failed to retrieve donations.');
   }
 };
 
@@ -49,14 +46,14 @@ const createDonation = async (req, res) => {
     res.status(result.duplicate ? 200 : 201).json({ success: true, data: result });
   } catch (err) {
     console.error('[createDonation]', err.message);
-    const status = err.status || 500;
+    const { status, message } = errorReply(err, 'Failed to record donation.');
     // Structured validation errors (err.details: { field: message }) are
     // passed through on 4xx so the gate can highlight exactly which field
     // failed. Always attach the duplicate-prevention fingerprint hint when
     // the service computed one, so the UI can warn (not block) on re-submit.
     res.status(status).json({
       success: false,
-      message: status < 500 ? err.message : 'Failed to record donation.',
+      message,
       ...(err.details ? { errors: err.details } : {}),
       ...(err.duplicateFingerprint ? { duplicateFingerprint: err.duplicateFingerprint } : {}),
     });
@@ -72,11 +69,7 @@ const listUnmatchedItems = async (req, res) => {
     res.status(200).json({ success: true, data: items });
   } catch (err) {
     console.error('[listUnmatchedItems]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve unmatched donation items.',
-    });
+    sendError(res, err, 'Failed to retrieve unmatched donation items.');
   }
 };
 
@@ -90,11 +83,7 @@ const listSection18AQueue = async (req, res) => {
     res.status(200).json({ success: true, data: queue });
   } catch (err) {
     console.error('[listSection18AQueue]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve the Section 18A queue.',
-    });
+    sendError(res, err, 'Failed to retrieve the Section 18A queue.');
   }
 };
 
@@ -112,11 +101,7 @@ const listEmailHistory = async (req, res) => {
     res.status(200).json({ success: true, data: emails });
   } catch (err) {
     console.error('[listEmailHistory]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve donation email history.',
-    });
+    sendError(res, err, 'Failed to retrieve donation email history.');
   }
 };
 
@@ -126,11 +111,7 @@ const resendDonationEmail = async (req, res) => {
     res.status(200).json({ success: true, data: email });
   } catch (err) {
     console.error('[resendDonationEmail]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to resend donation email.',
-    });
+    sendError(res, err, 'Failed to resend donation email.');
   }
 };
 
@@ -140,11 +121,7 @@ const getSection18AForm = async (req, res) => {
     res.status(200).json({ success: true, data: form });
   } catch (err) {
     console.error('[getSection18AForm]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve the Section 18A form.',
-    });
+    sendError(res, err, 'Failed to retrieve the Section 18A form.');
   }
 };
 
@@ -154,10 +131,10 @@ const submitSection18AForm = async (req, res) => {
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     console.error('[submitSection18AForm]', err.message);
-    const status = err.status || 500;
+    const { status, message } = errorReply(err, 'Failed to submit the Section 18A form.');
     res.status(status).json({
       success: false,
-      message: status < 500 ? err.message : 'Failed to submit the Section 18A form.',
+      message,
       ...(err.details ? { errors: err.details } : {}),
     });
   }
@@ -177,11 +154,7 @@ const generateSection18ACertificate = async (req, res) => {
     } });
   } catch (err) {
     console.error('[generateSection18ACertificate]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to generate the Section 18A certificate.',
-    });
+    sendError(res, err, 'Failed to generate the Section 18A certificate.');
   }
 };
 
@@ -197,11 +170,7 @@ const downloadSection18ACertificate = async (req, res) => {
     res.send(file.buffer);
   } catch (err) {
     console.error('[downloadSection18ACertificate]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to download the Section 18A certificate.',
-    });
+    sendError(res, err, 'Failed to download the Section 18A certificate.');
   }
 };
 
@@ -215,11 +184,7 @@ const resolveUnmatchedItem = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[resolveUnmatchedItem]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to resolve donation item.',
-    });
+    sendError(res, err, 'Failed to resolve donation item.');
   }
 };
 
@@ -232,11 +197,7 @@ const getDonationById = async (req, res) => {
     res.status(200).json({ success: true, data: donation });
   } catch (err) {
     console.error('[getDonationById]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve donation.',
-    });
+    sendError(res, err, 'Failed to retrieve donation.');
   }
 };
 
@@ -249,11 +210,7 @@ const getDonationEvents = async (req, res) => {
     res.status(200).json({ success: true, data: events });
   } catch (err) {
     console.error('[getDonationEvents]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve donation history.',
-    });
+    sendError(res, err, 'Failed to retrieve donation history.');
   }
 };
 
@@ -267,11 +224,7 @@ const reclassifyDonation = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[reclassifyDonation]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to reclassify donation.',
-    });
+    sendError(res, err, 'Failed to reclassify donation.');
   }
 };
 
@@ -284,11 +237,7 @@ const getSection18ASettings = async (req, res) => {
     res.status(200).json({ success: true, data: settings });
   } catch (err) {
     console.error('[getSection18ASettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve Section 18A settings.',
-    });
+    sendError(res, err, 'Failed to retrieve Section 18A settings.');
   }
 };
 
@@ -300,11 +249,7 @@ const updateSection18ASettings = async (req, res) => {
     res.status(200).json({ success: true, data: settings });
   } catch (err) {
     console.error('[updateSection18ASettings]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to update Section 18A settings.',
-    });
+    sendError(res, err, 'Failed to update Section 18A settings.');
   }
 };
 

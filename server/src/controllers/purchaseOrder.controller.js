@@ -5,14 +5,12 @@
 // no SQL here.
 // ─────────────────────────────────────────────────────────────
 import purchaseOrderService from '../services/purchaseOrder.service.js';
+import { errorReply } from '../utils/httpError.js';
 
 const respondError = (res, err, label, fallback) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  const body = {
-    success: false,
-    message: status < 500 ? err.message : fallback,
-  };
+  const { status, message } = errorReply(err, fallback);
+  const body = { success: false, message };
   // Carried through so the form can highlight the offending rows
   // rather than making the manager re-read a 30-line order herself.
   if (err.missingProductIds) body.missingProductIds = err.missingProductIds;

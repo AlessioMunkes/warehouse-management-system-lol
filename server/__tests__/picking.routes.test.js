@@ -337,7 +337,7 @@ describe('picking routes — service status is honoured', () => {
   });
 
   it('falls back to 500 for an error with no status', async () => {
-    serviceMock.getSlips.mockRejectedValueOnce(new Error('connection terminated unexpectedly'));
+    serviceMock.getSlips.mockRejectedValueOnce(new Error('something unexpected broke'));
     const res = await request(app).get(BASE).set('Cookie', cookieFor(ROLES.WORKER));
     expect(res.status).toBe(500);
   });
@@ -350,17 +350,17 @@ describe('picking routes — service status is honoured', () => {
 
     expect(res.status).toBe(500);
     expect(res.body.message).not.toMatch(/postgres|password/i);
-    expect(res.body.message).toBe('Failed to retrieve picking slips.');
+    expect(res.body.message).toBe('Could not load picking slips. Try again, and if it keeps happening, tell an administrator.');
   });
 
   it.each([
-    ['getSlipById',   'get',  `${BASE}/1`,                  'Failed to retrieve picking slip.'],
-    ['generateSlips', 'post', `${BASE}/generate`,           'Failed to generate picking slips.'],
-    ['createSlip',    'post', BASE,                         'Failed to create picking slip.'],
-    ['assignSlip',    'post', `${BASE}/1/assign`,           'Failed to assign picking slip.'],
-    ['confirmItem',   'post', `${BASE}/1/items/5/confirm`,  'Failed to confirm item.'],
-    ['flagItem',      'post', `${BASE}/1/items/5/flag`,     'Failed to flag item.'],
-    ['completeSlip',  'post', `${BASE}/1/complete`,         'Failed to complete picking slip.'],
+    ['getSlipById',   'get',  `${BASE}/1`,                  'Could not load picking slip. Try again, and if it keeps happening, tell an administrator.'],
+    ['generateSlips', 'post', `${BASE}/generate`,           'Could not generate picking slips. Try again, and if it keeps happening, tell an administrator.'],
+    ['createSlip',    'post', BASE,                         'Could not create picking slip. Try again, and if it keeps happening, tell an administrator.'],
+    ['assignSlip',    'post', `${BASE}/1/assign`,           'Could not assign picking slip. Try again, and if it keeps happening, tell an administrator.'],
+    ['confirmItem',   'post', `${BASE}/1/items/5/confirm`,  'Could not confirm item. Try again, and if it keeps happening, tell an administrator.'],
+    ['flagItem',      'post', `${BASE}/1/items/5/flag`,     'Could not flag item. Try again, and if it keeps happening, tell an administrator.'],
+    ['completeSlip',  'post', `${BASE}/1/complete`,         'Could not complete picking slip. Try again, and if it keeps happening, tell an administrator.'],
   ])('masks a raw %s failure with a generic message', async (fn, method, path, expected) => {
     serviceMock[fn].mockRejectedValueOnce(new Error('relation "picking_slips" does not exist'));
     // Packing a pallet is the floor's; everything else here an admin may do.
@@ -456,7 +456,7 @@ describe('picking routes — PATCH /:id', () => {
     const res = await request(app).patch(`${BASE}/1`)
       .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
     expect(res.status).toBe(500);
-    expect(res.body.message).toBe('Failed to update picking slip.');
+    expect(res.body.message).toBe('Could not update picking slip. Try again, and if it keeps happening, tell an administrator.');
   });
 });
 
@@ -490,7 +490,7 @@ describe('picking routes — /:id/release', () => {
     const res = await request(app).post(`${BASE}/1/release`)
       .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
     expect(res.status).toBe(500);
-    expect(res.body.message).toBe('Failed to release picking slip.');
+    expect(res.body.message).toBe('Could not release picking slip. Try again, and if it keeps happening, tell an administrator.');
   });
 });
 

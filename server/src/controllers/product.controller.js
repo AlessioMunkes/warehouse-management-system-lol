@@ -6,14 +6,11 @@
 // division of labour as supplier.controller.js/user.controller.js.
 // ─────────────────────────────────────────────────────────────
 import productService from '../services/product.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const respondError = (res, err, label, fallback) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  res.status(status).json({
-    success: false,
-    message: status < 500 ? err.message : fallback,
-  });
+  sendError(res, err, fallback);
 };
 
 // ── GET /api/products?includeInactive=&search= ─────────────────
