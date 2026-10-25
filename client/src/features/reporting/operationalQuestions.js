@@ -15,6 +15,9 @@ export const AREAS = [
   { id: 'receiving',   label: 'Receiving and suppliers',  metrics: ['goods_received', 'receiving_discrepancy_rate', 'unresolved_discrepancies', 'po_on_time_rate', 'supplier_lead_time'] },
   { id: 'procurement', label: 'Procurement',              metrics: ['overdue_purchase_orders', 'purchase_order_pipeline', 'procurement_spend', 'unit_price_trend'] },
   { id: 'stock',       label: 'Stock',                    metrics: ['low_stock_items', 'stock_on_hand', 'stock_value', 'expiring_stock', 'standing_order_demand', 'stock_movement_volume', 'stock_count_variance', 'adjustment_reasons'] },
+  // Staff activity counts each person's work; the others are the same
+  // reports as elsewhere, opened by staff member from their own page.
+  { id: 'staff',       label: 'Staff performance',        metrics: ['staff_activity'] },
   { id: 'people',      label: 'Donations, community and volunteers', metrics: ['donation_value', 'donation_routing', 'section18a_pipeline', 'community_request_outcomes', 'community_response_time', 'volunteer_hours', 'volunteer_event_attendance'] },
 ];
 
@@ -41,6 +44,7 @@ export const FEATURED_QUESTIONS = [
   'Which products have gone up in price?',
   'Is decanting wastage getting worse?',
   'Which products do packers flag most?',
+  'Staff activity by staff member and area',
   // The workload heatmap: it used to be its own tab.
   'When is receiving busiest? Show a heatmap',
   'Scatter plot of centres: collections vs children',

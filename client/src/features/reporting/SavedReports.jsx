@@ -105,7 +105,10 @@ export function SavedReportsBar({ items, onOpen, onChanged }) {
   );
 }
 
-export function SaveReport({ kind, spec, defaultTitle, preset, onSaved }) {
+// narrative: the written report from "Generate report", when one has been
+// written for this chart; it is saved with the report. narrativeRange: the
+// dates it was written about.
+export function SaveReport({ kind, spec, defaultTitle, preset, narrative = null, narrativeRange = null, onSaved }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(defaultTitle ?? '');
   const [schedule, setSchedule] = useState('none');
@@ -128,7 +131,10 @@ export function SaveReport({ kind, spec, defaultTitle, preset, onSaved }) {
     setBusy(true);
     setError(null);
     try {
-      await saveReport({ kind, spec, title, schedule, pinned, preset });
+      await saveReport({
+        kind, spec, title, schedule, pinned, preset,
+        ...(narrative ? { narrative, narrativeRange } : {}),
+      });
       setDone(true);
       await onSaved?.();
     } catch (err) {
@@ -159,6 +165,11 @@ export function SaveReport({ kind, spec, defaultTitle, preset, onSaved }) {
         {busy ? 'Saving…' : 'Save'}
       </button>
       <button type="button" onClick={() => setOpen(false)} className="underline underline-offset-2">Cancel</button>
+      <span className="w-full" style={{ color: MUTED }}>
+        {narrative
+          ? 'The written report is saved with it.'
+          : 'To keep a written report with it, choose Generate report below first.'}
+      </span>
       {schedule !== 'none' && (
         <span className="w-full" style={{ color: MUTED }}>
           The email goes to your own address and covers the last full {schedule === 'weekly' ? 'week' : 'month'}.

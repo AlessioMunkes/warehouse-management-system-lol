@@ -41,6 +41,8 @@ export const DRILL_FILTERS = {
   ecd_centre:    { filter: 'ecd_id',            lookupTable: 'ecd_centres' },
   programme:     { filter: 'programme_id',      lookupTable: 'programmes' },
   location:      { filter: 'location_id',       lookupTable: 'storage_locations' },
+  // One member of staff, found by the full name the bar shows.
+  staff:         { filter: 'staff_id',          lookupTable: 'users' },
   cohort:        { filter: 'cohort' },
   beneficiary:   { filter: 'beneficiary_kind' },
   movement_type: { filter: 'movement_type' },

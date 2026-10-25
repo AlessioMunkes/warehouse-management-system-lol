@@ -455,6 +455,16 @@ export const OPERATIONAL_INSIGHTS = {
     ],
     actions: [],
   },
+  // Staff performance: volume here, quality and speed in the related
+  // charts, each by staff member.
+  staff_activity: {
+    area: 'picking', better: null,
+    related: [
+      { metric: 'picking_flag_rate', dimension: 'staff' },
+      { metric: 'picking_turnaround', dimension: 'staff' },
+    ],
+    actions: [],
+  },
   days_of_cover: {
     area: 'stock', better: 'up', target: 30,
     related: [{ metric: 'low_stock_items', dimension: 'product' }, { metric: 'dispatch_volume', dimension: 'product' }],

@@ -17,10 +17,11 @@
 //     by EVENT, never by person
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
-import { COLLECTED_STATUSES, SAST } from '../features/reporting/reportCatalog.js';
+import { COLLECTED_STATUSES, SAST, STAFF_AREAS } from '../features/reporting/reportCatalog.js';
 import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import stockCoverRepo from './stockCover.repository.js';
 import { listExpiringLots } from './shelfLots.repository.js';
+import { staffName, staffFilter } from './reportingStaff.sql.js';
 
 const sastDate = (col) => `((${col} AT TIME ZONE '${SAST}')::date)`;
 const TODAY = `((NOW() AT TIME ZONE '${SAST}')::date)`;
@@ -136,11 +137,14 @@ const purchaseOrderPipeline = async ({ dimension, filters, dateRange }) => {
 const pickingTurnaround = async ({ dimension, filters, dateRange }) => {
   const expr = pick({
     none: `'Total'`, month: bucketMonth('ps.dispatch_date'), week: bucketWeek('ps.dispatch_date'), day: bucketDay('ps.dispatch_date'), cohort: 'ps.cohort::text',
+    // Who finished the pallet.
+    staff: staffName('ps.completed_by'),
   }, dimension);
   const params = [dateRange.from, dateRange.to];
   const where = [
     `ps.dispatch_date BETWEEN $1::date AND $2::date`,
     `ps.started_at IS NOT NULL`, `ps.completed_at IS NOT NULL`, `ps.completed_at > ps.started_at`,
+    ...staffFilter('ps.completed_by', filters, params),
   ];
   if (filters.cohort) { params.push(filters.cohort); where.push(`ps.cohort = $${params.length}::cohort_group`); }
   const { rows } = await pool.query(
@@ -312,9 +316,10 @@ const adjustmentReasons = async ({ dimension, filters, dateRange }) => {
     reason: `COALESCE(NULLIF(LOWER(TRIM(sm.reason)), ''), 'no reason recorded')`,
     month: bucketMonth(d), week: bucketWeek(d), day: bucketDay(d),
     product: `COALESCE(p.name, 'Unknown product')`,
+    staff: staffName('sm.performed_by'),
   }, dimension);
   const params = [dateRange.from, dateRange.to];
-  const where = [`${d} BETWEEN $1::date AND $2::date`, `sm.movement_type = 'adjustment'`];
+  const where = [`${d} BETWEEN $1::date AND $2::date`, `sm.movement_type = 'adjustment'`, ...staffFilter('sm.performed_by', filters, params)];
   if (filters.product_id) { params.push(filters.product_id); where.push(`sm.product_id = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
@@ -322,7 +327,7 @@ const adjustmentReasons = async ({ dimension, filters, dateRange }) => {
   LEFT JOIN products p ON p.id = sm.product_id
       WHERE ${where.join(' AND ')}
       GROUP BY ${expr} ORDER BY ${isTime(dimension) ? '1' : '2 DESC, 1'}
-      ${dimension === 'reason' || dimension === 'product' ? 'LIMIT 25' : ''}`,
+      ${dimension === 'reason' || dimension === 'product' || dimension === 'staff' ? 'LIMIT 25' : ''}`,
     params
   );
   return rows2series(rows);
@@ -333,9 +338,10 @@ const decantingMarginRate = async ({ dimension, filters, dateRange }) => {
   const expr = pick({
     none: `'Total'`, week: bucketWeek('dr.week_of'), month: bucketMonth('dr.week_of'),
     product: `COALESCE(p.name, 'Unknown product')`,
+    staff: staffName('dr.recorded_by'),
   }, dimension);
   const params = [dateRange.from, dateRange.to];
-  const where = [`dr.week_of BETWEEN $1::date AND $2::date`];
+  const where = [`dr.week_of BETWEEN $1::date AND $2::date`, ...staffFilter('dr.recorded_by', filters, params)];
   if (filters.product_id) { params.push(filters.product_id); where.push(`dl.product_id = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label,
@@ -349,6 +355,55 @@ const decantingMarginRate = async ({ dimension, filters, dateRange }) => {
     params
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { bags: r.bags } }));
+};
+
+// ══ Staff activity ═════════════════════════════════════════════
+// The work each member of staff recorded, across the floor: one row per
+// piece of work, from the column that names who did it, on the day it
+// was done (South African time). Rows with nobody recorded are left
+// out: this report is about people. Volunteer guests are not users and
+// never appear. The areas are the catalog's STAFF_AREAS.
+const AREA_LABEL = `CASE w.area ${STAFF_AREAS.map((a) => `WHEN '${a.id}' THEN '${a.label}'`).join(' ')} END`;
+const STAFF_WORK = `
+  SELECT dn.received_by AS uid, 'receiving' AS area,
+         COALESCE(${sastDate('dn.delivered_at')}, dn.delivery_date) AS day
+    FROM delivery_notes dn
+  UNION ALL
+  SELECT psi.confirmed_by, 'packing', ${sastDate('psi.confirmed_at')}
+    FROM picking_slip_items psi
+   WHERE psi.status IN ('confirmed', 'flagged') AND psi.confirmed_at IS NOT NULL
+  UNION ALL
+  SELECT de.dispatched_by, 'gate', ${sastDate('de.collected_at')}
+    FROM dispatch_events de WHERE de.collected_at IS NOT NULL
+  UNION ALL
+  SELECT dr.recorded_by, 'decanting', ${sastDate('dr.created_at')} FROM decanting_records dr
+  UNION ALL
+  SELECT d.received_by, 'donations', ${sastDate('d.received_at')} FROM donations d
+  UNION ALL
+  SELECT sm.performed_by, 'adjustments', ${sastDate('sm.created_at')}
+    FROM stock_movements sm WHERE sm.movement_type = 'adjustment'`;
+
+const staffActivity = async ({ dimension, filters = {}, dateRange }) => {
+  const name = staffName('w.uid');
+  const expr = pick({
+    staff: name,
+    staff_area: `${name} || '|' || ${AREA_LABEL}`,
+    area: AREA_LABEL,
+    none: `'Total'`,
+    month: bucketMonth('w.day'), week: bucketWeek('w.day'), day: bucketDay('w.day'),
+  }, dimension);
+  const params = [dateRange.from, dateRange.to];
+  const where = [`w.uid IS NOT NULL`, `w.day BETWEEN $1::date AND $2::date`, ...staffFilter('w.uid', filters, params)];
+  if (filters.staff_area) { params.push(filters.staff_area); where.push(`w.area = $${params.length}`); }
+  const ordered = isTime(dimension) || dimension === 'staff_area';
+  const { rows } = await pool.query(
+    `SELECT ${expr} AS label, COUNT(*)::numeric AS value
+       FROM (${STAFF_WORK}) w
+      WHERE ${where.join(' AND ')}
+      ${groupBy(dimension, expr)} ORDER BY ${ordered ? '1' : '2 DESC, 1'}`,
+    params
+  );
+  return rows2series(rows);
 };
 
 // ══ Community, donations, volunteers (aggregate only) ═════════
@@ -490,4 +545,5 @@ export default {
   pickingTurnaround, slipPipeline, gateLoadVariance, lateCollectionRate,
   standingOrderDemand, stockValue, countUnpricedStock, expiringStock, adjustmentReasons,
   decantingMarginRate, communityResponseTime, donationRouting, volunteerEventAttendance,
+  staffActivity,
 };

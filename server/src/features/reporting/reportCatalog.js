@@ -50,6 +50,17 @@ export const S18A_STATUSES = [
 ];
 
 // ── Guard rails ───────────────────────────────────────────────
+// Where a member of staff's recorded work happens (the staff_activity
+// report and its filter).
+export const STAFF_AREAS = [
+  { id: 'receiving', label: 'Receiving' },
+  { id: 'packing', label: 'Packing' },
+  { id: 'gate', label: 'Dispatch gate' },
+  { id: 'decanting', label: 'Decanting' },
+  { id: 'donations', label: 'Donations' },
+  { id: 'adjustments', label: 'Stock adjustments' },
+];
+
 export const MAX_RANGE_DAYS     = 730;
 export const MAX_RANK_LIMIT     = 25;
 export const DEFAULT_RANK_LIMIT = 10;
@@ -97,6 +108,10 @@ export const DIMENSIONS = {
   // Workload only: "08|Mon", an hour of the day by weekday, drawn as a
   // heatmap.
   hour_weekday:      { id: 'hour_weekday',      label: 'Hour and day',        chart: 'stacked_bar' },
+  // Who did the work, where a report records a person.
+  staff:             { id: 'staff',             label: 'Staff member',        chart: 'hbar' },
+  staff_area:        { id: 'staff_area',        label: 'Staff member and area', chart: 'stacked_bar' },
+  area:              { id: 'area',              label: 'Area of work',        chart: 'bar'  },
   // Diagram-only breakdowns, one metric each.
   flow:              { id: 'flow',              label: 'Opening to closing',  chart: 'bar'  },
   category_flow:     { id: 'category_flow',     label: 'Category to routing', chart: 'bar'  },
@@ -127,6 +142,9 @@ export const FILTERS = {
   storage_type:      { label: 'Storage type',     text: true },
   // Workload: which area of the floor (receiving, packing, the gate).
   work_area:         { label: 'Area',             values: WORK_AREAS },
+  // One member of staff (users.id), and the area of their work.
+  staff_id:          { label: 'Staff member',     values: null },
+  staff_area:        { label: 'Area of work',     values: STAFF_AREAS.map((a) => a.id) },
 };
 
 // grouped_bar: several series clustered per time bucket (e.g.
@@ -319,8 +337,8 @@ export const METRICS = {
       'staff loaded onto the vehicle, not what was packed onto the pallet earlier ' +
       'in the week.',
     repoFn: 'dispatchVolume', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type'],
-    filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id', 'product_category', 'storage_type'],
+    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type', 'staff'],
+    filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id', 'product_category', 'storage_type', 'staff_id'],
     defaultChart: 'line',
     caveat: 'Gate-loaded quantities, kilogram lines only. Counted on the day the pallet left, not the day it was booked for.',
   },
@@ -358,7 +376,7 @@ export const METRICS = {
       'what was packed. Rising wastage on one product usually points at a process ' +
       'or supplier problem.',
     repoFn: 'decantingWastage', unit: '%',
-    dimensions: ['none', 'week', 'month', 'product'], filters: ['product_id'],
+    dimensions: ['none', 'week', 'month', 'product', 'staff'], filters: ['product_id', 'staff_id'],
     defaultChart: 'line',
     caveat: 'Wastage as a share of packed weight.',
   },
@@ -371,8 +389,8 @@ export const METRICS = {
       'actually received and signed for at the door, not what the purchase order ' +
       'said was coming.',
     repoFn: 'goodsReceived', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'supplier', 'product', 'month_supplier', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type'],
-    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type'],
+    dimensions: ['none', 'month', 'week', 'supplier', 'product', 'month_supplier', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type', 'staff'],
+    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type', 'staff_id'],
     defaultChart: 'line',
     caveat: 'Received weights where recorded in kilograms.',
   },
@@ -386,8 +404,8 @@ export const METRICS = {
     repoFn: 'receivingDiscrepancyRate', unit: '%',
     // supplier first: this is the supplier-reliability report, and a
     // single overall discrepancy rate is not something anyone acts on.
-    dimensions: ['supplier', 'none', 'month', 'product', 'week', 'day', 'product_category'],
-    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type'],
+    dimensions: ['supplier', 'none', 'month', 'product', 'week', 'day', 'product_category', 'staff'],
+    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type', 'staff_id'],
     defaultChart: 'hbar',
     caveat: 'A line counts as discrepant if received differs from expected in either direction.',
   },
@@ -443,8 +461,8 @@ export const METRICS = {
       'The estimated rand value of donations received. Aggregate only; this report ' +
       'cannot be broken down by donor.',
     repoFn: 'donationValue', unit: 'ZAR',
-    dimensions: ['none', 'month', 'category', 'week', 'day'],
-    filters: ['donation_category'],
+    dimensions: ['none', 'month', 'category', 'week', 'day', 'staff'],
+    filters: ['donation_category', 'staff_id'],
     defaultChart: 'line',
     caveat: 'Values are as estimated at intake.',
   },
@@ -497,8 +515,8 @@ export const METRICS = {
       'donated, written off as wastage, or manually adjusted. Use this to see ' +
       'warehouse throughput or to check how much was adjusted by hand.',
     repoFn: 'stockMovementVolume', unit: 'units',
-    dimensions: ['movement_type', 'month', 'week', 'product', 'programme', 'month_movement', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type'],
-    filters: ['movement_type', 'product_id', 'programme_id', 'product_category', 'storage_type'],
+    dimensions: ['movement_type', 'month', 'week', 'product', 'programme', 'month_movement', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type', 'staff'],
+    filters: ['movement_type', 'product_id', 'programme_id', 'product_category', 'storage_type', 'staff_id'],
     defaultChart: 'bar',
     caveat: 'Mixed units across products; compare within a product rather than across.',
   },
@@ -525,8 +543,8 @@ export const METRICS = {
     repoFn: 'pickingFlagRate', unit: '%',
     // product first: a flag rate is only useful once you know which
     // product is causing it.
-    dimensions: ['product', 'none', 'month', 'cohort', 'week', 'day', 'product_category'],
-    filters: ['product_id', 'cohort', 'product_category', 'storage_type'],
+    dimensions: ['product', 'none', 'month', 'cohort', 'week', 'day', 'product_category', 'staff'],
+    filters: ['product_id', 'cohort', 'product_category', 'storage_type', 'staff_id'],
     defaultChart: 'hbar',
     caveat: 'Flagged lines as a share of all lines that were worked.',
   },
@@ -613,7 +631,7 @@ export const METRICS = {
       'Average hours from a packer starting a picking slip to completing it. Rising turnaround ' +
       'means pallets are taking longer to pack.',
     repoFn: 'pickingTurnaround', unit: 'hours',
-    dimensions: ['month', 'week', 'cohort', 'none', 'day'], filters: ['cohort'],
+    dimensions: ['month', 'week', 'cohort', 'none', 'day', 'staff'], filters: ['cohort', 'staff_id'],
     defaultChart: 'line',
     caveat: 'Slips completed without being started first have no duration and are left out.',
   },
@@ -694,7 +712,7 @@ export const METRICS = {
       'Why stock was adjusted by hand, by the reason staff recorded. Frequent reasons point at a ' +
       'step in receiving or picking that is not being captured.',
     repoFn: 'adjustmentReasons', unit: 'adjustments',
-    dimensions: ['reason', 'month', 'week', 'day', 'product'], filters: ['product_id'],
+    dimensions: ['reason', 'month', 'week', 'day', 'product', 'staff'], filters: ['product_id', 'staff_id'],
     defaultChart: 'hbar',
     caveat: 'Reasons are grouped as typed, ignoring case. The top fifteen are shown.',
   },
@@ -706,7 +724,7 @@ export const METRICS = {
       'The percentage of decanting lines where the bags packed came out within the allowed margin ' +
       'of the required weight. Falling accuracy means bags are being over- or under-filled.',
     repoFn: 'decantingMarginRate', unit: '%',
-    dimensions: ['none', 'week', 'month', 'product'], filters: ['product_id'],
+    dimensions: ['none', 'week', 'month', 'product', 'staff'], filters: ['product_id', 'staff_id'],
     defaultChart: 'line',
     caveat: 'Uses the within-margin check recorded on each decanting line.',
   },
@@ -763,6 +781,24 @@ export const METRICS = {
     defaultChart: 'stacked_bar',
     caveat: 'Average per weekday in the period, so a period with more Mondays does not make Monday look busier. ' +
       'Counts work recorded (a delivery saved, a line picked, a pallet released), not people.',
+  },
+
+  // Staff performance: what each member of staff recorded. Quality and
+  // speed per person are the other reports broken down by staff member
+  // (picking_flag_rate, receiving_discrepancy_rate, picking_turnaround).
+  staff_activity: {
+    id: 'staff_activity', label: 'Staff activity', temporal: 'range',
+    description:
+      'The work each member of staff recorded: deliveries received, lines packed, pallets handed over at the ' +
+      'gate, decanting runs, donations taken in and stock adjustments. Choose a person to see their work ' +
+      'over time.',
+    repoFn: 'staffActivity', unit: 'pieces of work',
+    dimensions: ['staff', 'staff_area', 'area', 'month', 'week', 'day', 'none'],
+    filters: ['staff_id', 'staff_area'],
+    defaultChart: 'hbar',
+    caveat: 'Counts work recorded under each person. A delivery, a packed line and a pallet each count as one, ' +
+      'so compare people within one area rather than across areas. For accuracy and speed, break the packing ' +
+      'flag rate, the delivery discrepancy rate or the packing turnaround down by staff member.',
   },
 
   // How long stock lasts at the current rate of dispatch.

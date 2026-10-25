@@ -30,6 +30,7 @@ import { listWorkload } from './reportingPlanning.repository.js';
 import { workloadSeries } from '../features/reporting/workload.js';
 import opsRepo from './reportingOps.repository.js';
 import { committedStockSql } from './committedStock.sql.js';
+import { staffName, staffFilter } from './reportingStaff.sql.js';
 import {
   COLLECTED_STATUSES, NOT_COLLECTED_STATUSES, IMPACT_BENEFICIARY_KINDS, SAST,
 } from '../features/reporting/reportCatalog.js';
@@ -105,12 +106,15 @@ const slipDimension = (dimension, day = 'ps.dispatch_date') => {
     case 'day':              return { expr: bucketDay(day), group: bucketDay(day) };
     case 'product_category': return { expr: PRODUCT_CATEGORY, group: PRODUCT_CATEGORY };
     case 'storage_type':     return { expr: STORAGE_TYPE,     group: STORAGE_TYPE };
+    // Who handed the pallet over at the gate. Only reports joined to
+    // dispatch_events list this breakdown.
+    case 'staff':            return { expr: staffName('de.dispatched_by'), group: staffName('de.dispatched_by') };
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
 
 const slipFilters = (filters, params) => {
-  const clauses = [];
+  const clauses = [...staffFilter('de.dispatched_by', filters, params)];
   if (filters.cohort)           { params.push(filters.cohort);           clauses.push(`ps.cohort = $${params.length}::cohort_group`); }
   if (filters.beneficiary_kind) { params.push(filters.beneficiary_kind); clauses.push(`ps.beneficiary_kind = $${params.length}::beneficiary_type`); }
   if (filters.ecd_id)           { params.push(filters.ecd_id);           clauses.push(`ps.ecd_id = $${params.length}`); }
@@ -416,7 +420,7 @@ const repeatNonCollections = async ({ filters, dateRange, limit }) => {
 // straight ratio. NULLIF guards a week where nothing was packed.
 const decantingWastage = async ({ dimension, filters, dateRange }) => {
   const params = [dateRange.from, dateRange.to];
-  const where = [`dr.week_of BETWEEN $1::date AND $2::date`];
+  const where = [`dr.week_of BETWEEN $1::date AND $2::date`, ...staffFilter('dr.recorded_by', filters, params)];
   if (filters.product_id) { params.push(filters.product_id); where.push(`dl.product_id = $${params.length}`); }
 
   const expr = {
@@ -424,6 +428,7 @@ const decantingWastage = async ({ dimension, filters, dateRange }) => {
     week:    bucketWeek('dr.week_of'),
     month:   bucketMonth('dr.week_of'),
     product: `COALESCE(p.name, 'Unknown product')`,
+    staff:   staffName('dr.recorded_by'),
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
@@ -436,7 +441,7 @@ const decantingWastage = async ({ dimension, filters, dateRange }) => {
   LEFT JOIN products p ON p.id = dl.product_id
       WHERE ${where.join(' AND ')}
       ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
-      ORDER BY ${dimension === 'product' ? '2 DESC NULLS LAST, 1' : '1'}`,
+      ORDER BY ${dimension === 'product' || dimension === 'staff' ? '2 DESC NULLS LAST, 1' : '1'}`,
     params
   );
   return rows.map((r) => ({
@@ -497,12 +502,14 @@ const receivingDimension = (dimension) => {
     case 'day':              return { expr: bucketDay('dn.delivery_date'), group: bucketDay('dn.delivery_date') };
     case 'product_category': return { expr: PRODUCT_CATEGORY, group: PRODUCT_CATEGORY };
     case 'storage_type':     return { expr: STORAGE_TYPE,     group: STORAGE_TYPE };
+    // Who received the delivery.
+    case 'staff':            return { expr: staffName('dn.received_by'), group: staffName('dn.received_by') };
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
 
 const receivingFilters = (filters, params) => {
-  const clauses = [];
+  const clauses = [...staffFilter('dn.received_by', filters, params)];
   if (filters.supplier_id) { params.push(filters.supplier_id); clauses.push(`dn.supplier_id = $${params.length}`); }
   if (filters.product_id)  { params.push(filters.product_id);  clauses.push(`dni.product_id = $${params.length}`); }
   clauses.push(...productFilters(filters, params));
@@ -659,11 +666,13 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
     week:      bucketWeek(d),
     day:       bucketDay(d),
     category:  `dn.donation_category::text`,
+    // The member of staff who took it in. Never the donor.
+    staff:     staffName('dn.received_by'),
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
   const params = [dateRange.from, dateRange.to];
-  const where = [`${d} BETWEEN $1::date AND $2::date`];
+  const where = [`${d} BETWEEN $1::date AND $2::date`, ...staffFilter('dn.received_by', filters, params)];
   if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.donation_category = $${params.length}`); }
 
   const { rows } = await pool.query(
@@ -777,11 +786,12 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
     month_movement: `${bucketMonth(d)} || '|' || sm.movement_type`,
     weekday:        weekday(d),
     week_weekday:   weekWeekday(d),
+    staff:          staffName('sm.performed_by'),
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
   const params = [dateRange.from, dateRange.to];
-  const where = [`${d} BETWEEN $1::date AND $2::date`];
+  const where = [`${d} BETWEEN $1::date AND $2::date`, ...staffFilter('sm.performed_by', filters, params)];
   if (filters.movement_type) { params.push(filters.movement_type); where.push(`sm.movement_type = $${params.length}`); }
   if (filters.product_id)    { params.push(filters.product_id);    where.push(`sm.product_id = $${params.length}`); }
   if (filters.programme_id)  { params.push(filters.programme_id);  where.push(`p.programme_id = $${params.length}`); }
@@ -841,6 +851,8 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
     product_category: PRODUCT_CATEGORY,
     product: `p.name`,
     cohort:  `ps.cohort::text`,
+    // Who confirmed or flagged the line: the packer of that line.
+    staff:   staffName('psi.confirmed_by'),
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
@@ -848,6 +860,7 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
   const where = [
     `ps.dispatch_date BETWEEN $1::date AND $2::date`,
     `psi.status IN ('confirmed', 'flagged')`,
+    ...staffFilter('psi.confirmed_by', filters, params),
   ];
   if (filters.product_id) { params.push(filters.product_id); where.push(`psi.product_id = $${params.length}`); }
   if (filters.cohort)     { params.push(filters.cohort);     where.push(`ps.cohort = $${params.length}::cohort_group`); }
