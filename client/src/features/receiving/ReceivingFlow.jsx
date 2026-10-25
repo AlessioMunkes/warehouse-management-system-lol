@@ -77,7 +77,6 @@ import {
   TOTAL_STEPS,
   STEP_META,
   isFreshProduct,
-  todayISO,
   orderText,
   orderCode,
 } from './receivingText';
@@ -97,7 +96,13 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
   // Raised but not approved yet: named on step 1, never selectable.
   const [waitingOrders, setWaitingOrders] = useState([]);
-  const [deliveryDate, setDeliveryDate] = useState(todayISO);
+  // The clock the sign-in panel shows. The moment itself is taken when
+  // the delivery is finished (deliveredAt in finish below).
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 30 * 1000);
+    return () => clearInterval(tick);
+  }, []);
   const [signature, setSignature] = useState(null);
   const [pdfDelivery, setPdfDelivery] = useState(null);
   // The note for the delivery just recorded, offered on the confirmation.
@@ -260,8 +265,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
         counted: line.counted, location: line.location, useBy: line.useBy,
       };
     }
-    writeDraft(linesKey, { counted, deliveryDate });
-  }, [phase, linesKey, lines, deliveryDate, hasLines]);
+    writeDraft(linesKey, { counted });
+  }, [phase, linesKey, lines, hasLines]);
 
   const handleModeChange = (next) => {
     setMode(next);
@@ -322,7 +327,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
       setLines(built);
       setLinesKey(`receiving-${poId}`);
-      if (draft?.deliveryDate) setDeliveryDate(draft.deliveryDate);
       setPhase('work');
       // Form opens on the first fresh line still missing its date, since
       // that is the one thing its collapsed rows cannot show.
@@ -450,7 +454,9 @@ export default function ReceivingFlow({ onCrumbChange }) {
       // is captured and does go to delivery_notes.signature.
       const result = await receivingAPI.recordDelivery({
         supplierId,
-        deliveryDate,
+        // The moment it was signed in, on this phone's clock. Queued with
+        // no signal, it still carries this moment, not when it is sent.
+        deliveredAt: new Date().toISOString(),
         purchaseOrderId: orderId,
         signatureData: signature,
         poCompleted: lines.every((l) => Number(l.counted) >= l.expected),
@@ -503,7 +509,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setLines([]);
     setOrderId('');
     setFocusId(null);
-    setDeliveryDate(todayISO());
     setSignature(null);
     setPdfDelivery(null);
     setDoneNote(null);
@@ -636,8 +641,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
           }
           side={
             <SignInPanel
-              deliveryDate={deliveryDate}
-              onDeliveryDate={setDeliveryDate}
+              now={now}
               orderId={orderId}
               shortCount={shortLines.length}
               signature={signature}

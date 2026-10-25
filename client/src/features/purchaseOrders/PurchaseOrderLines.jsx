@@ -127,7 +127,7 @@ export default function PurchaseOrderLines({
                     >
                       <SelectTrigger
                         aria-label={`Item for line ${index + 1}`}
-                        className={rejected ? 'border-brand' : undefined}
+                        className={rejected ? 'w-full border-brand' : 'w-full'}
                       >
                         <SelectValue placeholder="Choose a stock item" />
                       </SelectTrigger>

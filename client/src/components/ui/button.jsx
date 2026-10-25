@@ -1,3 +1,4 @@
+import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
@@ -45,8 +46,24 @@ const rawButtonVariants = cva(
 // Dialog trigger styled as an outline button came out borderless.
 const buttonVariants = (options) => cn(rawButtonVariants(options));
 
+// How long a submit button ignores another press after the first. Long
+// enough to swallow a double click; short enough that a real second
+// attempt after an error is never refused.
+const SUBMIT_SETTLE_MS = 1200;
+
 // `loading` is for a button whose action is under way: it shows a
 // spinner in place of the button's own icon and cannot be pressed again.
+//
+// MULTIPLE CLICKS. Every button guards itself, so a form does not have to
+// remember to:
+//   - an onClick that returns a promise (an async save) makes the button
+//     busy until it settles, spinner and all, and presses in between do
+//     nothing;
+//   - a submit button ignores presses for a moment after the first, so a
+//     double click sends the form once. (The form's own busy state takes
+//     over from there, as before.)
+// The check is a ref as well as state, so two clicks in the same frame,
+// before React has re-rendered, still count as one.
 function Button({
   className,
   variant = "default",
@@ -54,19 +71,61 @@ function Button({
   loading = false,
   disabled,
   children,
+  onClick,
+  type,
   ...props
 }) {
+  const [pending, setPending] = React.useState(false);
+  const locked = React.useRef(false);
+  const mounted = React.useRef(true);
+  React.useEffect(() => () => { mounted.current = false; }, []);
+
+  const handleClick = (event) => {
+    if (locked.current) {
+      event.preventDefault();
+      return;
+    }
+    const result = onClick?.(event);
+    if (result && typeof result.then === 'function') {
+      locked.current = true;
+      setPending(true);
+      Promise.resolve(result).finally(() => {
+        locked.current = false;
+        if (mounted.current) setPending(false);
+      });
+    } else if (type === 'submit' && !event.defaultPrevented) {
+      // Locked until the moment passes OR anything in the form changes:
+      // a double click changes nothing, but someone fixing what the
+      // form just refused must be able to send it again at once.
+      locked.current = true;
+      const form = event.currentTarget?.form;
+      const unlock = () => {
+        locked.current = false;
+        clearTimeout(timer);
+        form?.removeEventListener('input', unlock, true);
+        form?.removeEventListener('change', unlock, true);
+      };
+      const timer = setTimeout(unlock, SUBMIT_SETTLE_MS);
+      form?.addEventListener('input', unlock, true);
+      form?.addEventListener('change', unlock, true);
+    }
+    return result;
+  };
+
+  const busy = loading || pending;
   return (
     <ButtonPrimitive
       data-slot="button"
-      aria-busy={loading || undefined}
-      disabled={disabled || loading}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
+      type={type}
+      onClick={handleClick}
       className={buttonVariants({
         variant, size,
-        className: cn(loading && "[&>svg:not([data-spinner])]:hidden", className),
+        className: cn(busy && "[&>svg:not([data-spinner])]:hidden", className),
       })}
       {...props}>
-      {loading ? <Loader2 data-spinner="" aria-hidden="true" className="animate-spin" /> : null}
+      {busy ? <Loader2 data-spinner="" aria-hidden="true" className="animate-spin" /> : null}
       {children}
     </ButtonPrimitive>
   );

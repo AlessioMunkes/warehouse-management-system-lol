@@ -123,6 +123,11 @@ export const POOL_OPTIONS = Object.freeze({
   max: intFromEnv('DB_POOL_MAX', 5),
   min: intFromEnv('DB_POOL_MIN', 2),
   idleTimeoutMillis: 5 * 60 * 1000,
+  // How long a request waits for a connection before giving up. pg's
+  // default is forever, so with the database unreachable (or the pool
+  // full) a screen spun until the browser gave up. Now it fails in 15
+  // seconds with an error the app answers as "try again".
+  connectionTimeoutMillis: intFromEnv('DB_CONNECT_TIMEOUT_MS', 15000),
   keepAlive: true,
 });
 

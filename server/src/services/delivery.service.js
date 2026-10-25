@@ -59,6 +59,15 @@ const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
 const todayInSAST = () =>
   new Date(Date.now() + SAST_OFFSET_MS).toISOString().slice(0, 10);
 
+// The warehouse's calendar day of a moment.
+const sastDayOf = (at) => new Date(at.getTime() + SAST_OFFSET_MS).toISOString().slice(0, 10);
+
+// A phone's clock may run a little fast; a minute or five is not a lie.
+const DELIVERED_AT_SKEW_MS = 5 * 60 * 1000;
+// A queued delivery can wait days for signal, but not weeks: past that
+// the clock is wrong, not the signal.
+const DELIVERED_AT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 const daysAgoInSAST = (days) =>
   new Date(Date.now() + SAST_OFFSET_MS - days * 86400000).toISOString().slice(0, 10);
 
@@ -175,8 +184,25 @@ const getDeliveryById = async (id) => {
 // receiving tablet that lost signal and retried did exactly the right
 // thing, and telling it otherwise would teach staff to submit twice.
 const createDelivery = async (data, userId) => {
-  const { supplierId, deliveryDate, purchaseOrderId,
+  const { supplierId, purchaseOrderId, deliveredAt: sentAt,
           signatureData, poCompleted, lineItems, idempotencyKey } = data || {};
+
+  // ── When it arrived ─────────────────────────────────────────
+  // The phone sends the moment the delivery was signed in, and the day
+  // is worked out from it, so neither is typed. A delivery queued with
+  // no signal keeps the moment it was recorded, not when it was sent.
+  // Older phones, and anything queued before this, still send just a
+  // deliveryDate; that is taken as before.
+  let deliveredAt = null;
+  let deliveryDate = data?.deliveryDate;
+  if (sentAt !== undefined && sentAt !== null) {
+    const at = new Date(sentAt);
+    if (typeof sentAt !== 'string' || Number.isNaN(at.getTime())) fail(400, 'Invalid delivery time.');
+    if (at.getTime() > Date.now() + DELIVERED_AT_SKEW_MS) fail(400, 'The delivery time is in the future. Check the phone’s clock.');
+    if (at.getTime() < Date.now() - DELIVERED_AT_MAX_AGE_MS) fail(400, 'The delivery time is more than a week ago. Check the phone’s clock.');
+    deliveredAt = at.toISOString();
+    deliveryDate = sastDayOf(at);
+  }
 
   // ── Header shape ────────────────────────────────────────────
   if (!supplierId)      fail(400, 'Supplier is required.');
@@ -328,6 +354,7 @@ const createDelivery = async (data, userId) => {
   const result = await deliveryModel.createDelivery({
     supplierId,
     deliveryDate,
+    deliveredAt,
     purchaseOrderId,
     signatureData,
     poCompleted: !!poCompleted,

@@ -293,9 +293,25 @@ const loggableRequestPath = (req) =>
     ? req.path.replace(/^(\/api\/password-reset\/)[^/]+/, '$1[REDACTED]')
     : req.path;
 
+// The database could not be reached, as opposed to refusing a query:
+// a lost connection, a refused or timed-out connect, Supabase restarting.
+// Said as such, with a 503, so the person knows to wait and try again
+// rather than reading "an unexpected error" as a fault in what they did.
+const DB_DOWN_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', '57P01', '57P03', '08001', '08006']);
+const isDatabaseDown = (err) =>
+  DB_DOWN_CODES.has(err?.code) ||
+  /timeout exceeded when trying to connect|Connection terminated|connection.*(refused|closed)/i.test(err?.message ?? '');
+
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(`[error] ${req.method} ${loggableRequestPath(req)} —`, err.message);
+  if (isDatabaseDown(err)) {
+    return res.status(503).json({
+      success: false,
+      message: 'The database cannot be reached right now. Wait a minute and try again.',
+      retryable: true,
+    });
+  }
   const status = err.status || err.statusCode || 500;
   res.status(status).json({
     success: false,
@@ -303,6 +319,15 @@ app.use((err, req, res, next) => {
       ? err.message
       : 'An unexpected error occurred. Please try again.',
   });
+});
+
+// A promise somebody forgot to handle used to stop the whole server:
+// since Node 15 an unhandled rejection exits the process, taking every
+// warehouse's session with it over one stray error. It is logged and
+// the server carries on; the request it belonged to has already failed
+// or answered.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandled rejection]', reason instanceof Error ? reason.stack : reason);
 });
 
 // ── Start ─────────────────────────────────────────────────────

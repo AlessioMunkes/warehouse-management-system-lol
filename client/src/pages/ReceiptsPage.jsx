@@ -50,7 +50,7 @@ import { VARIANCE_STYLE } from '@/lib/statusStyles';
 import DeliveryNotePDF from '../features/receiving/DeliveryNotePDF';
 import DispatchNotePDF from '../features/receipts/DispatchNotePDF';
 import {
-  formatDateShort, DISPATCH_STATUS_LABEL, DELIVERY_STATUS_LABEL,
+  formatDateShort, formatDateTime, DISPATCH_STATUS_LABEL, DELIVERY_STATUS_LABEL,
 } from '../features/receipts/noteFormat';
 import receivingAPI from '../services/receivingAPI';
 import useTableView from '../features/masterdata/useTableView';
@@ -269,7 +269,7 @@ export default function ReceiptsPage() {
       ),
     },
     { key: 'date',     header: 'Delivered',   sortKey: 'delivery_date',
-      render: (r) => formatDateShort(r.delivery_date) },
+      render: (r) => (r.delivered_at ? formatDateTime(r.delivered_at) : formatDateShort(r.delivery_date)) },
     { key: 'supplier', header: 'Supplier',    sortKey: 'supplier_name',
       render: (r) => r.supplier_name || 'Unknown supplier' },
     {

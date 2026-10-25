@@ -25,7 +25,7 @@ import HistoryScreen, { HistoryRow } from '../features/staff/HistoryScreen';
 import { byNewest, byOldest, byText } from '../features/staff/historyView';
 import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../features/staff/workerStatus';
-import { formatShortDate as formatDate } from '@/lib/dates';
+import { formatShortDate as formatDate, formatShortDateTime } from '@/lib/dates';
 
 // The badge people actually want to read here is "did the order this
 // delivery belongs to get fully delivered" — not "recorded", which is
@@ -42,7 +42,7 @@ const badgeFor = (delivery) => (
     : { status: 'partial', label: 'Partially delivered' }
 );
 
-const dateOf = (d) => d.delivery_date ?? d.created_at;
+const dateOf = (d) => d.delivered_at ?? d.delivery_date ?? d.created_at;
 
 // Module level so their identity is stable across renders.
 const SORTS = [
@@ -127,7 +127,7 @@ export default function StaffDeliveriesPage() {
             <HistoryRow
               title={delivery.supplier_name}
               meta={[
-                formatDate(delivery.delivery_date),
+                delivery.delivered_at ? formatShortDateTime(delivery.delivered_at) : formatDate(delivery.delivery_date),
                 delivery.po_number,
                 delivery.received_by_name ? `Received by ${delivery.received_by_name}` : null,
               ].filter(Boolean).join(' · ')}

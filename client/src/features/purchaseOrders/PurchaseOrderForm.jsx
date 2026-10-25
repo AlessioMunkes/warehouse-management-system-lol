@@ -50,6 +50,9 @@ const todayInSAST = () =>
 export default function PurchaseOrderForm({
   suppliers = [],
   products = [],
+  // True while the page is still reading suppliers and products, so an
+  // empty list is not yet "none".
+  loading = false,
   onSubmit,
   onCancel,
   busy = false,
@@ -165,10 +168,10 @@ export default function PurchaseOrderForm({
           <Select
             value={form.supplierId || null}
             onValueChange={chooseSupplier}
-            disabled={busy}
+            disabled={busy || loading}
           >
             <SelectTrigger id="po-supplier">
-              <SelectValue placeholder="Choose a supplier" />
+              <SelectValue placeholder={loading ? 'Loading suppliers…' : 'Choose a supplier'} />
             </SelectTrigger>
             <SelectContent>
               {orderable.map((s) => (
@@ -176,7 +179,7 @@ export default function PurchaseOrderForm({
               ))}
             </SelectContent>
           </Select>
-          {orderable.length === 0 ? (
+          {!loading && orderable.length === 0 ? (
             <FieldDescription>
               No active suppliers. Register one under Suppliers first.
             </FieldDescription>

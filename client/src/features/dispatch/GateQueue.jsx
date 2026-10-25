@@ -80,6 +80,14 @@ const dayOf = (row) => {
   });
 };
 
+// When its picking slip was made: "9 Oct".
+const slipMadeOf = (row) => {
+  if (!row.slip_created_at) return null;
+  const d = new Date(row.slip_created_at);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-ZA', { timeZone: 'Africa/Johannesburg', day: 'numeric', month: 'short' });
+};
+
 const timeOf = (value) => {
   if (!value) return null;
   const d = new Date(value);
@@ -106,6 +114,12 @@ const metaOf = (row) => {
     if (row.ecd_is_active === false) parts.push('Centre now inactive');
   } else {
     parts.push(dayOf(row));
+    // Who packed it, and when its slip was made: what a manager asked
+    // for when checking what is waiting at the gate.
+    const packers = [row.packed_by_name, row.packed_by_2_name].filter(Boolean);
+    if (packers.length) parts.push(`Packed by ${packers.join(' and ')}`);
+    const made = slipMadeOf(row);
+    if (made) parts.push(`Slip made ${made}`);
     if (Number(row.flagged_items) > 0)  parts.push(`${row.flagged_items} flagged`);
     if (Number(row.variance_items) > 0) parts.push(`${row.variance_items} short or over`);
   }

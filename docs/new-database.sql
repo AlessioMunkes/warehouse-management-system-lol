@@ -2,7 +2,7 @@
 -- new-database.sql — a new, empty Batches warehouse database
 --
 -- Written by server/scripts/export-new-database.mjs on 2026-10-25,
--- from a database on PostgreSQL 17.6, with 53 migrations applied
+-- from a database on PostgreSQL 17.6, with 54 migrations applied
 -- (the last: 2026_08_13_donations). Do not edit by hand: change the
 -- database through a migration, then run `npm run export-database` again.
 --
@@ -302,7 +302,8 @@ CREATE TABLE public."delivery_notes" (
   "signature" text,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   "driver_name" character varying(200),
-  "idempotency_key" text
+  "idempotency_key" text,
+  "delivered_at" timestamp with time zone
 );
 
 CREATE TABLE public."delivery_receipts" (
@@ -2036,6 +2037,7 @@ INSERT INTO public.schema_migrations (id, notes) VALUES
   ('058_runtime_schema_to_migration', 'In new-database.sql'),
   ('059_tidy_indexes', 'In new-database.sql'),
   ('060_drop_unused_schema', 'In new-database.sql'),
+  ('061_delivery_delivered_at', 'In new-database.sql'),
   ('2026_08_02_schema_gap_migration', 'In new-database.sql'),
   ('2026_08_13_donations', 'In new-database.sql');
 

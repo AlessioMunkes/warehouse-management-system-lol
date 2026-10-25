@@ -2125,6 +2125,13 @@ color:white;
   outline-offset: 2px;
 }
 
+/* A heading or a result region given tabIndex -1 is focused by the code
+   so a screen reader announces it; nobody can tab to it, so it is not a
+   control and should not be drawn as one. The browser drew its focus box
+   round "Which delivery is this?" on every step, which read as a glitch.
+   Applies everywhere, not only on the floor. */
+[tabindex="-1"]:focus { outline: none; }
+
 /* ── App bar ─────────────────────────────────────────────────────── */
 
 /* ── Breadcrumb row ──────────────────────────────────────────────── */
@@ -3967,6 +3974,10 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-search-icon {
   position: absolute;
+  /* Above the input: the donation form's .stf-search-input rule (earlier
+     in this file, same class name) makes the input positioned too, and
+     coming after the icon it was painted over it. */
+  z-index: 1;
   left: 12px;
   font-size: 18px;
   color: var(--stf-text-meta);
@@ -3987,6 +3998,12 @@ button.stf-panel-head:disabled { cursor: default; }
    --stf-field-bg it only clears 3.28:1, under this file's own 4.5:1
    goal (ACC-02). text-sub clears 4.81:1 on the same background. */
 .stf-search-input::placeholder { color: var(--stf-text-sub); }
+/* The right padding is room for the clear button, which only shows once
+   something is typed. Empty, the hint gets that room, and a hint still
+   too long for a narrow phone ends in "…" rather than being cut off
+   mid-letter. */
+.stf-search-input { text-overflow: ellipsis; }
+.stf-search-input:placeholder-shown { padding-right: 14px; }
 .stf-search-input:focus-visible {
   outline: 2px solid var(--stf-accent);
   outline-offset: 1px;

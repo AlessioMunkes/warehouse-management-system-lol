@@ -113,12 +113,14 @@ export const getProducts = async () => {
 // reached again. See outbox.js for why only this and the collection
 // at the gate are allowed to wait.
 export const recordDelivery = async ({
-  supplierId, deliveryDate, purchaseOrderId, signatureData, poCompleted,
+  supplierId, deliveryDate, deliveredAt, purchaseOrderId, signatureData, poCompleted,
   lineItems, idempotencyKey,
 }) => {
+  // deliveredAt (when it was signed in) is what the server goes by; the
+  // day is worked out from it. deliveryDate is only for older callers.
   const body = {
     supplierId,
-    deliveryDate,
+    ...(deliveredAt ? { deliveredAt } : { deliveryDate }),
     purchaseOrderId,
     signatureData,
     poCompleted: Boolean(poCompleted),
