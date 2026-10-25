@@ -30,14 +30,15 @@ export const fetchTopic = (id) =>
  * they are looking at.
  *
  * Resolves to one of:
- *   { type:'topic',       topic }
+ *   { type:'topic',       topic, answer, also, notice? }
  *   { type:'navigate',    screen }
  *   { type:'clarify',     question, options }
- *   { type:'not_covered', closest }
+ *   { type:'not_covered', closest, suggestions }
  */
-// `previous` is the turn before this one ({ question, topicId }), so a
-// reply like "that's not what I meant" is read as a reply.
-export const askAssistant = (question, screen, previous) =>
-  apiPost('/api/assistant/ask', { question, screen, previous: previous ?? undefined }).then(unwrap);
+// `history` is the last few turns, oldest first ([{ question, topicId }]),
+// so a reply like "that's not what I meant" or "and then?" is read as a
+// reply.
+export const askAssistant = (question, screen, history) =>
+  apiPost('/api/assistant/ask', { question, screen, history: history ?? undefined }).then(unwrap);
 
 export default { fetchAssistantCatalog, fetchTopic, askAssistant };

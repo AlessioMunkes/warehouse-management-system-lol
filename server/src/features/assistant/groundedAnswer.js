@@ -24,17 +24,26 @@
 //
 // It is a vocabulary check, not understanding: it cannot tell "do X"
 // from "do not X" when both use the topic's words. That is why the
-// topic is always shown underneath, and why the answer is kept to a
-// couple of sentences.
+// topic is always shown underneath.
+//
+// A FULLER ANSWER, SENTENCE BY SENTENCE. The model may now answer in up
+// to eight sentences, drawing on up to three topics when a question
+// spans several jobs ("what happens after a delivery is received").
+// The source is then every chosen topic's text. Each sentence is
+// checked by itself and one that fails is dropped, so a single doubtful
+// sentence no longer costs the whole answer; but if most of them fail,
+// the model was not answering from the topics, and nothing is shown.
 // ─────────────────────────────────────────────────────────────
 
-const MAX_LENGTH    = 320;
+const MAX_LENGTH    = 900;
 const MIN_LENGTH    = 12;
-const MAX_SENTENCES = 3;
-// How much of the answer may be words the topic does not use: joining
+const MAX_SENTENCES = 8;
+// How much of a sentence may be words the topics do not use: joining
 // words the stop list misses, a rephrasing or two. Not a new idea.
 const MAX_UNKNOWN_WORDS = 2;
-const MAX_UNKNOWN_SHARE = 0.15;
+const MAX_UNKNOWN_SHARE = 0.25;
+// And of the answer as a whole, once the sentences are kept.
+const MAX_UNKNOWN_SHARE_OVERALL = 0.15;
 
 // Words that carry no claim. Four letters and up; shorter ones are
 // ignored outright.
@@ -64,8 +73,9 @@ const contentWords = (text) => words(text).filter((w) => w.length >= 4 && !STOP.
 
 const numbers = (text) => String(text ?? '').match(/\d+(?:[.,:]\d+)*/g) ?? [];
 
-const sourceTextOf = (topic, context = '') => [
-  topic.title, topic.body, ...(topic.steps ?? []), ...(topic.asks ?? []), context,
+const sourceTextOf = (topics, context = '') => [
+  ...topics.flatMap((topic) => [topic.title, topic.body, ...(topic.steps ?? []), ...(topic.asks ?? [])]),
+  context,
 ].filter(Boolean).join(' ');
 
 const tidy = (raw) => String(raw)
@@ -79,43 +89,54 @@ const sentencesOf = (text) => text.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g)?.map
 /**
  * The answer as it may be shown, or null when it may not be.
  *
- * @param {unknown} raw      what the model wrote
- * @param {object}  topic    the catalogue topic it chose
- * @param {string}  context  the organisation description the model was given
+ * @param {unknown}         raw      what the model wrote
+ * @param {object|object[]} topics   the catalogue topic or topics it chose
+ * @param {string}          context  the organisation description the model was given
  */
-export const checkAnswer = (raw, topic, context = '') => {
-  if (typeof raw !== 'string' || !topic) return null;
+export const checkAnswer = (raw, topics, context = '') => {
+  const chosen = (Array.isArray(topics) ? topics : [topics]).filter(Boolean);
+  if (typeof raw !== 'string' || chosen.length === 0) return null;
 
-  let text = tidy(raw);
+  const text = tidy(raw);
   if (text.length < MIN_LENGTH) return null;
 
   // Nothing that points outside the app, and nothing shaped like a
-  // contact detail.
+  // contact detail. Anywhere in it: this one is not forgiven.
   if (/https?:|www\.|@|\.co\.za|\.com\b/i.test(text)) return null;
 
-  // Whole sentences, a few of them, within the length.
-  const kept = [];
-  for (const sentence of sentencesOf(text).slice(0, MAX_SENTENCES)) {
-    if ([...kept, sentence].join(' ').length > MAX_LENGTH) break;
-    kept.push(sentence);
-  }
-  text = kept.join(' ');
-  if (text.length < MIN_LENGTH) return null;
-
-  const source = sourceTextOf(topic, context);
-
-  // Every figure has to be the topic's own.
+  const source = sourceTextOf(chosen, context);
   const known = new Set(numbers(source));
-  if (numbers(text).some((n) => !known.has(n))) return null;
-
-  // Every meaningful word has to be the topic's own.
   const vocabulary = new Set(contentWords(source));
-  const said = contentWords(text);
-  if (said.length === 0) return null;
-  const unknown = said.filter((w) => !vocabulary.has(w));
-  if (unknown.length > MAX_UNKNOWN_WORDS || unknown.length / said.length > MAX_UNKNOWN_SHARE) return null;
 
-  return text;
+  // Whole sentences, within the count and the length.
+  const offered = [];
+  for (const sentence of sentencesOf(text).slice(0, MAX_SENTENCES)) {
+    if ([...offered, sentence].join(' ').length > MAX_LENGTH) break;
+    offered.push(sentence);
+  }
+  if (offered.length === 0) return null;
+
+  // Each sentence on its own: every figure the topics' own, and almost
+  // every meaningful word.
+  const passes = (sentence) => {
+    if (numbers(sentence).some((n) => !known.has(n))) return false;
+    const said = contentWords(sentence);
+    if (said.length === 0) return false;
+    const unknown = said.filter((w) => !vocabulary.has(w)).length;
+    return unknown <= MAX_UNKNOWN_WORDS && unknown / said.length <= MAX_UNKNOWN_SHARE;
+  };
+  const kept = offered.filter(passes);
+
+  // Most of it failed: the model was not answering from the topics.
+  if (kept.length === 0 || kept.length * 2 < offered.length) return null;
+
+  const out = kept.join(' ');
+  if (out.length < MIN_LENGTH) return null;
+  const said = contentWords(out);
+  const unknown = said.filter((w) => !vocabulary.has(w)).length;
+  if (unknown / said.length > MAX_UNKNOWN_SHARE_OVERALL) return null;
+
+  return out;
 };
 
 export default { checkAnswer };

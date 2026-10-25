@@ -59,16 +59,20 @@ const getTopic = async (req, res) => {
 
 // POST /api/assistant/ask
 // Returns one of:
-//   { type:'topic',       topic, answer }   answer: a checked sentence or two, or null
+//   { type:'topic',       topic, answer, also, notice? }
+//                           answer: the checked sentences, or null
+//                           also:   other topics the answer drew on
+//                           notice: set when the model could not be asked
 //   { type:'navigate',    screen }
 //   { type:'clarify',     question, options }
-//   { type:'not_covered', closest }
+//   { type:'not_covered', closest, suggestions }
 const ask = async (req, res) => {
   try {
     const result = await assistantService.ask({
       question: req.body?.question,
       screen:   req.body?.screen,
       previous: req.body?.previous,
+      history:  req.body?.history,
       userId:   req.user?.id,
       role:     req.user?.role,
     });

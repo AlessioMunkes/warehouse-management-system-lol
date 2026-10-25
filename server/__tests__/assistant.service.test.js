@@ -74,7 +74,7 @@ describe('answering normally', () => {
   it('says so honestly when nothing covers it', async () => {
     call('not_covered', {});
     const res = await askAs('manager', 'what is the weather in cape town');
-    expect(res).toEqual({ type: 'not_covered', closest: null });
+    expect(res).toEqual({ type: 'not_covered', closest: null, suggestions: [] });
   });
 
   it('offers the nearest topic on a not_covered, without asserting it', async () => {
@@ -176,7 +176,7 @@ describe('the question itself', () => {
   });
 
   it('refuses an essay, before spending a call on it', async () => {
-    await expect(askAs('manager', 'x'.repeat(301))).rejects.toMatchObject({ status: 400 });
+    await expect(askAs('manager', 'x'.repeat(501))).rejects.toMatchObject({ status: 400 });
     expect(providerMock.callWithTools).not.toHaveBeenCalled();
   });
 
@@ -232,8 +232,107 @@ describe('when the provider fails', () => {
     err.code = 'rate_limit';
     providerMock.callWithTools.mockRejectedValue(err);
 
-    await expect(askAs('manager')).rejects.toMatchObject({ status: 429 });
+    // Words that point at no topic, so there is nothing to fall back on.
+    await expect(askAs('manager', 'zebra quartz lantern')).rejects.toMatchObject({ status: 429 });
     expect(providerMock.callWithTools).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers with the closest topic when the words point clearly at one, and says so', async () => {
+    const err = new Error('The AI assistant has hit its usage limit for now.');
+    err.status = 429;
+    err.code = 'rate_limit';
+    providerMock.callWithTools.mockRejectedValue(err);
+
+    const res = await askAs('manager', 'what is the process map');
+    expect(res.type).toBe('topic');
+    expect(res.topic.id).toBe('process-map');
+    expect(res.answer).toBeNull();
+    expect(res.notice).toMatch(/closest help topic/);
+  });
+
+  it('still says plainly when the assistant is set up wrong', async () => {
+    const err = new Error('The configured AI models are not available.');
+    err.status = 502;
+    err.code = 'model_missing';
+    providerMock.callWithTools.mockRejectedValue(err);
+    await expect(askAs('manager', 'what is the process map')).rejects.toMatchObject({ status: 502 });
+  });
+
+  it('only falls back on topics the role may read', async () => {
+    const err = new Error('busy');
+    err.status = 503;
+    err.code = 'busy';
+    providerMock.callWithTools.mockRejectedValue(err);
+    // The process map is a manager's. A worker's nearest is the overview,
+    // which is not a clear enough match to show as the answer.
+    await expect(askAs('warehouse_worker', 'what is the process map')).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+describe('a question that spans several topics', () => {
+  it('lets the answer draw on the extra topics, and offers them as links', async () => {
+    call('explain_topic', {
+      topic_id: 'process-map',
+      more_topic_ids: ['process-map-cycle-times'],
+      direct_answer: 'The Process map is a tab on Operations reports. Cycle times names the Bottleneck, the slowest step.',
+    });
+    const res = await askAs('manager', 'what is the process map and where is the slowest bit');
+    expect(res.topic.id).toBe('process-map');
+    expect(res.also).toEqual([{ id: 'process-map-cycle-times', title: 'Reading the cycle times' }]);
+    expect(res.answer).toMatch(/Bottleneck/);
+  });
+
+  it('drops extra topics the role may not read, unknown ones and repeats', async () => {
+    call('explain_topic', {
+      topic_id: 'receiving-record',
+      more_topic_ids: ['users-and-accounts', 'nope', 'receiving-record', 'receiving-partial', 'receiving-expiry', 'barcode-scanning'],
+    });
+    const res = await askAs('warehouse_worker');
+    expect(res.also.map((t) => t.id)).toEqual(['receiving-partial', 'receiving-expiry']);
+  });
+
+  it('keeps the sentences the topics bear out and drops the one they do not', async () => {
+    call('explain_topic', {
+      topic_id: 'process-map',
+      direct_answer:
+        'The Process map is a tab on Operations reports. It shows how long each wait took. ' +
+        'Choose the Period at the top. Call the regional office on 021 555 0100 for help.',
+    });
+    const res = await askAs('manager', 'what is the process map');
+    expect(res.answer).toMatch(/tab on Operations reports/);
+    expect(res.answer).not.toMatch(/021|regional/);
+  });
+
+  it('gives a guest no extra topics', async () => {
+    call('explain_topic', { topic_id: 'guest-pack-item', more_topic_ids: ['guest-problem'] });
+    const res = await service.ask({ question: 'how do I pack this', userId: 55, role: 'guest' });
+    expect(res.also).toEqual([]);
+  });
+});
+
+describe('not covered, with the words matched against the topics', () => {
+  it('offers the topics the words point at, as well as the model’s pick', async () => {
+    call('not_covered', { closest_topic_id: 'reporting-tabs' });
+    const res = await askAs('manager', 'what is the process map');
+    expect(res.closest).toEqual({ id: 'reporting-tabs', title: 'What is on Operations reports' });
+    expect(res.suggestions.map((s) => s.id)).toContain('process-map');
+    expect(res.suggestions.map((s) => s.id)).not.toContain('reporting-tabs');
+    expect(res.suggestions.length).toBeLessThanOrEqual(2);
+  });
+
+  it('never suggests a topic the role may not read', async () => {
+    call('not_covered', {});
+    const res = await askAs('warehouse_worker', 'how do I add a user account and reset passwords');
+    for (const s of res.suggestions) {
+      const { getTopic } = await import('../src/features/assistant/helpCatalog.js');
+      expect(getTopic(s.id).roles).toContain('warehouse_worker');
+    }
+  });
+
+  it('offers a guest nothing beyond the model’s own pick', async () => {
+    call('not_covered', {});
+    const res = await service.ask({ question: 'how do I pack an item', userId: 55, role: 'guest' });
+    expect(res.suggestions).toEqual([]);
   });
 });
 
@@ -292,6 +391,25 @@ describe('the direct answer and the previous turn', () => {
     expect(sent).toMatch(/Their previous message: different purchase order on lists/);
     expect(sent).toMatch(/You answered it with the topic: receiving-no-order/);
     expect(sent).toMatch(/They asked: but we do not buy anything/);
+  });
+
+  it('tells the model the last three turns, oldest first', async () => {
+    call('explain_topic', { topic_id: 'receiving-partial' });
+    await service.ask({
+      question: 'and then what', userId: 7, role: 'warehouse_worker',
+      history: [
+        { question: 'first one', topicId: 'what-is-this' },
+        { question: 'second one', topicId: 'process-overview' },
+        { question: 'third one', topicId: 'receiving-record' },
+        { question: 'fourth one', topicId: 'receiving-discrepancy' },
+      ],
+    });
+    const sent = providerMock.callWithTools.mock.calls[0][0].userMessage;
+    expect(sent).not.toMatch(/first one/);
+    expect(sent.indexOf('second one')).toBeLessThan(sent.indexOf('third one'));
+    expect(sent).toMatch(/Their previous message: fourth one/);
+    expect(sent).toMatch(/You answered it with the topic: receiving-discrepancy/);
+    expect(sent).toMatch(/They asked: and then what/);
   });
 
   it('ignores a previous topic this role may not see', async () => {
