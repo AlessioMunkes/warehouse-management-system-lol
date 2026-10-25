@@ -98,6 +98,15 @@ describe('matchProducts', () => {
     expect(matchProducts(HEINZ, [vegetables, legumes])).toEqual([]);
   });
 
+  // Rice is counted in kg: a 5 kg bag is still Rice, whatever size the
+  // packs already linked to it are.
+  it('matches any pack size to an item counted by weight', () => {
+    const rice = { id: 20, name: 'Rice', unit: 'kg', weightKg: 1,
+      barcodes: [{ foodName: 'Jasmine rice', foodWeightKg: 2, foodCategories: ['cereals', 'rices'] }] };
+    const fiveKg = { productName: 'Long grain white rice', brand: 'Spekko', weightKg: 5, categories: ['cereals', 'rices'] };
+    expect(matchProducts(fiveKg, [rice])).toEqual([expect.objectContaining({ productId: 20, reasons: ['name', 'kind'] })]);
+  });
+
   it('returns at most three, best first', () => {
     const many = Array.from({ length: 6 }, (_, i) => ({ id: 10 + i, name: `Baked beans ${i}`, weightKg: 0.41, barcodes: [] }));
     const result = matchProducts(BRAND_B_BEANS, [...many, BEANS_410]);

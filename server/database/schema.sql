@@ -1885,6 +1885,60 @@ CREATE TABLE IF NOT EXISTS barcode_scan_events (
 CREATE INDEX IF NOT EXISTS barcode_scan_events_scanned_at_idx ON barcode_scan_events (scanned_at);
 
 
+-- from 054_finance_link_expiry
+-- ─────────────────────────────────────────────────────────────
+-- 054_finance_link_expiry.sql
+--
+-- A finance report link stops working 30 days after it is made, and
+-- each open is counted.
+--
+-- The link is a bearer token: whoever holds the URL can read the
+-- figures, with no sign-in. Until now it worked until someone made a
+-- new one or revoked it, so a forwarded email kept working for good.
+--
+--   expires_at      when the link stops opening
+--   last_opened_at  the last time the report was read through it
+--   open_count      how many times it has been read
+--
+-- Links made before this get 30 days from when they were made, so
+-- one older than that stops working now. Send a new one from
+-- Finance if it is still needed.
+--
+-- Additive: three columns, filled for the existing rows.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE finance_report_access_links
+  ADD COLUMN IF NOT EXISTS expires_at timestamp with time zone,
+  ADD COLUMN IF NOT EXISTS last_opened_at timestamp with time zone,
+  ADD COLUMN IF NOT EXISTS open_count integer NOT NULL DEFAULT 0;
+
+UPDATE finance_report_access_links
+   SET expires_at = created_at + INTERVAL '30 days'
+ WHERE expires_at IS NULL;
+
+ALTER TABLE finance_report_access_links
+  ALTER COLUMN expires_at SET NOT NULL;
+
+
+-- from 055_user_session_version
+-- ─────────────────────────────────────────────────────────────
+-- 055_user_session_version.sql
+--
+-- A number on each account that every session token must match.
+--
+-- A session is a signed token that lasts 8 hours. Until now a token
+-- kept working for all of that time after the password was changed or
+-- reset, or the account was deactivated or archived. Each of those now
+-- adds 1 to session_version, and auth.middleware.js turns away any
+-- token carrying an older number, so the person signs in again.
+--
+-- Existing tokens carry no number, which counts as 0: everyone stays
+-- signed in through this migration.
+--
+-- Additive: one column with a default.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS session_version integer NOT NULL DEFAULT 0;
+
 -- from 056_product_barcode_food_facts
 -- ─────────────────────────────────────────────────────────────
 -- 056_product_barcode_food_facts.sql

@@ -25,7 +25,7 @@ const BARCODE_COLUMNS = `
 // whether it can still be received at all.
 const findByCode = async (code) => {
   const { rows } = await pool.query(
-    `SELECT ${BARCODE_COLUMNS},
+    `SELECT ${BARCODE_COLUMNS}, pb.food_checked_at,
             p.name AS product_name, p.stock_keeping_unit AS sku,
             p.default_unit, p.is_active, p.archived_at
        FROM product_barcodes pb
@@ -149,7 +149,7 @@ const recordScan = async ({ screen, outcome, productId = null, referenceId = nul
 // never a suggestion.
 const listMatchCandidates = async () => {
   const { rows } = await pool.query(
-    `SELECT p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg,
+    `SELECT p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg, p.default_unit,
             COALESCE(
               json_agg(json_build_object(
                 'foodName', pb.food_name, 'foodBrand', pb.food_brand,

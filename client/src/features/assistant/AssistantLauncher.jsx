@@ -81,15 +81,41 @@ export default function AssistantLauncher({ role, hintReady = true } = {}) {
   // a second render on every navigation to move a button that has
   // not moved. A layout effect also lands it before paint, so there
   // is no visible hop.
+  //
+  // Measured once was not enough: the floor screens are loaded a moment
+  // after the route changes, so on a phone the button measured no tab
+  // bar, stayed at the bottom, and sat on the bar's last tab. So it
+  // keeps watching: it measures again when anything is added to the
+  // page (the tab bar arriving) and whenever the tab bar changes size.
   useLayoutEffect(() => {
     const root = document.documentElement;
-    const bar  = document.querySelector('.stf-tabbar');
-    const inset = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+    let observed = null;
+    const sizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => measure());
 
-    root.style.setProperty('--wms-launcher-bottom', `${inset + GAP}px`);
-    root.style.setProperty('--wms-assistant-h', `${inset + GAP + SIZE + CLEAR}px`);
+    function measure() {
+      const bar = document.querySelector('.stf-tabbar');
+      const inset = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+      root.style.setProperty('--wms-launcher-bottom', `${inset + GAP}px`);
+      root.style.setProperty('--wms-assistant-h', `${inset + GAP + SIZE + CLEAR}px`);
+      if (sizes && bar !== observed) {
+        if (observed) sizes.unobserve(observed);
+        if (bar) sizes.observe(bar);
+        observed = bar;
+      }
+    }
+
+    measure();
+    let frame = 0;
+    const added = typeof MutationObserver === 'undefined' ? null : new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
+    added?.observe(document.body, { childList: true, subtree: true });
 
     return () => {
+      added?.disconnect();
+      sizes?.disconnect();
+      cancelAnimationFrame(frame);
       root.style.removeProperty('--wms-launcher-bottom');
       root.style.removeProperty('--wms-assistant-h');
     };

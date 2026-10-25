@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate }                 from 'react-router-dom';
+import { Link, useNavigate }           from 'react-router-dom';
+import { LEGAL }                       from '../routes/paths';
 import L                               from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getPublicImpactSummary }      from '../services/publicImpactAPI';
@@ -739,8 +740,11 @@ const LandingPage = () => {
             <span>Ladles of Love is a registered South African non-profit organisation.</span>
             <span>© Ladles of Love · Warehouse Management System</span>
             <span className="lol-footer-legal">
-              <a href="https://wms-lol.onrender.com/privacy">Privacy Policy</a>
-              <a href="https://wms-lol.onrender.com/terms">Terms of Service</a>
+              {/* The app's own pages, like the login page's links: a
+                  written-out address sent staging and local copies to the
+                  live site. */}
+              <Link to={LEGAL.privacy}>Privacy Policy</Link>
+              <Link to={LEGAL.terms}>Terms of Service</Link>
             </span>
           </div>
         </div>
