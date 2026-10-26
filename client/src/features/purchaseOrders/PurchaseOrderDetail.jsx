@@ -406,11 +406,11 @@ export default function PurchaseOrderDetail({
               </Button>
             </dd>
           ) : (
-            <dd className="flex items-center gap-1">
+            <dd className="flex min-w-0 items-center gap-1">
               {/* Unlinked is the normal state until Finance has entered
                   the order, so it reads as neutral, not as a problem. */}
-              <StatusBadge kind="accountsLink" status={po.quickbooksPoId ? 'linked' : 'unlinked'} className="max-w-full whitespace-normal break-all">
-                {po.quickbooksPoId ? `Linked to QuickBooks PO number ${po.quickbooksPoId}` : 'Not linked to QuickBooks yet'}
+              <StatusBadge kind="accountsLink" status={po.quickbooksPoId ? 'linked' : 'unlinked'} className="max-w-full whitespace-normal break-words">
+                {po.quickbooksPoId ? po.quickbooksPoId : 'Not linked yet'}
               </StatusBadge>
               {canManage ? (
                 <Button

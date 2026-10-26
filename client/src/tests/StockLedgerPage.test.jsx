@@ -72,13 +72,13 @@ describe('StockLedgerPage', () => {
     expect(table.getByText('55')).toBeInTheDocument();
   });
 
-  it('sums the selection up in one line, out as a signed figure', async () => {
+  // Across products, in and out would add kilograms to litres to crates:
+  // the line says how many movements, and the totals wait for one product.
+  it('says how many movements across products, with no mixed-unit totals', async () => {
     renderPage();
-    // One line in place of the four tiles; -35 in the ledger reads
-    // "Out −35", the sign carried once.
-    expect(await screen.findByText('−35')).toBeInTheDocument();
-    expect(screen.getByText('+510')).toBeInTheDocument();
-    expect(screen.getByText(/7 movements across 3 products/)).toBeInTheDocument();
+    expect(await screen.findByText(/7 movements across 3 products/)).toBeInTheDocument();
+    expect(screen.queryByText('+510')).toBeNull();
+    expect(screen.queryByText('−35')).toBeNull();
   });
 
   it('defaults to the last 30 days', async () => {

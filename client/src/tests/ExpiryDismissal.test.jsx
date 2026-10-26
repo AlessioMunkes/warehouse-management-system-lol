@@ -168,12 +168,15 @@ describe('units in the delivery list', () => {
 });
 
 describe('the estimate is said to be one', () => {
-  it('gives the Earliest expiry column a tooltip, with about how much of that delivery is left', async () => {
+  // The earliest expiry is in the product's panel, not a table column.
+  it('says the earliest expiry in the product panel, with about how much of that delivery is left', async () => {
+    const user = userEvent.setup();
     render(<InventoryManagementPage />);
-    await screen.findByRole('button', { name: 'Rice' });
+    await user.click(await screen.findByRole('button', { name: 'Rice' }));
 
-    expect(screen.getByRole('button', { name: 'Sort by Earliest expiry' })).toHaveAttribute('title', 'Estimated: assumes oldest stock goes out first');
-    const cell = screen.getByRole('button', { name: 'Rice' }).closest('tr').querySelector('td[title]');
-    expect(cell).toHaveAttribute('title', 'Estimated: assumes oldest stock goes out first. About 12 kg of that delivery left');
+    expect(screen.queryByRole('button', { name: 'Sort by Earliest expiry' })).toBeNull();
+    const line = (await screen.findByText(/Earliest expiry:/)).closest('p');
+    expect(line).toHaveAttribute('title', 'Estimated: assumes oldest stock goes out first');
+    expect(line).toHaveTextContent(/about 12 kg of that delivery left/);
   });
 });

@@ -13,17 +13,19 @@
 // (raised, each delivery) is a real, dated event with real data
 // behind it, not invented to fill out a shape.
 // ─────────────────────────────────────────────────────────────
-import { PackagePlus, Truck, CheckCircle2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { PackagePlus, Truck, Check, AlertTriangle, RotateCcw } from 'lucide-react';
 import { formatShortDateTime as fmtDateTime } from '@/lib/dates';
 
 const STATUS_ICON = {
-  completed:          CheckCircle2,
+  // A plain tick: the black circle round it is the row's, as on every
+  // other step (a circled tick inside it read as a different kind of row).
+  completed:          Check,
   returned:           RotateCcw,
   follow_up_required: AlertTriangle,
 };
 
 const STATUS_TONE = {
-  completed:          'text-good-ink border-good-ink',
+  completed:          'text-ink border-ink',
   returned:           'text-brand border-brand',
   follow_up_required: 'text-brand border-brand',
 };
@@ -77,13 +79,16 @@ export default function PurchaseOrderTimeline({ purchaseOrder: po }) {
   // pending — a freshly raised order's whole story is the one event
   // above, and repeating "Pending approval" under it would say
   // nothing new.
+  const lastDeliveryAt = po.deliveries.map((d) => d.recordedAt ?? d.deliveryDate).filter(Boolean).sort().at(-1) ?? null;
   if (po.status !== 'pending') {
     events.push({
-      at: timeOf(po.statusChangedAt),
-      icon: STATUS_ICON[po.status] ?? CheckCircle2,
+      at: timeOf(po.statusChangedAt ?? lastDeliveryAt),
+      icon: STATUS_ICON[po.status] ?? Check,
       tone: STATUS_TONE[po.status] ?? 'text-ink border-ink',
       title: po.statusLabel,
-      meta: `${fmtDateTime(po.statusChangedAt)}${po.statusReason ? ` · ${po.statusReason}` : ''}`,
+      // When the status changed; for an order completed by its last delivery
+      // with no change time of its own, when that delivery came in.
+      meta: [fmtDateTime(po.statusChangedAt ?? lastDeliveryAt), po.statusReason].filter((v) => v && v !== '-').join(' · '),
     });
   }
 

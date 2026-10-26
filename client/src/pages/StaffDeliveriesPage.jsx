@@ -27,19 +27,12 @@ import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../features/staff/workerStatus';
 import { formatShortDate as formatDate, formatShortDateTime } from '@/lib/dates';
 
-// The badge people actually want to read here is "did the order this
-// delivery belongs to get fully delivered" — not "recorded", which is
-// just delivery_notes' own bookkeeping status and true of every row.
-// 'completed' is the only closed-off value purchase_orders_status_check
-// permits — see server/src/constants/purchaseOrderStatus.js. This used
-// to accept 'received' as well, on the belief that two lifecycles were
-// in play; there is one, and the constraint decides it.
-const isPoComplete = (poStatus) => poStatus === 'completed';
-
+// Per delivery, the same rule and words as the note and the Receipts
+// list (deliveryStatusLabel): a line that came in short makes it partial.
 const badgeFor = (delivery) => (
-  isPoComplete(delivery.po_status)
-    ? { status: 'completed', label: 'Completed' }
-    : { status: 'partial', label: 'Partially delivered' }
+  Number(delivery.short_count) > 0
+    ? { status: 'partial', label: 'Partially received' }
+    : { status: 'completed', label: 'Completed' }
 );
 
 const dateOf = (d) => d.delivered_at ?? d.delivery_date ?? d.created_at;
@@ -55,7 +48,7 @@ const FILTERS = [
     key: 'status', label: 'Status',
     // A discrepancy is its own choice: it is what someone goes looking for.
     valueOf: (d) => (d.status === 'flagged' ? 'discrepancy' : badgeFor(d).status),
-    labelOf: (v) => ({ completed: 'Completed', partial: 'Partially delivered', discrepancy: 'Discrepancy' }[v] ?? v),
+    labelOf: (v) => ({ completed: 'Completed', partial: 'Partially received', discrepancy: 'Discrepancy' }[v] ?? v),
   },
   { key: 'supplier', label: 'Supplier', valueOf: (d) => d.supplier_name },
   { key: 'receivedBy', label: 'Received by', valueOf: (d) => d.received_by_name },

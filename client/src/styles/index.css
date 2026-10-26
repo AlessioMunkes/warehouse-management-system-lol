@@ -3396,13 +3396,15 @@ body.reduced-movement *::after {
   html[data-stf-floor] button.wms-launcher { transition-property: bottom, filter; }
 
   html[data-stf-working] .app-topbar { transform: translateY(-100%); }
-  html[data-stf-working] .stf-tabbar { transform: translateY(calc(100% + 2px)); }
+  /* The tab bar stays put: it is how a worker gets anywhere, and it going
+     away on scroll read as the app losing its menu. The Finish bar folds
+     down onto it instead of onto the bottom of the screen. */
   html[data-stf-working] .stf-task-head { top: calc(-1 * var(--stf-head-fold, 0px)); }
-  html[data-stf-working] .stf-task-foot { bottom: calc(-1 * var(--stf-foot-fold, 0px)); }
+  html[data-stf-working] .stf-task-foot { bottom: calc(var(--stf-tabbar-h) - var(--stf-foot-fold, 0px)); }
   /* The Help button lifts clear of the Finish bar, which it would
      otherwise sit on. Its position is set on <html> from JS, so this has
      to win over that (AssistantLauncher.jsx). */
-  html[data-stf-working] { --wms-launcher-bottom: 150px !important; }
+  html[data-stf-working] { --wms-launcher-bottom: calc(var(--stf-tabbar-h, 64px) + 86px) !important; }
 }
 @media (max-width: 767px) and (prefers-reduced-motion: reduce) {
   html[data-stf-floor] :is(.app-topbar, .stf-tabbar, .stf-task-head, .stf-task-foot, button.wms-launcher) {
@@ -4003,7 +4005,7 @@ button.stf-panel-head:disabled { cursor: default; }
    too long for a narrow phone ends in "…" rather than being cut off
    mid-letter. */
 .stf-search-input { text-overflow: ellipsis; }
-.stf-search-input:placeholder-shown { padding-right: 14px; }
+.stf-search-input:placeholder-shown:not(.has-close) { padding-right: 14px; }
 .stf-search-input:focus-visible {
   outline: 2px solid var(--stf-accent);
   outline-offset: 1px;
@@ -4189,6 +4191,15 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-success-fact.is-warn dd { color: var(--warn-ink, #9a4d00); }
 
+/* What was done, and the line under it, centred under the picture like
+   the thank-you, not left on their own. */
+.stf-success [data-slot="dialog-header"],
+.stf-success [data-slot="dialog-title"],
+.stf-success > .stf-step-sub,
+.stf-success > p {
+  text-align: center;
+  align-items: center;
+}
 .stf-success-thanks {
   margin: 4px 0 0;
   text-align: center;

@@ -105,6 +105,13 @@ export const DISPATCH_STATUS_LABEL = {
   cancelled:      'Cancelled',
 };
 
+// What a delivery reads as, everywhere: the note, the Receipts list and
+// the worker's past deliveries. A line that came in short makes it
+// partial; otherwise it is complete. (The stored state, recorded or
+// flagged, is a record of the review, not of what arrived.)
+export const deliveryStatusLabel = ({ shortCount = 0 } = {}) =>
+  (Number(shortCount) > 0 ? 'Partially received' : 'Completed');
+
 export const DELIVERY_STATUS_LABEL = {
   recorded: 'Recorded',
   flagged:  'Flagged',

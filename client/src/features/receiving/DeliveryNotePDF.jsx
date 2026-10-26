@@ -19,7 +19,7 @@
 // of what arrived must never pass for one.
 // ─────────────────────────────────────────────────────────────
 import NoteSheet, { NoteSignatures } from '../receipts/NoteSheet';
-import { formatDate, formatDateTime, fmtQty, variance, noteNumber } from '../receipts/noteFormat';
+import { formatDate, formatDateTime, fmtQty, variance, noteNumber, deliveryStatusLabel } from '../receipts/noteFormat';
 
 const DeliveryNotePDF = ({ delivery, onClose }) => {
   if (!delivery) return null;
@@ -33,6 +33,9 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
   const variedCount = fromPO ? 0 : items.filter(
     (i) => variance(i.received_quantity, i.expected_quantity) !== null
   ).length;
+  // What a person reads, the same on every screen (deliveryStatusLabel):
+  // a line in short makes the delivery partial.
+  const shortCount = fromPO ? 0 : items.filter((i) => Number(i.received_quantity) < Number(i.expected_quantity)).length;
 
   const info = fromPO
     ? `This note has no lines of its own, so the quantities below are what was ORDERED on ${order}. They are not a record of what arrived.`
@@ -60,8 +63,8 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         { label: 'Received by', value: delivery.received_by_name || '-' },
         {
           label: 'Status',
-          value: isFlagged ? 'Flagged for review' : 'Recorded',
-          tone: isFlagged || variedCount > 0 ? 'partial' : 'complete',
+          value: deliveryStatusLabel({ shortCount }),
+          tone: shortCount > 0 || isFlagged || variedCount > 0 ? 'partial' : 'complete',
         },
       ]}
       info={info}

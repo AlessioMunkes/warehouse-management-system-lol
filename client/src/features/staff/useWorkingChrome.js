@@ -8,7 +8,7 @@
 // them. While the worker is working, they slide out of the way (the
 // CSS is under "Working on a phone" in the floor screens section of
 // index.css):
-//   the top bar slides up and the tab bar down,
+//   the top bar slides up (the tab bar stays: it is the way round),
 //   the task's header slides up until only its title shows,
 //   the Finish bar slides down until only its main button shows
 //   ("Start over" and other second buttons wait).

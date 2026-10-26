@@ -97,15 +97,15 @@ describe('PurchaseOrderDetail — finance email', () => {
 });
 
 describe('PurchaseOrderDetail — QuickBooks PO number', () => {
-  it('shows "Not linked to QuickBooks yet" in a neutral badge when unlinked', () => {
+  it('shows "Not linked yet" in a neutral badge when unlinked', () => {
     renderDetail();
     expect(screen.getByText('QuickBooks PO number')).toBeTruthy();
-    expect(screen.getByText('Not linked to QuickBooks yet').closest('[data-tone]').dataset.tone).toBe('neutral');
+    expect(screen.getByText('Not linked yet').closest('[data-tone]').dataset.tone).toBe('neutral');
   });
 
-  it('shows "Linked to QuickBooks PO number <number>" when linked', () => {
+  it('shows the QuickBooks PO number when linked', () => {
     renderDetail({ quickbooks_po_id: 'QB-1042' });
-    expect(screen.getByText('Linked to QuickBooks PO number QB-1042')).toBeTruthy();
+    expect(screen.getByText('QB-1042')).toBeTruthy();
   });
 
   it('uses the renamed edit label and placeholder', async () => {

@@ -153,7 +153,7 @@ describe('PurchaseOrdersPage', () => {
 
     await user.click(await screen.findByText('PO-3'));
     const panel = within(await screen.findByRole('dialog', { name: 'PO-3' }));
-    expect(panel.getByText('Late')).toBeInTheDocument();
+    expect(panel.getAllByText('Late').length).toBeGreaterThan(0);
     await user.click(panel.getByRole('button', { name: /Reopen for receiving/ }));
 
     await waitFor(() => expect(api.setPurchaseOrderStatus).toHaveBeenCalledWith(3, 'approved', null));

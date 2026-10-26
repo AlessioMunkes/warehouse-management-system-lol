@@ -151,7 +151,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
     id: 'stf-order-search',
     query: orderSearch.query,
     onQuery: orderSearch.setQuery,
-    placeholder: 'Search by order number, supplier or date',
+    placeholder: 'Order number, supplier or date',
     buttonLabel: 'Search orders',
   };
 

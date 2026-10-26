@@ -91,6 +91,7 @@ const getDeliveries = async ({
        po.status             AS po_status,
        COALESCE(d.discrepancy_count, 0)        AS discrepancy_count,
        COALESCE(d.discrepancy_count, 0) > 0    AS has_discrepancies,
+       COALESCE(d.short_count, 0)              AS short_count,
        COALESCE(d.unresolved_count, 0)         AS unresolved_discrepancy_count,
        COALESCE(i.line_count, 0)               AS line_count,
        COUNT(*) OVER ()                        AS total_count
@@ -103,7 +104,10 @@ const getDeliveries = async ({
      LEFT JOIN LATERAL (
        SELECT
          COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0)                                   AS discrepancy_count,
-         COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0 AND dni.discrepancy_resolved = false) AS unresolved_count
+         COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0 AND dni.discrepancy_resolved = false) AS unresolved_count,
+         -- Lines that came in below what was ordered: the delivery reads
+         -- "Partially received" rather than "Completed".
+         COUNT(*) FILTER (WHERE dni.received_quantity < dni.expected_quantity)                   AS short_count
        FROM delivery_note_items dni
        WHERE dni.delivery_note_id = dn.id
      ) d ON TRUE
@@ -115,7 +119,9 @@ const getDeliveries = async ({
      WHERE ($1::date IS NULL OR dn.delivery_date >= $1::date)
        AND ($2::date IS NULL OR dn.delivery_date <= $2::date)
        AND ($3::int  IS NULL OR dn.supplier_id   = $3::int)
-       AND ($4::text IS NULL OR dn.status        = $4::text)
+       AND ($4::text IS NULL OR dn.status        = $4::text
+            OR ($4::text = 'complete' AND COALESCE(d.short_count, 0) = 0)
+            OR ($4::text = 'partial'  AND COALESCE(d.short_count, 0) > 0))
        -- Free text across the two things someone actually has in their hand:
        -- a PO number off a printed order, or the note's own record number.
        -- dn.id::text so "11" matches note 11 without a separate numeric field.

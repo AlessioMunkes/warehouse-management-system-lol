@@ -141,7 +141,7 @@ export const SCREENS = [
     about: 'Which weekday each cohort collects, and the public holidays and closures when the warehouse is shut.',
     aka: ['calendar', 'public holidays', 'closures', 'closed days', 'collection days', 'holidays'] },
   { id: 'receipts', label: 'Receipts', roles: MANAGERS_UP,
-    about: 'The archive of delivery notes and dispatch notes.',
+    about: 'The archive of delivery notes, dispatch notes and decanting sheets.',
     aka: ['paperwork', 'notes archive', 'documents'] },
   { id: 'reporting', label: 'Operations reports', roles: MANAGERS_UP,
     about: 'Ask a question about the figures, or browse reports by area; Generate report explains the chart, gives the business view and lists the actions.',
@@ -1712,10 +1712,10 @@ export const TOPICS = [
     screens: ['receipts'],
     asks: [
       'receipts', 'where are the notes', 'find paperwork', 'old notes', 'archive',
-      'delivery and dispatch notes',
+      'delivery and dispatch notes', 'decanting sheets', 'past decanting sheets',
     ],
     body:
-      'Receipts holds every delivery note (Goods in) and dispatch note (Goods out). ' +
+      'Receipts holds every delivery note (Goods in), dispatch note (Goods out) and decanting sheet. ' +
       'Search, narrow by status, supplier or centre and dates, and click a row to ' +
       'open its note. It’s where to look when someone asks what came in or went out ' +
       'on a particular day.',

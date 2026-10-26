@@ -191,7 +191,7 @@ export const PHRASES = [
   ["Choose a supplier above to see its open orders.", "Kies 'n verskaffer hierbo om sy oop bestellings te sien.", "Khetha umthengisi ngasentla ukuze ubone ii-odolo zakhe ezivulekileyo."],
   ["Which order", "Watter bestelling", "Yeyiphi i-odolo"],
   ["Choose an order", "Kies 'n bestelling", "Khetha i-odolo"],
-  ["Search by order number, supplier or date", "Soek volgens bestelnommer, verskaffer of datum", "Khangela ngenombolo ye-odolo, umthengisi okanye umhla"],
+  ["Order number, supplier or date", "Bestelnommer, verskaffer of datum", "Inombolo ye-odolo, umthengisi okanye umhla"],
   ["No supplier has an approved order right now.", "Geen verskaffer het tans 'n goedgekeurde bestelling nie.", "Akukho mthengisi une-odolo evunyiweyo ngoku."],
   ["There are no open orders to receive against right now. Ask your manager to approve the order before you sign anything in.", "Daar is tans geen oop bestellings om teen te ontvang nie. Vra jou bestuurder om die bestelling goed te keur voordat jy enigiets inteken.", "Akukho odolo zivulekileyo zokwamkela ngoku. Cela umphathi wakho avume i-odolo phambi kokuba usayine nantoni na."],
   ["There is no open order for", "Daar is geen oop bestelling vir", "Akukho odolo ivulekileyo ye-"],
@@ -236,6 +236,7 @@ export const PHRASES = [
   ["Completed", "Voltooi", "Igqityiwe"],
   ["Discrepancy", "Verskil", "Umahluko"],
   ["Partially delivered", "Gedeeltelik afgelewer", "Ifike ngokuyinxenye"],
+  ["Partially received", "Gedeeltelik ontvang", "Yamkelwe ngokuyinxenye"],
   ["View note", "Bekyk nota", "Jonga iphepha"],
 
   // ── Decanting ──

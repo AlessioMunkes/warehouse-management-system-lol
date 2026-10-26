@@ -101,6 +101,8 @@ export default function StockLedgerPage() {
   const [error, setError] = useState(null);
 
   const [products, setProducts] = useState([]);
+  // The unit of the one product chosen, for the in and out totals.
+  const chosenUnit = products.find((p) => String(p.id) === productId)?.unit ?? "";
   const [actors, setActors] = useState([]);
 
   const [recon, setRecon] = useState(null);
@@ -336,16 +338,21 @@ export default function StockLedgerPage() {
                   </Select>
                 </ListToolbar>
 
-                {/* One line in place of four tiles: the totals for exactly
-                    what the tab and filters select, from the server. */}
+                {/* One short line. In and out only for one product: across
+                    products they add kilograms to litres to crates, which
+                    is not a number anyone can use. */}
                 <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
                   {summary ? (
                     <>
-                      In <span className="font-medium text-good">{signed(summary.totalIn)}</span>
-                      {" · "}Out <span className="font-medium text-danger">{signed(summary.totalOut)}</span>
-                      {" · "}Net <span className="font-medium text-foreground">{signed(summary.netChange)}</span>
-                      {" · "}{summary.movementCount} movement{summary.movementCount === 1 ? "" : "s"}
-                      {summary.productCount ? ` across ${summary.productCount} product${summary.productCount === 1 ? "" : "s"}` : ""}
+                      {productId ? (
+                        <>
+                          In <span className="font-medium text-good">{signed(summary.totalIn)}{chosenUnit ? ` ${chosenUnit}` : ""}</span>
+                          {" · "}Out <span className="font-medium text-danger">{signed(summary.totalOut)}{chosenUnit ? ` ${chosenUnit}` : ""}</span>
+                          {" · "}
+                        </>
+                      ) : null}
+                      {Number(summary.movementCount).toLocaleString("en-ZA")} movement{summary.movementCount === 1 ? "" : "s"}
+                      {!productId && summary.productCount ? ` across ${summary.productCount} product${summary.productCount === 1 ? "" : "s"}` : ""}
                     </>
                   ) : " "}
                 </p>

@@ -38,12 +38,10 @@ import useTableView from '@/features/masterdata/useTableView';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 import { exportExcel } from '@/lib/excelExport';
 import { fmtQty } from '@/lib/quantity';
-import { fmtQtyUnit } from '@/lib/stockWording';
 import {
   FILTERS, EXPORT_COLUMNS, STOCK_STATUS_LABEL, STOCK_STATUS_RANK,
-  EXPIRY_ESTIMATE_HINT, countdownLabel, expiryState, exportRows, filterProducts, isExpiringSoon, rowTone, stockStatus, todaySast,
+  EXPIRY_ESTIMATE_HINT, exportRows, filterProducts, rowTone, stockStatus, todaySast,
 } from './inventoryViews';
-import { formatCalendarDay as fmtDay } from '@/lib/dates';
 
 // ── Columns ──────────────────────────────────────────────────
 // One definition drives the header, the body and the Columns menu, so
@@ -66,10 +64,8 @@ const COLUMNS = [
     sort: (p) => p.available },
   { key: 'reorderAt', label: 'Reorder at',      numeric: true, align: 'right', minWidth: 'lg',
     sort: (p) => p.reorderAt },
-  // Sorted as a timestamp so the soonest comes first ascending; no
-  // expiry on record sorts last either way (useTableView).
-  { key: 'expiry',    label: 'Earliest expiry', numeric: true, minWidth: 'md',
-    sort: (p) => (p.earliestExpiry ? Date.parse(p.earliestExpiry) : null) },
+  // No expiry column: the earliest expiry is in the product's panel,
+  // and the Expiring tab lists what is close.
   // Problems first on the first (descending) click.
   { key: 'status',    label: 'Status',          numeric: true, minWidth: 'sm',
     sort: (p) => STOCK_STATUS_RANK[stockStatus(p)] },
@@ -270,7 +266,7 @@ export default function StockManifestTable({
                       aria-label={`Select ${p.name}`}
                     />
                   </TableCell>
-                  {columns.map((c) => <Cell key={c.key} column={c} product={p} onOpen={onOpen} today={today} />)}
+                  {columns.map((c) => <Cell key={c.key} column={c} product={p} onOpen={onOpen} />)}
                 </TableRow>
               );
             })}
@@ -281,7 +277,7 @@ export default function StockManifestTable({
   );
 }
 
-function Cell({ column, product: p, onOpen, today }) {
+function Cell({ column, product: p, onOpen }) {
   const num = 'text-right tabular-nums';
   switch (column.key) {
     case 'name':
@@ -315,21 +311,6 @@ function Cell({ column, product: p, onOpen, today }) {
       );
     case 'reorderAt':
       return <TableCell className={`${num} text-muted-foreground`}>{fmtQty(p.reorderAt)}</TableCell>;
-    case 'expiry': {
-      // Close: a countdown badge, red inside two weeks, amber inside the
-      // month. Further out: the date.
-      const state = expiryState(p.earliestExpiry, today);
-      const left = p.earliestExpiryLeft > 0 ? `. About ${fmtQtyUnit(p.earliestExpiryLeft, p.unit)} of that delivery left` : '';
-      return (
-        <TableCell className="tabular-nums" title={p.earliestExpiry ? `${EXPIRY_ESTIMATE_HINT}${left}` : undefined}>
-          {isExpiringSoon(state) ? (
-            <StatusBadge kind="expiry" status={state.status}>{countdownLabel(state)}</StatusBadge>
-          ) : (
-            <span className="text-muted-foreground">{fmtDay(p.earliestExpiry)}</span>
-          )}
-        </TableCell>
-      );
-    }
     case 'status': {
       const status = stockStatus(p);
       return (

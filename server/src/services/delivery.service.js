@@ -82,7 +82,9 @@ const resolveRange = (range) => {
   }
 };
 
-const DELIVERY_STATUSES = ['recorded', 'flagged', 'closed'];
+// The stored states, and the two a person reads: 'complete' (every line
+// came in at least as ordered) and 'partial' (a line came in short).
+const DELIVERY_STATUSES = ['recorded', 'flagged', 'closed', 'complete', 'partial'];
 
 const MAX_PAGE_SIZE     = 100;
 const DEFAULT_PAGE_SIZE = 25;
