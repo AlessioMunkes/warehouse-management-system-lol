@@ -40,6 +40,8 @@ const CAN_ADJUST = ["manager", "admin"];
 const CAN_ORDER  = ["manager", "admin"];
 
 const MAP_TAB = "map";
+// The same rhythm as the Map tab (WarehouseMapTab.jsx).
+const REFRESH_MS = 60_000;
 
 export default function InventoryManagementPage() {
   const { user } = useAuth();
@@ -81,6 +83,26 @@ export default function InventoryManagementPage() {
       .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  // FRESH, LIKE THE MAP. The Map tab re-reads every minute, and this list
+  // used to load once: after a delivery or a dismissed expiry the two
+  // disagreed (the map said three products expire soon, the Expiring tab
+  // one). Now the list re-reads on the same minute and whenever the page
+  // comes back into view, quietly, and never under an open adjustment.
+  const busyAdjusting = adjustQueue.length > 0 || isSaving || picking;
+  useEffect(() => {
+    if (busyAdjusting) return undefined;
+    let cancelled = false;
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      getManifest()
+        .then((rows) => { if (!cancelled) { setProducts(rows); setLoadError(null); } })
+        .catch(() => { /* the figures on screen stay; the next minute tries again */ });
+    };
+    const timer = setInterval(refresh, REFRESH_MS);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { cancelled = true; clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+  }, [busyAdjusting]);
 
   const reloadManifest = useCallback(async () => {
     setIsLoading(true);

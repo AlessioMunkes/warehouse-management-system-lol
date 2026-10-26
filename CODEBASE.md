@@ -355,9 +355,10 @@ client and runs the server's tests on every push.
   changes what the app does, so each needs a decision first:
   - Receiving offers two places to put a line (dry store, cold room) of the five storage
     areas in `constants/storageAreas.js` (`LOCATIONS` in `features/receiving/receivingText.js`).
-  - "Stock near expiry" means 14 days in the manager's action lists
-    (`features/reporting/operationalInsights.js`) and 30 days in the expiring-stock report
-    (`reportingOps.repository.js`). Neither reads the expiry warning windows in Settings.
+  - Expiry has two windows everywhere: "expiring soon" is 30 days (the Inventory tab, the
+    expiring-stock report, the map's amber), and "urgent" is the first expiry warning in
+    Settings (the warning emails, the action list, the red badges). The 30 is fixed in
+    `inventoryViews.js` and `reportingOps.repository.js`.
   - The decanting bag sizes are a fixed list, kept once on each side
     (`features/decanting/BagSizes.jsx`, `decanting.service.js`).
   - The donation categories are listed once in `constants/donationCategories.js` and once

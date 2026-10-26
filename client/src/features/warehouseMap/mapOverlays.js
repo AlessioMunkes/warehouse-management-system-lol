@@ -17,6 +17,7 @@
 // here.
 // ─────────────────────────────────────────────────────────────
 import { expiryState } from '../inventory/inventoryViews';
+import { getUrgentExpiryDays } from '../../lib/expiryWindow';
 import { isStaging, kindById } from './mapGeometry';
 
 // fill and stroke draw an area; solid is the stronger colour of the
@@ -147,7 +148,7 @@ export const legendFor = (overlay, { products = [] } = {}) => {
     ];
   }
   return [
-    { tone: 'bad', label: 'Expired or within 14 days' },
+    { tone: 'bad', label: `Expired or within ${getUrgentExpiryDays()} days` },
     { tone: 'warn', label: 'Within 30 days' },
     { tone: 'good', label: 'Later' },
     { tone: 'neutral', label: 'No expiry on record' },

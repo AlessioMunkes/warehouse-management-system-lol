@@ -16,6 +16,7 @@
 // never duplicated here.
 // ─────────────────────────────────────────────────────────────
 import insightRepo from '../../repositories/reportingInsight.repository.js';
+import settings from '../../services/settings.service.js';
 import { pluralUnit } from '../units/pluralUnit.js';
 
 const fmtDate = (d) => {
@@ -117,11 +118,14 @@ export const ACTION_LISTS = {
     }),
   },
 
+  // "Soon" is the first expiry warning in Settings, the same window the
+  // warning emails and the red expiry badges use (it was a fixed 14 days
+  // here, whatever Settings said).
   near_expiry: {
-    title: 'Stock expiring in the next two weeks',
+    title: 'Stock expiring soon',
     intro: 'Put these on the next picking slips first, so they leave the warehouse before they spoil.',
     link: 'stockLedger',
-    run: () => insightRepo.stockNearExpiry({ withinDays: 14 }),
+    run: async () => insightRepo.stockNearExpiry({ withinDays: await settings.get('stock.expiryWarningFirstDays') }),
     entry: (r) => ({
       name: r.name,
       detail: `Expires ${fmtDate(r.expiry_date)} (${r.days_left === 0 ? 'today' : `in ${plural(r.days_left, 'day')}`})`

@@ -26,6 +26,7 @@
 // so every future screen reading the manifest gets the same shape.
 // ─────────────────────────────────────────────────────────────
 import { apiDelete, apiGet, apiPost } from "./api";
+import { setUrgentExpiryDays } from "../lib/expiryWindow";
 
 // ── Row mappers ───────────────────────────────────────────────
 // Three quantities, and they mean different things:
@@ -134,7 +135,11 @@ const toMovement = (row) => ({
 // ── GET /api/stock ────────────────────────────────────────────
 export const getManifest = async () => {
   const body = await apiGet("/api/stock");
-  return (body.data ?? []).map(toProduct);
+  const rows = body.data ?? [];
+  // Settings' first expiry warning: where an expiry badge turns red.
+  const urgent = Number(rows[0]?.urgent_expiry_days);
+  if (Number.isFinite(urgent) && urgent > 0) setUrgentExpiryDays(urgent);
+  return rows.map(toProduct);
 };
 
 // ── GET /api/stock/:id/history ────────────────────────────────
