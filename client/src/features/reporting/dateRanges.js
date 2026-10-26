@@ -28,6 +28,9 @@ const shiftDays = (date, days) => new Date(date.getTime() + days * 24 * 60 * 60 
 // A week starts on Monday, the same as the server (periods.js).
 const startOfWeek = (date) => shiftDays(date, -((date.getUTCDay() + 6) % 7));
 
+// The Impact report's periods: the usual ones, then everything.
+export const CUMULATIVE_PRESET = { id: 'all_time', label: 'Cumulative' };
+
 export const RANGE_PRESETS = [
   { id: 'today',        label: 'Today' },
   { id: 'yesterday',    label: 'Yesterday' },
@@ -99,6 +102,12 @@ export const resolvePreset = (id) => {
       start.setUTCMonth(0, 1);
       return { from: iso(start), to: iso(today) };
     }
+
+    // Cumulative: the longest period a report covers (MAX_RANGE_DAYS on
+    // the server, 730 days), today included. Only the Impact screens
+    // offer it.
+    case 'all_time':
+      return { from: iso(shiftDays(today, -729)), to: iso(today) };
 
     default:
       return { from: iso(startOfMonth(shiftMonths(today, -2))), to: iso(today) };

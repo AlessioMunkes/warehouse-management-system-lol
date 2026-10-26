@@ -103,7 +103,7 @@ export const ROUTES = [
   // Unclaimed slips are the queue's normal state, so only pallets not
   // collected are counted.
   { id: 'pickingSlips', path: STAFF.pickingSlips, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Outbound', 'Picking slips', ClipboardText, (a) => a.pickingSlips.notCollected + (a.pickingSlips.neverPacked ?? 0))] },
+    nav: [nav('manager', 'Outbound', 'Picking slips', ClipboardText, (a) => a.pickingSlips.notCollected + (a.pickingSlips.neverPacked ?? 0) + (a.pickingSlips.flagged ?? 0))] },
   { id: 'beneficiaries', path: STAFF.beneficiaries, roles: MANAGER_ONLY, shell: true,
     nav: [nav('manager', 'Outbound', 'Beneficiaries', UsersThree)] },
   { id: 'collectionReminders', path: STAFF.collectionReminders, roles: MANAGER_ONLY, shell: true,

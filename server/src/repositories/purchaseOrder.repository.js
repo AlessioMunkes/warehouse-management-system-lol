@@ -199,7 +199,7 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
   const { rows } = await pool.query(
     `SELECT ${PO_COLUMNS},
             s.name AS supplier_name,
-            u.first_name AS created_by_name,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS created_by_name,
             (SELECT COUNT(*) FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id)::int AS line_count,
             -- Lines whose full expected quantity has arrived, summed
@@ -245,12 +245,12 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
 const getPurchaseOrderById = async (id) => {
   // The three reads do not depend on each other, so they go together:
   // one wait on the database instead of three in a row.
-  const [{ rows }, { rows: items }, { rows: deliveries }] = await Promise.all([
+  const [{ rows }, { rows: items }, { rows: deliveries }, { rows: statusChanges }] = await Promise.all([
     pool.query(
     `SELECT ${PO_COLUMNS},
             s.name AS supplier_name,
             s.is_active AS supplier_is_active,
-            u.first_name AS created_by_name,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS created_by_name,
             qom.qbo_id AS quickbooks_po_id,
             -- The order this one is a follow-up to, and any raised to
             -- follow it (migration 043).
@@ -291,13 +291,9 @@ const getPurchaseOrderById = async (id) => {
     [id]
   ),
 
-  // Every delivery actually recorded against this PO, oldest first —
-  // real events for the PO detail's timeline (order raised, then one
-  // entry per delivery, then wherever status sits today), not a
-  // fabricated status history. There is no per-transition log of past
-  // status changes (only status_changed_at, the most recent one), so
-  // the timeline is built from what's actually there: this table plus
-  // the PO's own created_at/status_changed_at.
+  // Every delivery actually recorded against this PO, oldest first:
+  // real events for the PO detail's timeline, with the status changes
+  // read below.
     pool.query(
     `SELECT dn.id, dn.delivery_date, COALESCE(dn.delivered_at, dn.created_at) AS recorded_at, dn.status, dn.driver_name,
             TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS received_by_name,
@@ -313,6 +309,21 @@ const getPurchaseOrderById = async (id) => {
       ORDER BY dn.delivery_date ASC, dn.id ASC`,
     [id]
   ),
+
+  // Every status change a person made (approve, in transit, returned,
+  // and so on), from the audit trail updatePurchaseOrderStatus writes:
+  // who made it and when. Changes made by receiving are not here; the
+  // delivery itself is on the timeline.
+    pool.query(
+    `SELECT al.after_data->>'status' AS status, al.reason, al.created_at,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS actor_name
+       FROM audit_log al
+       LEFT JOIN users u ON u.id = al.actor_id
+      WHERE al.entity_type = 'purchase_order' AND al.entity_id = $1
+        AND al.action = 'status_changed'
+      ORDER BY al.created_at ASC, al.id ASC`,
+    [id]
+  ),
   ]);
 
   const purchaseOrder = rows[0];
@@ -320,7 +331,7 @@ const getPurchaseOrderById = async (id) => {
   // Whatever is stored, only a short safe message leaves the repository.
   purchaseOrder.finance_email_error = safeFinanceEmailError(purchaseOrder.finance_email_error);
 
-  return { ...purchaseOrder, items, deliveries };
+  return { ...purchaseOrder, items, deliveries, status_changes: statusChanges };
 };
 
 // ── Status transition ────────────────────────────────────────

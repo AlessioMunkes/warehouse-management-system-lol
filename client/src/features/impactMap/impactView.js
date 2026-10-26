@@ -35,6 +35,8 @@ export const PRESETS = [
   { days: 90, label: 'Last 90 days' },
   { days: 180, label: 'Last 6 months' },
   { days: 365, label: 'Last 12 months' },
+  // The longest period the server allows (MAX_RANGE_DAYS).
+  { days: 730, label: 'Cumulative' },
 ];
 
 export const addDays = (day, n) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);

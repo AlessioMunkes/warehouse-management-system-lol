@@ -54,6 +54,8 @@ export const toAttention = (row = {}) => {
       // Past their collection day and never packed, from any week.
       neverPacked:     n(row.pickingSlips?.neverPacked),
       neverPackedFrom: row.pickingSlips?.neverPackedFrom ?? null,
+      // This week's pallets, not yet gone out, with a flagged line.
+      flagged:         n(row.pickingSlips?.flagged),
     },
     purchaseOrders: {
       awaitingApproval: n(row.purchaseOrders?.awaitingApproval),

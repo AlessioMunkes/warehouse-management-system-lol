@@ -57,7 +57,10 @@ import { BENEFICIARY_COLOURS } from '../features/reporting/chartFormat';
 import ImpactCalculatorPDF from '../features/reporting/ImpactCalculatorPDF';
 import { runReport }  from '../services/reportingAPI';
 import ImpactFactorsForm from '../features/reporting/ImpactFactorsForm';
-import { RANGE_PRESETS, DEFAULT_PRESET, resolvePreset } from '../features/reporting/dateRanges';
+import { RANGE_PRESETS, CUMULATIVE_PRESET, DEFAULT_PRESET, resolvePreset } from '../features/reporting/dateRanges';
+
+// Custom has no dates to pick on this page, so it is not offered.
+const IMPACT_PRESETS = [...RANGE_PRESETS.filter((p) => p.id !== 'custom'), CUMULATIVE_PRESET];
 import { STAFF } from '../routes/paths';
 
 import {
@@ -252,7 +255,7 @@ const ImpactPanel = ({
           <Select value={preset} onValueChange={(value) => { setLoading(true); setPreset(value); }}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {RANGE_PRESETS.map((p) => (
+              {IMPACT_PRESETS.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
               ))}
             </SelectContent>
@@ -372,12 +375,14 @@ export default function ImpactReportPage() {
     <PageShell>
       <PageHeader
         title="Impact report"
-        description="See the impact for a period and export it as a PDF."
+        description={preset === CUMULATIVE_PRESET.id
+          ? 'Cumulative impact: every record from the last two years.'
+          : 'See the impact for a period and export it as a PDF.'}
         actions={<>
           <Select value={preset} onValueChange={setPreset}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {RANGE_PRESETS.map((p) => (
+              {IMPACT_PRESETS.map((p) => (
                 <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
               ))}
             </SelectContent>

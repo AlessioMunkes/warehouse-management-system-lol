@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // server/__tests__/purchaseOrder.getById.repository.test.js
 //
-// getPurchaseOrderById makes three sequential pool.query calls (the
-// PO row, its lines, its deliveries) — no client. Mocked in that
-// order with mockResolvedValueOnce.
+// getPurchaseOrderById makes four pool.query calls (the PO row, its
+// lines, its deliveries, its status changes) — no client. Mocked in
+// that order with mockResolvedValueOnce.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -25,15 +25,16 @@ const PO_ROW = {
 beforeEach(() => vi.clearAllMocks());
 
 describe('getPurchaseOrderById', () => {
-  // The order, its lines and its deliveries are read together (one wait
-  // on the database, not three), so all three are asked for either way.
+  // The order, its lines, its deliveries and its status changes are read
+  // together (one wait on the database), so all four are asked for
+  // either way.
   it('returns null when the PO does not exist', async () => {
     poolMock.query.mockResolvedValue({ rows: [] });
 
     const result = await getPurchaseOrderById(999);
 
     expect(result).toBeNull();
-    expect(poolMock.query).toHaveBeenCalledTimes(3);
+    expect(poolMock.query).toHaveBeenCalledTimes(4);
   });
 
   it('attaches items and deliveries to the found PO', async () => {
@@ -42,16 +43,33 @@ describe('getPurchaseOrderById', () => {
       id: 20, delivery_date: '2026-09-10', status: 'complete',
       driver_name: 'Sipho', received_by_name: 'Mcebisi', has_discrepancies: false,
     };
+    const CHANGE = { status: 'approved', reason: null, created_at: '2026-09-09T08:00:00Z', actor_name: 'Grizel Goliath' };
 
     poolMock.query
       .mockResolvedValueOnce({ rows: [PO_ROW] })
       .mockResolvedValueOnce({ rows: [ITEM] })
-      .mockResolvedValueOnce({ rows: [DELIVERY] });
+      .mockResolvedValueOnce({ rows: [DELIVERY] })
+      .mockResolvedValueOnce({ rows: [CHANGE] });
 
     const result = await getPurchaseOrderById(1);
 
-    expect(result).toEqual({ ...PO_ROW, items: [ITEM], deliveries: [DELIVERY] });
-    expect(poolMock.query).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({ ...PO_ROW, items: [ITEM], deliveries: [DELIVERY], status_changes: [CHANGE] });
+    expect(poolMock.query).toHaveBeenCalledTimes(4);
+  });
+
+  // The timeline's "who approved it, and when": the audit trail
+  // updatePurchaseOrderStatus writes, for this order only.
+  it('reads the status changes from the audit trail for this PO, oldest first', async () => {
+    poolMock.query.mockResolvedValueOnce({ rows: [PO_ROW] }).mockResolvedValue({ rows: [] });
+
+    await getPurchaseOrderById(1);
+
+    const [sql, params] = poolMock.query.mock.calls[3];
+    expect(sql).toMatch(/FROM audit_log al/i);
+    expect(sql).toMatch(/al\.entity_type = 'purchase_order' AND al\.entity_id = \$1/);
+    expect(sql).toMatch(/al\.action = 'status_changed'/);
+    expect(sql).toMatch(/ORDER BY al\.created_at ASC/);
+    expect(params).toEqual([1]);
   });
 
   it('scopes the deliveries query to this PO, oldest first', async () => {

@@ -24,7 +24,7 @@ beforeEach(() => {
   poolMock.query.mockImplementation(async (sql) => {
     // Never packed, past the collection day: checked before the week's query.
     if (/AS oldest/.test(sql)) return { rows: [{ n: 7, oldest: '2026-09-21' }] };
-    if (/FROM picking_slips/.test(sql)) return { rows: [{ unassigned: 4, not_collected: 1 }] };
+    if (/FROM picking_slips/.test(sql)) return { rows: [{ unassigned: 4, not_collected: 1, flagged: 2 }] };
     if (/FROM purchase_orders/.test(sql)) return { rows: [{ awaiting_approval: 2, follow_up: 3, finance_email_failed: 1, needs_quickbooks_match: 2 }] };
     if (/FROM community_requests/.test(sql)) return { rows: [{ pending: 5, approved: 2, overdue: 1, needs_items: 1 }] };
     if (/FROM collection_kits/.test(sql)) return { rows: [{ idle: 3 }] };
@@ -54,7 +54,7 @@ describe('getAttention', () => {
 
   it('reports slips, orders and requests from their own queries', async () => {
     const res = await repo.getAttention({ now: NOW });
-    expect(res.pickingSlips).toEqual({ unassigned: 4, notCollected: 1, neverPacked: 7, neverPackedFrom: '2026-09-21' });
+    expect(res.pickingSlips).toEqual({ unassigned: 4, notCollected: 1, flagged: 2, neverPacked: 7, neverPackedFrom: '2026-09-21' });
     expect(res.purchaseOrders).toEqual({ awaitingApproval: 2, followUp: 3, financeEmailFailed: 1, needsQuickbooksMatch: 2 });
     expect(res.communityRequests).toEqual({ pending: 5, approved: 2, overdue: 1, needsItems: 1 });
     expect(res.feedTheSoil).toEqual({ idleKits: 3 });

@@ -241,7 +241,7 @@ export default function ImpactMapPage() {
           </div>
 
           <p className="mt-3 text-xs text-muted-foreground">
-            {formatCalendarDay(data.range.from)} to {formatCalendarDay(data.range.to)}. Collected dispatches only; meals and kilograms count kilogram lines, as the Meals enabled report does.
+            {preset === 730 ? 'Cumulative: ' : ''}{formatCalendarDay(data.range.from)} to {formatCalendarDay(data.range.to)}. Collected dispatches only; meals and kilograms count kilogram lines, as the Meals enabled report does.
           </p>
         </>
       )}

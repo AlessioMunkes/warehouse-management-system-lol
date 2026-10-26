@@ -162,6 +162,11 @@ export const toPurchaseOrder = (row) => ({
   openFollowUpCount:    Number(row.open_follow_up_count ?? 0),
   items:                (row.items ?? []).map(toLine),
   deliveries:           (row.deliveries ?? []).map(toDelivery),
+  // Who changed the status, to what, and when (detail only).
+  statusChanges:        (row.status_changes ?? []).map((c) => ({
+    status: c.status, statusLabel: PO_STATUS_LABELS[c.status] ?? c.status,
+    reason: c.reason ?? "", at: c.created_at ?? null, actorName: c.actor_name ?? "",
+  })),
 });
 
 // ── GET /api/purchase-orders ──────────────────────────────────

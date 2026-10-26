@@ -2969,12 +2969,16 @@ export const TOPICS = [
     asks: [
       'how is packing going', 'which pallets are packed', 'who is packing',
       'is the pallet ready', 'packing board', 'packing progress', 'what is still to pack',
+      'packer flagged an item', 'flagged item', 'item flagged short', 'what do i do with a flag',
     ],
     body:
       'Picking slips is your view of the floor’s packing. Its tabs split the week: ' +
-      'Unassigned (nobody on it yet), Packing, Ready at gate and Not collected. Each ' +
-      'row shows who is packing it and how many lines are packed.\n\n' +
-      'Open a slip to see its lines, what was flagged short, and who has it.',
+      'On the floor (nobody on it yet), Packing, Ready at gate, Flagged and Not collected. ' +
+      'Each row shows who is packing it and how many lines are packed.\n\n' +
+      'When a packer flags a line, the pallet shows under Needs attention on your ' +
+      'dashboard and on the Flagged tab until it goes out. Open the slip to see what ' +
+      'was flagged, why, and any photo, then decide whether to top it up, send it ' +
+      'short or hold it.',
     followUp: {
       question: 'Would you like to know how to give a slip to a particular packer?',
       topic: 'picking-slip-assign',
@@ -3034,12 +3038,15 @@ export const TOPICS = [
     asks: [
       'approve an order', 'awaiting approval', 'sign off an order', 'pending order',
       'edit an order', 'delete an order', 'change an order before it goes',
+      'who approved an order', 'when was it approved', 'order history', 'order timeline',
     ],
     body:
       'New orders wait on the Awaiting approval tab. Open one, check the lines and ' +
       'total, and choose Approve. It is then ready to send to the supplier.\n\n' +
       'Only an order still awaiting approval can be edited or deleted; once approved, ' +
-      'it is a commitment to the supplier.',
+      'it is a commitment to the supplier.\n\n' +
+      'The order’s timeline records who raised it, who approved it or changed its ' +
+      'status, and each delivery, with the time of each.',
     followUp: {
       question: 'Would you like to know what each status means?',
       topic: 'po-status',

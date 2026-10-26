@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
-  countViews, shiftWeek, slipState, weekLabel, weekOf,
+  countViews, isFlaggedOpen, shiftWeek, slipState, weekLabel, weekOf,
 } from '../features/pickingSlips/slipViews';
 
 vi.mock('../services/pickingAPI', () => ({
@@ -85,7 +85,17 @@ describe('slipViews', () => {
   });
 
   it('counts each tab', () => {
-    expect(countViews(SLIPS)).toEqual({ all: 4, unassigned: 1, packing: 1, ready: 1, notcollected: 1 });
+    expect(countViews(SLIPS)).toEqual({ all: 4, unassigned: 1, packing: 1, ready: 1, notcollected: 1, flagged: 0 });
+  });
+
+  // The dashboard's "pallets with a flagged item" links here: a flag
+  // only needs the manager while the pallet has not gone out.
+  it('lists a flagged pallet until it goes out', () => {
+    expect(isFlaggedOpen(slip({ status: 'in_progress', flagged_items: 1 }))).toBe(true);
+    expect(isFlaggedOpen(slip({ status: 'complete', flagged_items: '2' }))).toBe(true);
+    expect(isFlaggedOpen(slip({ status: 'complete', flagged_items: 0 }))).toBe(false);
+    expect(isFlaggedOpen(slip({ status: 'dispatched', dispatch_status: 'collected', flagged_items: 1 }))).toBe(false);
+    expect(isFlaggedOpen(slip({ status: 'cancelled', flagged_items: 1 }))).toBe(false);
   });
 });
 

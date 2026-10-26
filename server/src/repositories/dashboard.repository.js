@@ -175,7 +175,8 @@ const getSummary = async () => {
 //                    product with a delivery estimated still on the shelf,
 //                    not dismissed, due within 30 days, today included)
 //   pickingSlips   — this week (Monday to Sunday, SAST), the Picking
-//                    Slips page's default range
+//                    Slips page's default range; flagged is a pallet not
+//                    yet gone out with a line a packer flagged
 //   purchaseOrders — awaiting approval; flagged for follow-up; the
 //                    Finance email failed; needs a match in QuickBooks
 //   communityRequests — awaiting approval; approved and waiting to go
@@ -196,7 +197,12 @@ const getAttention = async ({ now = new Date() } = {}) => {
     pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE ps.status = 'pending')::int          AS unassigned,
-         COUNT(*) FILTER (WHERE de.status = 'not_collected')::int     AS not_collected
+         COUNT(*) FILTER (WHERE de.status = 'not_collected')::int     AS not_collected,
+         -- Not gone out yet, with a line a packer flagged: the Flagged tab.
+         COUNT(*) FILTER (WHERE ps.status IN ('pending', 'in_progress', 'complete')
+                            AND COALESCE(de.status, 'awaiting') NOT IN ('collected', 'late_collected', 'not_collected', 'cancelled')
+                            AND EXISTS (SELECT 1 FROM picking_slip_items psi
+                                         WHERE psi.picking_slip_id = ps.id AND psi.status = 'flagged'))::int AS flagged
        FROM picking_slips ps
        LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
        WHERE ps.dispatch_date >= date_trunc('week', ${SAST_TODAY})::date
@@ -261,6 +267,7 @@ const getAttention = async ({ now = new Date() } = {}) => {
     pickingSlips:      {
       unassigned: num(slips.rows[0]?.unassigned),
       notCollected: num(slips.rows[0]?.not_collected),
+      flagged: num(slips.rows[0]?.flagged),
       neverPacked: num(overdueSlips.rows[0]?.n),
       neverPackedFrom: overdueSlips.rows[0]?.oldest ?? null,
     },
