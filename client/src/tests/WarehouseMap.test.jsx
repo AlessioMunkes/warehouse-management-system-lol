@@ -176,9 +176,9 @@ describe('WarehouseMapTab', () => {
     const user = userEvent.setup();
     render(<WarehouseMapTab />);
     await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
-    await user.click(await screen.findByRole('button', { name: /Count this area/ }));
+    await user.click(await screen.findByRole('button', { name: /Manage this area/ }));
 
-    const dialog = within(await screen.findByRole('dialog', { name: 'Count Dry store 1' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Manage Dry store 1' }));
     const rice = dialog.getByLabelText('Rice');
     await user.clear(rice);
     await user.type(rice, '28');
@@ -215,7 +215,7 @@ describe('WarehouseMapTab', () => {
     const panel = within(await screen.findByRole('dialog'));
     expect(panel.getByText('2 pallets of 6 spaces · 33%')).toBeInTheDocument();
     expect(panel.getByText('Sunflower ECD')).toBeInTheDocument();
-    expect(panel.queryByRole('button', { name: /Count this area/ })).toBeNull();
+    expect(panel.queryByRole('button', { name: /Manage this area/ })).toBeNull();
   });
 
   it('shows the capacity of the warehouse and of each area under the map', async () => {

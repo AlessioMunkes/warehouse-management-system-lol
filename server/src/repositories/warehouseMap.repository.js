@@ -95,6 +95,29 @@ const listMapProducts = async (db = pool) => {
 };
 
 /**
+ * What is still to be packed, per product and unit: the lines nobody has
+ * packed yet on picking slips that are waiting or being packed, with how
+ * many pallets that is and the first collection day among them. It is
+ * still on the shelves, so an area's panel can say what of its stock is
+ * spoken for.
+ */
+const listToPack = async (db = pool) => {
+  const { rows } = await db.query(
+    `SELECT psi.product_id, psi.unit,
+            SUM(GREATEST(psi.required_quantity - COALESCE(psi.packed_quantity, 0), 0))::numeric AS to_pack,
+            COUNT(DISTINCT ps.id)::int AS pallets,
+            MIN(ps.dispatch_date)::text AS first_day
+       FROM picking_slip_items psi
+       JOIN picking_slips ps ON ps.id = psi.picking_slip_id
+      WHERE ps.status IN ('pending', 'in_progress')
+        AND psi.status = 'pending'
+      GROUP BY psi.product_id, psi.unit
+     HAVING SUM(GREATEST(psi.required_quantity - COALESCE(psi.packed_quantity, 0), 0)) > 0`
+  );
+  return rows;
+};
+
+/**
  * Packed pallets not yet dispatched: closed slips with no dispatch, or one
  * still awaiting collection. The same rule as committed stock.
  */
@@ -330,6 +353,6 @@ const insertCounts = async (client, { areaId, lines, countedBy }) => {
 };
 
 export default {
-  listAreas, getArea, listLatestCounts, listMapProducts, listPackedPallets, listDayActivity, readUnitSizes, productsForCount, saveLayout,
+  listAreas, getArea, listLatestCounts, listMapProducts, listToPack, listPackedPallets, listDayActivity, readUnitSizes, productsForCount, saveLayout,
   latestCountsForArea, insertCounts,
 };

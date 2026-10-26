@@ -298,6 +298,9 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           selectedId={openArea?.id ?? null}
           highlighted={highlighted}
           onSelect={(a) => setOpenId(a.id)}
+          // A click on the empty floor puts the map back to normal: no area
+          // open, nothing lit up by a search or by "needs attention".
+          onClear={() => { setOpenId(null); setQuery(''); setAttentionOnly(false); }}
         />
       </div>
 

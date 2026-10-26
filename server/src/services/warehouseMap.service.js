@@ -60,14 +60,22 @@ const buildMap = async () => {
   const areas = await mapModel.listAreas();
   if (areas === null) return { ready: false, grid: GRID, areas: [], products: [] };
   const today = todayInSAST();
-  const [counts, products, pallets, sizes, shelf, day] = await Promise.all([
+  const [counts, products, pallets, sizes, shelf, day, toPackRows] = await Promise.all([
     mapModel.listLatestCounts(),
     mapModel.listMapProducts(),
     mapModel.listPackedPallets(),
     mapModel.readUnitSizes(),
     loadShelfLots(),
     mapModel.listDayActivity(today),
+    mapModel.listToPack(),
   ]);
+  // Still to pack, per product: [{ quantity, unit, pallets, firstDay }].
+  const toPackOf = new Map();
+  for (const r of toPackRows) {
+    const list = toPackOf.get(r.product_id) ?? [];
+    list.push({ quantity: num(r.to_pack), unit: r.unit, pallets: r.pallets, firstDay: r.first_day });
+    toPackOf.set(r.product_id, list);
+  }
   const placed = placeStock({
     areas: areas.map((a) => ({
       id: a.id, name: a.name, kind: a.kind,
@@ -87,6 +95,7 @@ const buildMap = async () => {
       storageType: p.storage_type ?? null,
       programmeId: p.programme_id ?? null, programmeName: p.programme_name ?? null,
       earliestExpiry: earliestLive(shelf.get(p.id)?.lots ?? [], today)?.expiryDate ?? null,
+      toPack: toPackOf.get(p.id) ?? [],
     })),
     pallets: pallets.map((r) => ({
       id: r.id, ref: r.pallet_ref ?? null, beneficiary: r.beneficiary ?? null, dispatchDate: r.dispatch_date ?? null,

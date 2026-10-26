@@ -87,6 +87,26 @@ function StockTake({ product, canAdjust, onAdjust }) {
   );
 }
 
+// What of this product is still to be packed: wanted on picking slips
+// nobody has finished, with how many pallets and the first collection
+// day. One line per unit the slips ask in ("12 kg", "40 each").
+function ToPackLine({ product }) {
+  const toPack = product?.toPack ?? [];
+  if (!toPack.length) return null;
+  const pallets = Math.max(...toPack.map((t) => t.pallets));
+  const first = toPack.map((t) => t.firstDay).filter(Boolean).sort()[0];
+  return (
+    <p className="mt-1 text-xs">
+      <span className="font-medium text-warn">
+        Still to pack: {toPack.map((t) => fmtQtyUnit(t.quantity, t.unit)).join(' and ')}
+      </span>
+      <span className="text-muted-foreground">
+        {' '}for {pallets} {pallets === 1 ? 'pallet' : 'pallets'}{first ? `, the earliest due ${formatCalendarDay(first)}` : ''}
+      </span>
+    </p>
+  );
+}
+
 function ExpiryBadge({ product, today }) {
   const state = expiryState(product?.earliestExpiry, today ?? undefined);
   if (!state || !(isExpiringSoon(state) || state.status === 'expired')) return null;
@@ -319,6 +339,8 @@ export default function AreaPanel({
   }
 
   const items = (area.items ?? []).filter((i) => i.about > 0);
+  // How many of the products here are wanted on pallets not packed yet.
+  const stillNeeded = new Set(items.filter((i) => productsById.get(i.productId)?.toPack?.length).map((i) => i.productId)).size;
   const by = items.find((i) => i.countedByName)?.countedByName;
   const eyebrow = holdsStock(area)
     ? `${kindById(area.kind).label} · ${countedWhen(area.lastCountedAt)}${by && area.lastCountedAt ? ` by ${by}` : ''}`
@@ -333,7 +355,7 @@ export default function AreaPanel({
       badges={<AlertBadges area={area} today={today} />}
       actions={canCount ? (
         <Button type="button" size="sm" onClick={onCount}>
-          <ClipboardList /> Count this area
+          <ClipboardList /> Manage this area
         </Button>
       ) : null}
     >
@@ -345,9 +367,15 @@ export default function AreaPanel({
           : <PalletList pallets={area.pallets} label={`Pallets in ${area.name}`} today={today} />
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {area.lastCountedAt ? 'Empty at the last count.' : 'Nothing counted here yet. Count this area to record what it holds.'}
+          {area.lastCountedAt ? 'Empty at the last count.' : 'Nothing counted here yet. Choose Manage this area to record what it holds.'}
         </p>
-      ) : (
+      ) : (<>
+        {stillNeeded > 0 ? (
+          <p className="text-sm">
+            <span className="font-medium">{stillNeeded} of these {stillNeeded === 1 ? 'product is' : 'products are'} still to be packed</span>
+            <span className="text-muted-foreground"> for pallets that have not been packed yet.</span>
+          </p>
+        ) : null}
         <ul className="divide-y rounded-lg border" aria-label={`In ${area.name}`}>
           {items.map((i) => {
             const product = productsById.get(i.productId);
@@ -374,12 +402,13 @@ export default function AreaPanel({
                   )}
                   <ExpiryBadge product={product} today={today} />
                 </div>
+                <ToPackLine product={product} />
                 {counted ? <StockTake product={product} canAdjust={canAdjust} onAdjust={onAdjust} /> : null}
               </li>
             );
           })}
         </ul>
-      )}
+      </>)}
     </DetailPanel>
   );
 }

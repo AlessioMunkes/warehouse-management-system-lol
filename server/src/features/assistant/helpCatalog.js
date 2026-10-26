@@ -1520,7 +1520,7 @@ export const TOPICS = [
       'floor records where stock is put: the map holds what a manager last counted.',
     steps: [
       'Walk to an area and open it on the map.',
-      'Choose Count this area. What the map thinks is there comes filled in: correct it, add anything else, and take off what is no longer there. Scanning works too.',
+      'Choose Manage this area. What the map thinks is there comes filled in: correct it, add anything else, and take off what is no longer there. Scanning works too.',
       'Save count. This never changes stock. The area then shows its count beside what is on hand, and Adjust stock corrects a difference.',
       'Stock in no area is listed under Not placed, on the map’s toolbar.',
     ],
