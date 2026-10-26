@@ -141,7 +141,7 @@ describe('customising the board', () => {
 
   it('shows the real figures, including this month’s dispatches', async () => {
     renderBoard();
-    expect(await screen.findByText('Low or out of stock')).toBeInTheDocument();
+    expect((await screen.findAllByText('Low stock')).length).toBeGreaterThan(0);
     await waitFor(() => expect(runReportMock).toHaveBeenCalled());
     // The report had rows: it must not be read as empty.
     await waitFor(() => expect(screen.queryByText(/Nothing dispatched/)).not.toBeInTheDocument());
@@ -284,9 +284,9 @@ describe('red, amber and green', () => {
     const w = WIDGETS.find((x) => x.id === 'product-health');
     const el = w.render({ summary: { healthyStockCount: 26, belowReorderCount: 0, outOfStockCount: 34 } });
     const colorFor = el.props.colorFor;
-    expect(colorFor('Out of stock')).toBe(RAG.bad);
+    expect(colorFor('Shortfall')).toBe(RAG.bad);
     expect(colorFor('Low stock')).toBe(RAG.warn);
-    expect(colorFor('Healthy stock')).toBe(RAG.good);
+    expect(colorFor('In stock')).toBe(RAG.good);
     expect(byLabel({})('anything')).toBeNull();
   });
 });

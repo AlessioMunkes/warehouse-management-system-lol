@@ -81,10 +81,11 @@ export const WIDGETS = [
 
   // ═══ Manager: number tiles ═══════════════════════════════════
   tile({
-    id: 'low-stock', title: 'Low or out of stock', roles: MANAGER_ONLY, needs: ['summary'],
-    description: 'Products at or below their reorder level, or with nothing available.',
+    // The same number as the Low stock tab it opens.
+    id: 'low-stock', title: 'Low stock', roles: MANAGER_ONLY, needs: ['summary'],
+    description: 'Products at or below their reorder level: the Low stock tab on Inventory.',
     render: ({ summary }) => (
-      <StatTile image="low-stock" label="Low or out of stock" value={summary.lowStockCount}
+      <StatTile image="low-stock" label="Low stock" value={summary.belowReorderCount}
         to={`${INVENTORY}?status=lowstock`} warn />
     ),
   }),
@@ -199,15 +200,15 @@ export const WIDGETS = [
   // ═══ Manager: charts ═════════════════════════════════════════
   {
     id: 'product-health', kind: 'panel', title: 'Product health', roles: MANAGER_ONLY, needs: ['summary'],
-    description: 'Active products split into healthy, low and out of stock.',
+    description: 'Active products split as the Inventory tabs split them: in stock, low stock and shortfall.',
     render: ({ summary }) => (
       <StaticChart
         unit="products" hint="donut" description="Product health"
-        colorFor={byLabel({ 'Healthy stock': RAG.good, 'Low stock': RAG.warn, 'Out of stock': RAG.bad })}
+        colorFor={byLabel({ 'In stock': RAG.good, 'Low stock': RAG.warn, 'Shortfall': RAG.bad })}
         series={[
-          { label: 'Healthy stock', value: summary.healthyStockCount },
+          { label: 'In stock', value: summary.healthyStockCount },
           { label: 'Low stock', value: summary.belowReorderCount },
-          { label: 'Out of stock', value: summary.outOfStockCount },
+          { label: 'Shortfall', value: summary.outOfStockCount },
         ]}
       />
     ),

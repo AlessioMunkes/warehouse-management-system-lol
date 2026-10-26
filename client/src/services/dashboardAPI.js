@@ -51,6 +51,9 @@ export const toAttention = (row = {}) => {
     pickingSlips: {
       unassigned:   n(row.pickingSlips?.unassigned),
       notCollected: n(row.pickingSlips?.notCollected),
+      // Past their collection day and never packed, from any week.
+      neverPacked:     n(row.pickingSlips?.neverPacked),
+      neverPackedFrom: row.pickingSlips?.neverPackedFrom ?? null,
     },
     purchaseOrders: {
       awaitingApproval: n(row.purchaseOrders?.awaitingApproval),

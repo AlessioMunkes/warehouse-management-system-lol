@@ -43,6 +43,10 @@ const lines = (a) => [
   { key: 'notCollected', tone: 'bad', icon: TriangleAlert, count: a.pickingSlips.notCollected,
     text: (n) => `${plural(n, 'pallet was', 'pallets were')} not collected this week`,
     to: `${STAFF.pickingSlips}?status=notcollected` },
+  // Opens the week of the oldest one.
+  { key: 'neverPacked', tone: 'bad', icon: TriangleAlert, count: a.pickingSlips.neverPacked ?? 0,
+    text: (n) => `${plural(n, 'picking slip was', 'picking slips were')} never packed and the collection day has passed`,
+    to: a.pickingSlips.neverPackedFrom ? `${STAFF.pickingSlips}?date=${a.pickingSlips.neverPackedFrom}` : STAFF.pickingSlips },
   { key: 'followUp', tone: 'bad', icon: TriangleAlert, count: a.purchaseOrders.followUp,
     text: (n) => `${plural(n, 'purchase order needs', 'purchase orders need')} following up with the supplier`,
     to: `${STAFF.purchaseOrders}?status=follow_up_required` },

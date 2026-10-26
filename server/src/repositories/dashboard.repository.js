@@ -97,13 +97,17 @@ const getMyWork = async () => {
 //   out of stock — nothing available
 //   low          — some available, at or below the reorder level
 //   healthy      — everything else
+// The Inventory tabs' own rules (inventoryViews.js stockStatus): a
+// shortfall is promised beyond what is on hand; low stock is at or below
+// its reorder level and not a shortfall. The dashboard used its own
+// ("out" = nothing available), so its tile said 7 while the Low stock
+// tab it opens said 6.
 const stockHealth = (rows) => {
   let out = 0;
   let low = 0;
   for (const r of rows) {
-    const available = Number(r.available);
-    if (available <= 0) out += 1;
-    else if (available <= Number(r.reorder_threshold)) low += 1;
+    if (r.is_shortfall) out += 1;
+    else if (r.is_low_stock) low += 1;
   }
   return { active: rows.length, out, low, healthy: rows.length - out - low };
 };
@@ -148,7 +152,7 @@ const getSummary = async () => {
 
   const health = stockHealth(manifest);
   return {
-    // Low OR out: what the inventory screen's low-stock filter shows.
+    // Low stock or shortfall: the two Inventory tabs together.
     lowStockCount:            health.low + health.out,
     belowReorderCount:        health.low,
     outOfStockCount:          health.out,
@@ -187,7 +191,7 @@ const sastDay = (date) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(date);
 
 const getAttention = async ({ now = new Date() } = {}) => {
-  const [manifest, slips, pos, requests, kits] = await Promise.all([
+  const [manifest, slips, pos, requests, kits, overdueSlips] = await Promise.all([
     stockRepo.getManifest(),
     pool.query(
       `SELECT
@@ -231,6 +235,15 @@ const getAttention = async ({ now = new Date() } = {}) => {
     // A warehouse without the kit tables has no kits to chase.
     pool.query(`SELECT COUNT(*)::int AS idle FROM collection_kits k WHERE ${idleKitSql('k')}`)
       .catch((err) => { if (err.code === '42P01') return { rows: [{ idle: 0 }] }; throw err; }),
+    // Slips whose collection day has gone by and that were never packed
+    // (waiting, or packing started and left). The week above cannot see
+    // them, so nothing pointed at them while the map counted them as
+    // still to pack. The oldest day, so the link opens that week.
+    pool.query(
+      `SELECT COUNT(*)::int AS n, MIN(dispatch_date)::text AS oldest
+         FROM picking_slips
+        WHERE status IN ('pending', 'in_progress') AND dispatch_date < ${SAST_TODAY}`
+    ),
   ]);
 
   const today = sastDay(now);
@@ -245,7 +258,12 @@ const getAttention = async ({ now = new Date() } = {}) => {
 
   return {
     inventory:         { shortfall, lowStock, expiring },
-    pickingSlips:      { unassigned: num(slips.rows[0]?.unassigned), notCollected: num(slips.rows[0]?.not_collected) },
+    pickingSlips:      {
+      unassigned: num(slips.rows[0]?.unassigned),
+      notCollected: num(slips.rows[0]?.not_collected),
+      neverPacked: num(overdueSlips.rows[0]?.n),
+      neverPackedFrom: overdueSlips.rows[0]?.oldest ?? null,
+    },
     purchaseOrders:    {
       awaitingApproval:     num(pos.rows[0]?.awaiting_approval),
       followUp:             num(pos.rows[0]?.follow_up),

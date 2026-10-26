@@ -117,16 +117,20 @@ describe('dashboard controller — responses', () => {
 // count as healthy.
 describe('stock health', async () => {
   const { default: repo } = await import('../src/repositories/dashboard.repository.js');
-  const row = (available, reorder_threshold) => ({ available: String(available), reorder_threshold: String(reorder_threshold) });
+  // As the manifest sends them: the same flags the Inventory tabs read.
+  const row = (available, reorder_threshold) => ({
+    available: String(available), reorder_threshold: String(reorder_threshold),
+    is_shortfall: available < 0, is_low_stock: available <= reorder_threshold,
+  });
 
-  it('splits products into out of stock, low and healthy by what is available', () => {
+  it('splits products the way the Inventory tabs do: shortfall, low stock, in stock', () => {
     expect(repo.stockHealth([
-      row(0, 0),     // nothing, no reorder level: OUT, not healthy
-      row(-2, 5),    // shortfall: out
+      row(0, 0),     // nothing, no reorder level: low stock, as the Low stock tab shows it
+      row(-2, 5),    // promised beyond what is on hand: shortfall
       row(3, 5),     // low
       row(5, 5),     // at the level: low
       row(9, 5),     // healthy
       row(4, 0),     // no level set, some stock: healthy
-    ])).toEqual({ active: 6, out: 2, low: 2, healthy: 2 });
+    ])).toEqual({ active: 6, out: 1, low: 3, healthy: 2 });
   });
 });
