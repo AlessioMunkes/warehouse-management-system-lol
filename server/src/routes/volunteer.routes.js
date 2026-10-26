@@ -19,6 +19,7 @@ import volunteerRepo                from '../repositories/volunteer.repository.j
 import slipAccessRepo               from '../repositories/slipAccess.repository.js';
 import { isTodayGateCode, todayGateCode } from '../services/gateCode.service.js';
 import { guestSignInRateLimiter } from '../middleware/rateLimiter.middleware.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ router.get('/gate-code', auth, requireRole(...MANAGERS_UP), (_req, res) => {
     return res.status(200).json({ success: true, data: todayGateCode() });
   } catch (error) {
     console.error('[volunteers:gate-code]', error.message);
-    return res.status(500).json({ success: false, message: 'Could not work out today\'s gate code.' });
+    return sendError(res, error, 'Could not work out today\'s gate code.');
   }
 });
 
@@ -93,7 +94,7 @@ router.post('/sign-in', guestSignInRateLimiter, async (req, res) => {
 
   } catch (error) {
     console.error('[volunteers]', error.message);
-    return res.status(500).json({ message: 'Server error recording sign-in.' });
+    return sendError(res, error, 'Could not record your sign-in.');
   }
 });
 
@@ -125,7 +126,7 @@ router.get('/',
       return res.status(200).json({ success: true, data, hasMore });
     } catch (error) {
       console.error('[volunteers:log]', error.message);
-      return res.status(500).json({ success: false, message: 'Failed to load the guest log.' });
+      return sendError(res, error, 'Failed to load the guest log.');
     }
   });
 
@@ -181,7 +182,7 @@ router.post('/sign-out',
       return res.status(200).json({ success: true, data: updated });
     } catch (error) {
       console.error('[volunteers:self-sign-out]', error.message);
-      return res.status(500).json({ success: false, message: 'Failed to sign you out.' });
+      return sendError(res, error, 'Failed to sign you out.');
     }
   });
 
@@ -214,7 +215,7 @@ router.post('/:id/sign-out',
       return res.status(200).json({ success: true, data: existing });
     } catch (error) {
       console.error('[volunteers:sign-out]', error.message);
-      return res.status(500).json({ success: false, message: 'Failed to sign the visit out.' });
+      return sendError(res, error, 'Failed to sign the visit out.');
     }
   });
 

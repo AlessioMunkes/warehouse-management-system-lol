@@ -61,6 +61,7 @@ const KEYWORDS = {
   community_response_time:    ['response time', 'respond', 'resolve requests', 'how quickly', 'answer requests'],
   volunteer_hours:            ['volunteer hours', 'volunteers', 'volunteer'],
   volunteer_event_attendance: ['attendance', 'event', 'events', 'checked in', 'no-shows'],
+  staff_activity:             ['staff performance', 'staff activity', 'performance', 'who did the most', 'who packed the most', 'who received the most', 'each staff member', 'each worker', 'per person', 'by person', 'by staff'],
   workload:                   ['workload', 'busiest hour', 'busiest hours', 'busiest time', 'busy hours', 'peak hour', 'peak hours', 'peak time', 'staffing', 'roster', 'rostering', 'how busy', 'time of day', 'when is', 'more staff', 'staff on', 'more people', 'the floor'],
 };
 
@@ -76,6 +77,8 @@ const COMPARISON_KEYWORDS = {
 const DIMENSION_WORDS = [
   [/\bby month|monthly|per month|each month|over time|trend|month\b|getting (worse|better)|improving|worsening/, ['month', 'month_supplier', 'month_beneficiary', 'month_movement']],
   [/\bweekly|per week|by week|each week\b/, ['week']],
+  // Not "packers" alone: "which products do packers flag" is by product.
+  [/\b(by staff|staff members?|each staff|per person|by person|each person|who (packed|received|did|handed))\b/, ['staff', 'staff_area']],
   [/\bsuppliers?\b/, ['supplier', 'month_supplier']],
   [/\b(centres?|centers?|ecds?|schools?)\b/, ['ecd_centre']],
   [/\bproducts?|items?\b/, ['product']],

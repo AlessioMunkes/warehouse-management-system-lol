@@ -25,11 +25,13 @@ describe('what can be drilled', () => {
 
   it('opens a bar every way the report can: over time, and by each other breakdown', () => {
     const ids = (metric, dimension, dateRange = RANGE) => drillOptions(getMetric(metric), { dimension, dateRange }).map((o) => o.id);
-    expect(ids('goods_received', 'supplier')).toEqual(['month', 'product', 'product_category', 'storage_type']);
-    expect(ids('goods_received', 'month')).toEqual(['week', 'day', 'supplier', 'product', 'product_category', 'storage_type']);
-    expect(ids('goods_received', 'week')).toEqual(['day', 'supplier', 'product', 'product_category', 'storage_type']);
-    expect(ids('goods_received', 'day')).toEqual(['supplier', 'product', 'product_category', 'storage_type']);
-    expect(ids('dispatch_volume', 'ecd_centre')).toEqual(['month', 'cohort', 'product', 'programme', 'beneficiary', 'product_category', 'storage_type']);
+    expect(ids('goods_received', 'supplier')).toEqual(['month', 'product', 'product_category', 'storage_type', 'staff']);
+    expect(ids('goods_received', 'month')).toEqual(['week', 'day', 'supplier', 'product', 'product_category', 'storage_type', 'staff']);
+    expect(ids('goods_received', 'week')).toEqual(['day', 'supplier', 'product', 'product_category', 'storage_type', 'staff']);
+    expect(ids('goods_received', 'day')).toEqual(['supplier', 'product', 'product_category', 'storage_type', 'staff']);
+    expect(ids('dispatch_volume', 'ecd_centre')).toEqual(['month', 'cohort', 'product', 'programme', 'beneficiary', 'product_category', 'storage_type', 'staff']);
+    // One member of staff: their work over time, or split another way.
+    expect(ids('goods_received', 'staff')).toEqual(['month', 'supplier', 'product', 'product_category', 'storage_type']);
     // A fortnight or less goes day by day.
     expect(ids('goods_received', 'supplier', { from: '2026-10-01', to: '2026-10-12' })[0]).toBe('day');
     // A short period goes week by week.

@@ -30,6 +30,7 @@ import { AUTH_COOKIE, authCookieOptions, setStaffSessionCookie } from '../config
 import { warehouseName, isMultiWarehouse } from '../config/warehouses.js';
 import { accountChangeRateLimiter } from '../middleware/rateLimiter.middleware.js';
 import accountService from '../services/account.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = express.Router();
 
@@ -104,7 +105,7 @@ router.patch('/language', auth, async (req, res) => {
     return res.json({ success: true, data: { language } });
   } catch (error) {
     console.error('[session] language not saved:', error.message);
-    return res.status(500).json({ success: false, message: 'Could not save your language.' });
+    return sendError(res, error, 'Could not save your language.');
   }
 });
 
@@ -123,7 +124,7 @@ const ownAccount = (change, label, after = null) => async (req, res) => {
   } catch (error) {
     if (error.status) return res.status(error.status).json({ success: false, message: error.message });
     console.error(`[session] ${label} not changed:`, error.message);
-    return res.status(500).json({ success: false, message: `Could not change your ${label}.` });
+    return sendError(res, error, `Could not change your ${label}.`);
   }
 };
 
@@ -193,7 +194,7 @@ router.get('/', auth, async (req, res) => {
     // briefly unreachable is not the same as the session being
     // invalid, and logging everyone out over a blip would be worse
     // than the outage.
-    return res.status(500).json({ success: false, message: 'Could not verify your session.' });
+    return sendError(res, error, 'Could not verify your session.');
   }
 });
 

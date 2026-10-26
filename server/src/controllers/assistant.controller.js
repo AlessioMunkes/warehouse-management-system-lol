@@ -17,17 +17,11 @@
 // step: ask a person.
 // ─────────────────────────────────────────────────────────────
 import assistantService from '../services/assistant.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const PASS_THROUGH = new Set([502, 503, 504]);
 
-const send = (res, err, fallback) => {
-  const status = err.status || 500;
-  const showMessage = status < 500 || PASS_THROUGH.has(status);
-  res.status(status).json({
-    success: false,
-    message: showMessage ? err.message : fallback,
-  });
-};
+const send = (res, err, fallback) => sendError(res, err, fallback, { passThrough: [...PASS_THROUGH] });
 
 // GET /api/assistant/catalog
 // The topics and per-screen suggestions for the signed-in role.
@@ -59,16 +53,20 @@ const getTopic = async (req, res) => {
 
 // POST /api/assistant/ask
 // Returns one of:
-//   { type:'topic',       topic, answer }   answer: a checked sentence or two, or null
+//   { type:'topic',       topic, answer, also, notice? }
+//                           answer: the checked sentences, or null
+//                           also:   other topics the answer drew on
+//                           notice: set when the model could not be asked
 //   { type:'navigate',    screen }
 //   { type:'clarify',     question, options }
-//   { type:'not_covered', closest }
+//   { type:'not_covered', closest, suggestions }
 const ask = async (req, res) => {
   try {
     const result = await assistantService.ask({
       question: req.body?.question,
       screen:   req.body?.screen,
       previous: req.body?.previous,
+      history:  req.body?.history,
       userId:   req.user?.id,
       role:     req.user?.role,
     });

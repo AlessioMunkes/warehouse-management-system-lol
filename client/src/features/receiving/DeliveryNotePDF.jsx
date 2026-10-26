@@ -19,7 +19,7 @@
 // of what arrived must never pass for one.
 // ─────────────────────────────────────────────────────────────
 import NoteSheet, { NoteSignatures } from '../receipts/NoteSheet';
-import { formatDate, fmtQty, variance, noteNumber } from '../receipts/noteFormat';
+import { formatDate, formatDateTime, fmtQty, variance, noteNumber } from '../receipts/noteFormat';
 
 const DeliveryNotePDF = ({ delivery, onClose }) => {
   if (!delivery) return null;
@@ -55,7 +55,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
       }}
       meta={[
         { label: 'Delivery note no.', value: noteNumber(delivery.id) },
-        { label: 'Delivered', value: formatDate(delivery.delivery_date) },
+        { label: 'Delivered', value: delivery.delivered_at ? formatDateTime(delivery.delivered_at) : formatDate(delivery.delivery_date) },
         { label: 'Purchase order', value: order },
         { label: 'Received by', value: delivery.received_by_name || '-' },
         {
@@ -117,7 +117,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         }}
         by={{
           label: 'Received by',
-          name: `${delivery.received_by_name || 'Warehouse Worker'} · ${formatDate(delivery.delivery_date)}`,
+          name: `${delivery.received_by_name || 'Warehouse Worker'} · ${delivery.delivered_at ? formatDateTime(delivery.delivered_at) : formatDate(delivery.delivery_date)}`,
         }}
       />
     </NoteSheet>

@@ -22,6 +22,7 @@ import accountRepository from '../repositories/account.repository.js';
 import { AUTH_COOKIE, authCookieOptions, setStaffSessionCookie as setSessionCookie } from '../config/cookie.js';
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { parseWarehouseNames, warehouseName } from '../config/warehouses.js';
+import { sendError } from '../utils/httpError.js';
 
 const router = express.Router();
 
@@ -172,7 +173,7 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('[login] failed:', error);
-    return res.status(500).json({ message: 'Server error during login.' });
+    return sendError(res, error, 'Could not sign you in.');
   }
 });
 

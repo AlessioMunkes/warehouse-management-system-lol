@@ -33,6 +33,39 @@ import { COLLECTED_STATUSES, NOT_COLLECTED_STATUSES, SAST } from '../features/re
 import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import { listExpiringLots } from './shelfLots.repository.js';
 import { WORK_SQL } from './reportingPlanning.repository.js';
+import { staffName } from './reportingStaff.sql.js';
+import { STAFF_AREAS } from '../features/reporting/reportCatalog.js';
+
+// Each piece of work a member of staff recorded, with when and where:
+// the rows behind Staff activity (reportingOps.repository.js counts the
+// same sources by day).
+const STAFF_WORK_SQL = `(
+  SELECT dn.received_by AS uid, 'receiving' AS area, COALESCE(dn.delivered_at, dn.created_at) AS at,
+         'Delivery note #' || LPAD(dn.id::text, 4, '0') AS what
+    FROM delivery_notes dn
+  UNION ALL
+  SELECT psi.confirmed_by, 'packing', psi.confirmed_at,
+         'Pallet ' || COALESCE(ps.pallet_ref, 'P-' || ps.id) || ': ' || p.name
+    FROM picking_slip_items psi
+    JOIN picking_slips ps ON ps.id = psi.picking_slip_id
+    JOIN products p ON p.id = psi.product_id
+   WHERE psi.status IN ('confirmed', 'flagged') AND psi.confirmed_at IS NOT NULL
+  UNION ALL
+  SELECT de.dispatched_by, 'gate', de.collected_at,
+         'Pallet ' || COALESCE(ps.pallet_ref, 'P-' || ps.id)
+    FROM dispatch_events de JOIN picking_slips ps ON ps.id = de.picking_slip_id
+   WHERE de.collected_at IS NOT NULL
+  UNION ALL
+  SELECT dr.recorded_by, 'decanting', dr.created_at, 'Decanting run, week of ' || dr.week_of::text
+    FROM decanting_records dr
+  UNION ALL
+  SELECT d.received_by, 'donations', d.received_at, 'Donation #' || d.id FROM donations d
+  UNION ALL
+  SELECT sm.performed_by, 'adjustments', sm.created_at, 'Adjustment: ' || p.name
+    FROM stock_movements sm JOIN products p ON p.id = sm.product_id
+   WHERE sm.movement_type = 'adjustment'
+) sw`;
+const STAFF_AREA_LABEL = `CASE sw.area ${STAFF_AREAS.map((a) => `WHEN '${a.id}' THEN '${a.label}'`).join(' ')} END`;
 
 export const MAX_RECORDS = 500;
 
@@ -76,6 +109,21 @@ const FAMILIES = {
   },
 
   // One line of one pallet, as loaded at the gate.
+  // One piece of work by one member of staff (Staff activity).
+  staff_work: {
+    noun: 'pieces of work',
+    from: STAFF_WORK_SQL,
+    date: sastDate('sw.at'),
+    columns: [
+      col('when', 'When', 'datetime', sastTime('sw.at')),
+      col('who', 'Staff member', 'text', staffName('sw.uid')),
+      col('area', 'Area', 'text', STAFF_AREA_LABEL),
+      col('what', 'What', 'text', `sw.what`),
+    ],
+    filters: { staff_id: `sw.uid = $?`, staff_area: `sw.area = $?` },
+    order: `1 DESC, 2`,
+  },
+
   dispatch_lines: {
     noun: 'gate lines',
     from: `dispatch_event_lines del
@@ -95,10 +143,12 @@ const FAMILIES = {
       col('unit', 'Unit', 'text', `del.unit`),
       col('outcome', 'Outcome', 'text', `REPLACE(de.status, '_', ' ')`),
       col('reason', 'Reason for a difference', 'text', `COALESCE(del.variance_reason, '')`),
+      col('who', 'Handed over by', 'text', staffName('de.dispatched_by')),
     ],
     filters: {
       cohort: `ps.cohort = $?::cohort_group`, beneficiary_kind: `ps.beneficiary_kind = $?::beneficiary_type`,
       ecd_id: `ps.ecd_id = $?`, product_id: `del.product_id = $?`, ...PRODUCT_FILTERS,
+      staff_id: `de.dispatched_by = $?`,
     },
     order: `1 DESC, 3, 5`,
   },
@@ -121,10 +171,12 @@ const FAMILIES = {
       col('collected', 'Collected at', 'datetime', sastTime('de.collected_at')),
       col('lines', 'Lines', 'number', `(SELECT COUNT(*) FROM picking_slip_items i WHERE i.picking_slip_id = ps.id)`),
       col('hours', 'Hours to pack', 'number', `ROUND((EXTRACT(EPOCH FROM (ps.completed_at - ps.started_at)) / 3600.0)::numeric, 1)`),
+      col('who', 'Packed by', 'text', staffName('ps.completed_by')),
     ],
     filters: {
       cohort: `ps.cohort = $?::cohort_group`, beneficiary_kind: `ps.beneficiary_kind = $?::beneficiary_type`,
       ecd_id: `ps.ecd_id = $?`, slip_status: `ps.status::text = $?`,
+      staff_id: `ps.completed_by = $?`,
     },
     order: `1 DESC, 2`,
   },
@@ -146,8 +198,9 @@ const FAMILIES = {
       col('unit', 'Unit', 'text', `psi.unit`),
       col('status', 'Line status', 'text', `psi.status::text`),
       col('reason', 'Flag reason', 'text', `COALESCE(psi.flag_reason, '')`),
+      col('who', 'Packed by', 'text', staffName('psi.confirmed_by')),
     ],
-    filters: { cohort: `ps.cohort = $?::cohort_group`, product_id: `psi.product_id = $?`, ecd_id: `ps.ecd_id = $?`, ...PRODUCT_FILTERS },
+    filters: { cohort: `ps.cohort = $?::cohort_group`, product_id: `psi.product_id = $?`, ecd_id: `ps.ecd_id = $?`, staff_id: `psi.confirmed_by = $?`, ...PRODUCT_FILTERS },
     order: `1 DESC, 2, 3`,
   },
 
@@ -177,8 +230,9 @@ const FAMILIES = {
       col('value', 'Value', 'money', `ROUND((dni.received_quantity * poi.unit_price)::numeric, 2)`),
       col('expiry', 'Use by', 'date', `dni.expiry_date::text`),
       col('stored', 'Stored in', 'text', `COALESCE(dni.storage_area, '')`),
+      col('who', 'Received by', 'text', staffName('dn.received_by')),
     ],
-    filters: { supplier_id: `dn.supplier_id = $?`, product_id: `dni.product_id = $?`, ...PRODUCT_FILTERS },
+    filters: { supplier_id: `dn.supplier_id = $?`, product_id: `dni.product_id = $?`, ...PRODUCT_FILTERS, staff_id: `dn.received_by = $?` },
     order: `1 DESC, 2, 5`,
   },
 
@@ -218,8 +272,9 @@ const FAMILIES = {
       col('unit', 'Unit', 'text', `sm.unit`),
       col('reason', 'Reason', 'text', `COALESCE(sm.reason, '')`),
       col('from', 'Came from', 'text', `COALESCE(REPLACE(sm.reference_type, '_', ' ') || ' ' || sm.reference_id, '')`),
+      col('who', 'By', 'text', staffName('sm.performed_by')),
     ],
-    filters: { movement_type: `sm.movement_type = $?`, product_id: `sm.product_id = $?`, ...PRODUCT_FILTERS },
+    filters: { movement_type: `sm.movement_type = $?`, product_id: `sm.product_id = $?`, ...PRODUCT_FILTERS, staff_id: `sm.performed_by = $?` },
     order: `1 DESC, 2`,
   },
 
@@ -264,8 +319,9 @@ const FAMILIES = {
       col('wastage', 'Wastage (kg)', 'number', `dl.wastage_kg`),
       col('margin', 'Within margin?', 'text', `CASE WHEN dl.within_margin THEN 'yes' ELSE 'no' END`),
       col('notes', 'Notes', 'text', `COALESCE(dl.notes, '')`),
+      col('who', 'Recorded by', 'text', staffName('dr.recorded_by')),
     ],
-    filters: { product_id: `dl.product_id = $?` },
+    filters: { product_id: `dl.product_id = $?`, staff_id: `dr.recorded_by = $?` },
     order: `1 DESC, 2`,
   },
 
@@ -323,8 +379,9 @@ const FAMILIES = {
       col('s18a', 'Section 18A', 'text', `COALESCE(REPLACE(dn.section_18a_status, '_', ' '), '')`),
       col('status', 'Status', 'text', `COALESCE(REPLACE(dn.status, '_', ' '), '')`),
       col('items', 'Items', 'number', `(SELECT COUNT(*) FROM donation_items di WHERE di.donation_id = dn.id)`),
+      col('who', 'Taken in by', 'text', staffName('dn.received_by')),
     ],
-    filters: { donation_category: `dn.donation_category = $?`, s18a_status: `dn.section_18a_status = $?` },
+    filters: { donation_category: `dn.donation_category = $?`, s18a_status: `dn.section_18a_status = $?`, staff_id: `dn.received_by = $?` },
     order: `1 DESC, 2`,
   },
 
@@ -421,6 +478,7 @@ const FAMILIES = {
 // rows whatever the period.
 export const REPORT_RECORDS = {
   workload:                   { family: 'work' },
+  staff_activity:             { family: 'staff_work', where: [`sw.uid IS NOT NULL`] },
   dispatch_volume:            { family: 'dispatch_lines', where: [`de.status IN (${inList(COLLECTED_STATUSES)})`] },
   gate_load_variance:         { family: 'dispatch_lines' },
   collection_compliance:      { family: 'pallets', where: [`ps.status IN ('complete', 'dispatched')`] },
@@ -540,6 +598,12 @@ const OPTION_QUERIES = {
   outcome:          `SELECT DISTINCT outcome::text AS value FROM community_requests WHERE outcome IS NOT NULL ORDER BY 1`,
   s18a_status:      `SELECT DISTINCT section_18a_status AS value FROM donations WHERE section_18a_status IS NOT NULL ORDER BY 1`,
   routing_status:   `SELECT DISTINCT routing_status AS value FROM donation_items WHERE routing_status IS NOT NULL ORDER BY 1`,
+  // Everyone with an account, past staff included: their work is still in
+  // the reports. Marked when they no longer work here.
+  staff_id: `SELECT id::text AS value,
+                    TRIM(first_name || ' ' || COALESCE(last_name, ''))
+                      || CASE WHEN is_active AND archived_at IS NULL THEN '' ELSE ' (no longer active)' END AS label
+               FROM users ORDER BY first_name, last_name LIMIT 500`,
 };
 
 export const listFilterOptions = async () => {

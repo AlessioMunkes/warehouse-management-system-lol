@@ -233,7 +233,7 @@ describe('the four things an answer can be', () => {
     await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
 
     await userEvent.click(await within(panel).findByRole('button', { name: 'Receiving' }));
-    await waitFor(() => expect(api.askAssistant).toHaveBeenLastCalledWith('Receiving', 'receiving', expect.objectContaining({ question: expect.any(String) })));
+    await waitFor(() => expect(api.askAssistant).toHaveBeenLastCalledWith('Receiving', 'receiving', [expect.objectContaining({ question: expect.any(String) })]));
   });
 
   it('says it does not know, and says who will', async () => {
@@ -245,6 +245,52 @@ describe('the four things an answer can be', () => {
 
     // "I don't know" on its own leaves someone exactly as stuck.
     expect(await within(panel).findByText(/manager will know/i)).toBeInTheDocument();
+  });
+
+  it('offers the closest topics when it does not have an exact answer', async () => {
+    api.askAssistant.mockResolvedValue({
+      type: 'not_covered',
+      closest: { id: 'receiving-record', title: 'Recording a delivery' },
+      suggestions: [{ id: 'receiving-partial', title: 'Only part of the order came' }],
+    });
+    renderAt();
+    const panel = await openPanel();
+    await userEvent.type(within(panel).getByRole('textbox', { name: /ask/i }), 'odd question');
+    await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
+
+    expect(await within(panel).findByText(/One of these may help/)).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: 'Only part of the order came' }));
+    await waitFor(() => expect(api.fetchTopic).toHaveBeenCalledWith('receiving-partial'));
+  });
+
+  it('shows the answer, the topic it came from, and the other topics it drew on', async () => {
+    api.askAssistant.mockResolvedValue({
+      type: 'topic', topic: TOPIC, answer: 'Count each line against the order.',
+      also: [{ id: 'receiving-partial', title: 'Only part of the order came' }],
+    });
+    renderAt();
+    const panel = await openPanel();
+    await userEvent.type(within(panel).getByRole('textbox', { name: /ask/i }), 'what do I do with a delivery');
+    await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
+
+    expect(await within(panel).findByText('Count each line against the order.')).toBeInTheDocument();
+    expect(within(panel).getByText(`From the help: ${TOPIC.title}`)).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Only part of the order came' })).toBeInTheDocument();
+  });
+
+  it('sends the last three turns with the next question', async () => {
+    api.askAssistant.mockResolvedValue({ type: 'topic', topic: TOPIC });
+    renderAt();
+    const panel = await openPanel();
+    const box = within(panel).getByRole('textbox', { name: /ask/i });
+    for (const q of ['one', 'two', 'three', 'four', 'five']) {
+      await userEvent.type(box, q);
+      await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
+      await waitFor(() => expect(api.askAssistant.mock.calls.at(-1)?.[0]).toBe(q));
+      await waitFor(() => expect(box).not.toBeDisabled());
+    }
+    const history = api.askAssistant.mock.calls.at(-1)[2];
+    expect(history.map((t) => t.question)).toEqual(['two', 'three', 'four']);
   });
 });
 

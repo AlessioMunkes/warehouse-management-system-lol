@@ -79,7 +79,7 @@ describe('GET /api/password-reset/:token', () => {
     serviceMock.resolveReset.mockRejectedValue(new Error('pool exhausted'));
     const res = await request(app).get(`${BASE}/badtoken`);
     expect(res.status).toBe(500);
-    expect(res.body.message).toBe('Could not load that reset link.');
+    expect(res.body.message).toBe('Could not load that reset link. Try again, and if it keeps happening, tell an administrator.');
   });
 });
 
@@ -106,6 +106,6 @@ describe('POST /api/password-reset/:token/confirm', () => {
     serviceMock.confirmReset.mockRejectedValue(new Error('boom'));
     const res = await request(app).post(`${BASE}/sometoken/confirm`).send({ password: 'longenough1' });
     expect(res.status).toBe(500);
-    expect(res.body.message).toBe('Could not reset your password.');
+    expect(res.body.message).toBe('Could not reset your password. Try again, and if it keeps happening, tell an administrator.');
   });
 });

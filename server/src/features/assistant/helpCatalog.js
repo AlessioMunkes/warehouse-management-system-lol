@@ -537,7 +537,39 @@ export const TOPICS = [
       topic: MY_ROLE,
     },
     rules: ['BR-01'],
-    related: ['who-can-do-what', 'find-my-way'],
+    related: ['process-overview', 'who-can-do-what', 'find-my-way'],
+  },
+  {
+    // The whole chain in one place, for "how does it all fit together".
+    // Each step names the screen it happens on, so the model can follow
+    // up with the topic for that step.
+    id: 'process-overview',
+    title: 'How the whole process works',
+    roles: EVERYONE,
+    screens: [],
+    asks: [
+      'what is the process', 'how does it all fit together', 'explain the whole process',
+      'what happens to food from start to finish', 'end to end', 'the workflow', 'what are the steps',
+      'where does the food come from and where does it go', 'what happens after receiving',
+      'what happens after packing', 'how does stock get to the centres', 'order to dispatch',
+    ],
+    body:
+      'Food comes in two ways: bought from suppliers on purchase orders, or donated. ' +
+      'Either way it ends up on a centre’s pallet, collected at the dispatch gate.',
+    steps: [
+      'A manager raises a purchase order in Purchase orders and approves it. Finance is emailed.',
+      'Warehouse staff receive the delivery against that order in Receiving, and stock goes up. Donated food is logged in Donation intake instead, and a manager checks it in the Classification queue.',
+      'Bulk stock is split into bags in Decanting.',
+      'Picking slips say what each centre gets. A manager generates or creates them in Picking slips, from the recipe in use or each centre’s standing order.',
+      'Warehouse staff take a slip on the Packing board and pack its pallet, oldest stock first.',
+      'The centre collects at the dispatch gate and the driver signs. Stock comes off then, not at packing.',
+      'Managers follow all of it in Operations reports. The Process map tab shows how long each step really takes.',
+    ],
+    followUp: {
+      question: 'Would you like to know what you can do in your role?',
+      topic: MY_ROLE,
+    },
+    related: ['what-is-this', 'who-can-do-what', 'fifo-fefo'],
   },
   {
     id: 'find-my-way',
@@ -1469,7 +1501,34 @@ export const TOPICS = [
       question: 'Would you like to know how to correct stock after a count?',
       topic: 'stock-adjustment',
     },
-    related: ['stock-adjustment'],
+    related: ['stock-adjustment', 'warehouse-map-count'],
+  },
+  {
+    id: 'warehouse-map-count',
+    title: 'The warehouse map and counting an area',
+    roles: MANAGERS_UP,
+    screens: ['inventory'],
+    asks: [
+      'warehouse map', 'where is the stock kept', 'count an area', 'stock take', 'map tab',
+      'what is in the cold room', 'not placed', 'how full is the warehouse', 'capacity',
+      'find a product on the map', 'which area holds the rice',
+    ],
+    body:
+      'The Map tab on Inventory shows the floor plan, each area coloured by what you choose in ' +
+      'Colour by, such as expiry or how long since it was counted. Search for a product to light up the ' +
+      'areas holding it. Capacity, under the map, shows how full each area is. Nothing on the ' +
+      'floor records where stock is put: the map holds what a manager last counted.',
+    steps: [
+      'Walk to an area and open it on the map.',
+      'Choose Count this area. What the map thinks is there comes filled in: correct it, add anything else, and take off what is no longer there. Scanning works too.',
+      'Save count. This never changes stock. The area then shows its count beside what is on hand, and Adjust stock corrects a difference.',
+      'Stock in no area is listed under Not placed, on the map’s toolbar.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to correct a stock figure?',
+      topic: 'stock-adjustment',
+    },
+    related: ['stock-count-scanning', 'stock-adjustment', 'inventory-columns'],
   },
   {
     id: 'print-labels-manager',
@@ -2041,16 +2100,16 @@ export const TOPICS = [
       'how much went out', 'numbers for the month', 'statistics', 'figures',
     ],
     body:
-      'Open Operations reports and type your question in plain English, like "how ' +
-      'much food went out in July", then tap Ask. It answers only with reports that ' +
-      'already exist, so it can’t make up a figure.\n\n' +
-      'You can also tap one of the suggested questions, or build a report with the ' +
-      'dropdowns underneath.',
+      'Open Operations reports, then the Reports tab. Type your question in plain English ' +
+      'under Ask about your data, like "how much food went out in July", then tap Ask. It ' +
+      'answers only with reports that already exist, so it can’t make up a figure.\n\n' +
+      'You can also tap one of the suggested questions, pick one from Browse all reports, ' +
+      'or build one underneath: Prepared report, or Custom report for your own breakdown.',
     followUp: {
       question: 'Would you like to know what Generate report adds under the chart?',
       topic: 'reporting-insights',
     },
-    related: ['reporting-impact', 'reporting-export'],
+    related: ['reporting-tabs', 'reporting-custom', 'reporting-export'],
   },
   {
     id: 'reporting-impact',
@@ -2114,6 +2173,28 @@ export const TOPICS = [
     related: ['reporting-impact', 'reporting-export'],
   },
   {
+    id: 'impact-map',
+    title: 'The impact map',
+    roles: MANAGERS_UP,
+    screens: ['impactMap'],
+    asks: [
+      'impact map', 'map of centres', 'which centres did we not serve', 'centres not served',
+      'where do we deliver', 'why is a centre grey', 'centre not on the map', 'show centres on a map',
+    ],
+    body:
+      'The Impact map puts every centre on a street map as a circle: bigger for more meals ' +
+      'enabled in the period, coloured by its collection cohort, and grey when nothing ' +
+      'reached it. Beside the map, Not served in this period lists the active centres that ' +
+      'got nothing, longest waiting first.\n\n' +
+      'Choose the Period and the Cohort at the top. A centre with no location is counted but ' +
+      'not drawn; set its address in Beneficiaries, under Edit details.',
+    followUp: {
+      question: 'Would you like to know about the Impact report?',
+      topic: 'reporting-impact',
+    },
+    related: ['reporting-impact', 'beneficiary-manage', 'missed-collections-manager'],
+  },
+  {
     id: 'reporting-export',
     title: 'Getting a report out',
     roles: MANAGERS_UP,
@@ -2144,7 +2225,7 @@ export const TOPICS = [
       'report on suppliers', 'report on wastage', 'report on collections', 'all reports',
     ],
     body:
-      'Open Browse all reports under the question box. Reports are grouped by area: ' +
+      'On the Reports tab of Operations reports, open Browse all reports under the question box. Reports are grouped by area: ' +
       'dispatch and collections, picking and decanting, receiving and suppliers, ' +
       'procurement, stock, and donations, community and volunteers. The suggested ' +
       'questions above it are a quick way in.',
@@ -2168,8 +2249,8 @@ export const TOPICS = [
     body:
       'Under the chart, choose GENERATE REPORT. It adds, in order: About this chart ' +
       '(what the chart shows, in plain words), the Business view (what it means for ' +
-      'the operation and whether it is on target), the key figures, related views, ' +
-      'and Actions: the centres, suppliers or products to follow up, with contacts.\n\n' +
+      'the operation and whether it is on target), the key figures, Related diagrams, ' +
+      'and Next steps: the centres, suppliers or products to follow up, with contacts.\n\n' +
       'The dashed line across the chart is the working target. Tap a bar or point to ' +
       'highlight it.',
     followUp: {
@@ -2177,6 +2258,260 @@ export const TOPICS = [
       topic: 'reporting-export',
     },
     related: ['reporting-ask', 'reporting-browse'],
+  },
+  {
+    id: 'reporting-tabs',
+    title: 'What is on Operations reports',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'what is on the reports page', 'what are the tabs on reports', 'operations reports',
+      'what can reporting do', 'what does each tab do', 'where is the process map',
+      'where is the reorder planner', 'where are the alerts',
+    ],
+    body:
+      'Operations reports has six tabs, under the title.',
+    steps: [
+      'Overview: your own set of report cards, and your saved reports.',
+      'Reports: ask a question, browse every report, or build a prepared or custom report.',
+      'Process map: how work really moves from purchase order to dispatch, and how long each step takes.',
+      'Reorder planner: when each product runs out, the date to order by and how much.',
+      'Exception alerts: the weekly measures that moved outside their normal range.',
+      'Chart a spreadsheet: chart a CSV or Excel file, or a Google Sheets link.',
+    ],
+    followUp: {
+      question: 'Would you like to know what the process map shows?',
+      topic: 'process-map',
+    },
+    related: ['reporting-overview', 'reporting-ask', 'process-map', 'reorder-planner', 'exception-alerts', 'chart-a-spreadsheet'],
+  },
+  {
+    id: 'reporting-overview',
+    title: 'The Overview cards',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'overview tab', 'report cards', 'add a card', 'change the cards', 'customise the overview',
+      'remove a card', 'at a glance', 'explore a card',
+    ],
+    body:
+      'The Overview tab of Operations reports shows reports as small cards, At a glance. ' +
+      'Explore on a card opens that report in full on the Reports tab.\n\n' +
+      'Choose Customise to move or remove cards, or Add a card: pick a report, its ' +
+      'breakdown and its period. Reset to default brings back the starting cards. Your ' +
+      'cards are kept for you on this device.',
+    followUp: {
+      question: 'Would you like to know how to save a report and have it emailed?',
+      topic: 'reporting-saved',
+    },
+    related: ['reporting-saved', 'reporting-tabs'],
+  },
+  {
+    id: 'reporting-custom',
+    title: 'Building a custom report',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'custom report', 'build my own report', 'how many by', 'break it down by two things',
+      'report that does not exist', 'prepared report or custom report', 'count by status',
+    ],
+    body:
+      'On the Reports tab of Operations reports, under the question box, choose Prepared ' +
+      'report for one of the warehouse’s reports, or Custom report to make your own "how ' +
+      'many of this, by that".',
+    steps: [
+      'Choose what to count.',
+      'Choose how to break it down, up to two ways.',
+      'Choose what to measure, and optionally one value to keep.',
+      'Set the period and run it. The chart, the table and the PDF work as for any report.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to save it for next time?',
+      topic: 'reporting-saved',
+    },
+    related: ['reporting-ask', 'reporting-saved'],
+  },
+  {
+    id: 'reporting-saved',
+    title: 'Saving a report and emailing it',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'save a report', 'email me a report every week', 'scheduled report', 'monthly report by email',
+      'pin a report', 'saved reports', 'send a report now', 'delete a saved report',
+    ],
+    body:
+      'Under any report, choose Save this report. Give it a Name, an Email schedule (No ' +
+      'email, Email me weekly on Mondays, or Email me monthly on the 1st), and tick Pin to ' +
+      'the top if you want it first.\n\n' +
+      'Saved reports are listed on the Overview tab. Manage there changes a schedule, pins, ' +
+      'sends one now or removes it. Scheduled emails go only to you.',
+    followUp: {
+      question: 'Would you like to know how to get a report as a PDF?',
+      topic: 'reporting-export',
+    },
+    related: ['reporting-overview', 'reporting-export'],
+  },
+  {
+    id: 'process-map',
+    title: 'The process map',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'what is the process map', 'process map', 'process mining', 'how long does each step take',
+      'where are the delays', 'bottleneck', 'what slows us down', 'how long from order to dispatch',
+      'flow map', 'cycle times', 'how does work move through the warehouse', 'where do things get stuck',
+    ],
+    body:
+      'The Process map is a tab on Operations reports. It follows the warehouse’s work from ' +
+      'purchase order to dispatch, using what the system has already recorded, so nobody ' +
+      'records anything extra. It shows the steps things really went through and how long ' +
+      'each wait took.\n\n' +
+      'It has two views. Flow map draws every route the work really took. Cycle times shows ' +
+      'how long each stage takes and names the Bottleneck, the slowest step.',
+    steps: [
+      'Open Operations reports, then the Process map tab.',
+      'Choose the Period, and narrow it by Supplier, Cohort or Beneficiary type if you want.',
+      'Choose Flow map or Cycle times.',
+      'Select a step or the line between two steps to see its figures and the cases that took longest.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to read the flow map?',
+      topic: 'process-map-flow',
+    },
+    related: ['process-map-flow', 'process-map-cycle-times', 'reporting-tabs'],
+  },
+  {
+    id: 'process-map-flow',
+    title: 'Reading the flow map',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'what do the lines mean', 'what is a variant', 'variants', 'rework', 'what is a deviation',
+      'reference path', 'root cause analysis', 'why is a line coloured', 'animate flow',
+      'frequency or duration', 'conformance rate', 'rework rate', 'thick line on the map',
+    ],
+    body:
+      'The Flow map, on the Process map tab, draws every route the work really took. Each box ' +
+      'is a step and each line a move from one step to the next. A thicker line was taken more ' +
+      'often. The Reference path is the expected route; a Deviation is a line off it, and a ' +
+      'line going back is rework, work done again.',
+    steps: [
+      'Choose the Process: Purchase orders, Packing, Order to dispatch, Donations or Benevolent requests. Order to dispatch is marked Estimate, because stock is not tracked by batch.',
+      'Frequency shows how many cases took each line. Duration shows how long each move typically took.',
+      'Variants lists every route, most frequent first. Show more or fewer of them, or switch one off.',
+      'Select a step to see what comes before and after it, and filter to the cases that went through it or bypassed it. Select a line to filter to the cases that took it, or did not.',
+      'Root cause analysis, under the map, shows which supplier, cohort, product or weekday stands out among the cases that deviated, had rework or took longest.',
+      'Animate flow shows the work moving. Export variants to Excel saves the routes.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to read the cycle times?',
+      topic: 'process-map-cycle-times',
+    },
+    related: ['process-map', 'process-map-cycle-times'],
+  },
+  {
+    id: 'process-map-cycle-times',
+    title: 'Reading the cycle times',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'cycle times', 'how long does an order take to arrive', 'lead time', 'what does median mean',
+      '90th percentile', 'what is the bottleneck', 'slowest step', 'dwell time',
+      'how long does stock sit on the shelf', 'export the process map', 'end to end lead time',
+    ],
+    body:
+      'Cycle times, on the Process map tab, shows the work in three lanes: Inbound, from order ' +
+      'to receipt; Storage, from receipt to dispatch; and Outbound, from picking slip to ' +
+      'dispatch. Each arrow between two steps is a wait.\n\n' +
+      'At the top, End-to-end lead time adds up the three stages, and Bottleneck names the ' +
+      'slowest step. Storage is an estimate, because stock is not tracked by batch.',
+    steps: [
+      'Select an arrow to see its Median (the typical wait), its Mean, its 90th percentile (9 in 10 were quicker) and its Sample size.',
+      'Under those: the cases that waited longest, the routes taken, and a break-down by supplier, cohort, beneficiary type or product.',
+      'Export to Excel saves the figures.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to read the flow map?',
+      topic: 'process-map-flow',
+    },
+    related: ['process-map', 'process-map-flow'],
+  },
+  {
+    id: 'reorder-planner',
+    title: 'The reorder planner',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'reorder planner', 'when will we run out', 'what do I need to order', 'how much should I order',
+      'order by date', 'days of cover', 'suggested order', 'stock forecast', 'run out date',
+      'what should I buy', 'are we going to run out of rice',
+    ],
+    body:
+      'The Reorder planner is a tab on Operations reports. For each product it works out when ' +
+      'stock runs out at the rate it is going, the date an order has to be raised by to arrive ' +
+      'in time, and how much to order. It uses the same figures as the Days of stock left report.',
+    steps: [
+      'Choose the planning horizon: 4, 8 or 12 weeks. The suggested order covers that long.',
+      'The list is most urgent first: Out of stock, Order now, Order within 7 days, Order later, Covered, No demand.',
+      'Select a product to see its week by week projection, and which demand and lead time it used. Missing data says what held a figure back.',
+      'Search by product or supplier, and export the plan to Excel as an order sheet.',
+      'To order, raise a purchase order as usual.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to raise a purchase order?',
+      topic: 'po-create',
+    },
+    related: ['po-create', 'po-from-inventory', 'inventory-low-stock'],
+  },
+  {
+    id: 'exception-alerts',
+    title: 'Exception alerts',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'exception alerts', 'what changed this week', 'is anything unusual', 'control chart',
+      'outside limits', 'adverse trend', 'what is in control', 'warnings on reports',
+    ],
+    body:
+      'Exception alerts, a tab on Operations reports, checks every weekly measure against its ' +
+      'own normal range, so you see what moved without opening every chart. The latest ' +
+      'complete week is compared with the weeks before it (8, 12 or 26 weeks: you choose).',
+    steps: [
+      'Outside limits: the week is outside the normal range. Adverse is on the bad side for that measure, Favourable on the good side.',
+      'Adverse trend: three changes in a row the wrong way, even though no week has left the range yet.',
+      'In control: nothing unusual. Insufficient history: it needs 6 weeks before it is judged.',
+      'Open report shows that measure’s full weekly report.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to read a report once it is open?',
+      topic: 'reporting-insights',
+    },
+    related: ['reporting-insights', 'reporting-tabs'],
+  },
+  {
+    id: 'chart-a-spreadsheet',
+    title: 'Charting a spreadsheet',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'chart a spreadsheet', 'upload a csv', 'chart my own data', 'excel file chart',
+      'google sheets chart', 'make a graph from a file', 'upload data',
+    ],
+    body:
+      'Chart a spreadsheet, a tab on Operations reports, charts a CSV or Excel file, or a ' +
+      'Google Sheets link. The file is read in your browser: nothing is uploaded or kept, and ' +
+      'the chart says its figures came from a file, not the warehouse.',
+    steps: [
+      'Drop the file in the box, or click to choose one, or paste a Google Sheets link.',
+      'Choose what to Show, Group by and Of column.',
+      'Choose the chart, such as Ranked bars or Single figure.',
+    ],
+    followUp: {
+      question: 'Would you like to know what else is on Operations reports?',
+      topic: 'reporting-tabs',
+    },
+    related: ['reporting-tabs'],
   },
 
   // ═══ Volunteers (manager+) ════════════════════════════════
@@ -3119,6 +3454,7 @@ export const TOPICS = [
       'Connections: whether the database, Gmail, email links, scheduled jobs, the AI, phone notifications and the volunteer system are working.',
       'Notifications & reminders: the not-collected cut-off and when reminders go out.',
       'Stock rules: when managers are warned about stock nearing its expiry date.',
+      'Recipes: what picking slips are made from.',
       'Reporting: the rates that turn kilograms into people fed.',
       'Certificates and Accounts: certificate details, and how long invite links last.',
     ],
@@ -3126,7 +3462,58 @@ export const TOPICS = [
       question: 'Would you like to know how email settings work?',
       topic: 'email-settings',
     },
-    related: ['email-settings', 'impact-conversions', 'user-invites'],
+    related: ['email-settings', 'recipes', 'impact-conversions', 'user-invites'],
+  },
+  {
+    id: 'recipes',
+    title: 'Recipes for picking slips',
+    roles: ADMIN_ONLY,
+    screens: ['settings'],
+    asks: [
+      'recipes', 'what are slips made from', 'summer recipe', 'winter recipe', 'change how much each centre gets',
+      'amount per child', 'override a recipe', 'standing order', 'when does winter start', 'child count band',
+    ],
+    body:
+      'Settings → Recipes decides what picking slips are made from. A recipe is a list of ' +
+      'products with an amount per child. A centre’s slip is that amount times its child ' +
+      'count, rounded up to a band: with bands of 5, 21 to 25 children all get the slip for 25.',
+    steps: [
+      'Seasons: the day summer starts and the day winter starts.',
+      'The summer and winter recipes apply in their season. New override makes a recipe for set dates, which replaces the season’s recipe from its first day to its last.',
+      'Centres with their own order keep their standing order and ignore the recipes.',
+      'A recipe with no products is not used: slips for its dates come from each centre’s standing order.',
+    ],
+    followUp: {
+      question: 'Would you like to know how the week’s slips are generated?',
+      topic: 'picking-slip-generate',
+      otherwise: { question: 'Would you like to know what else is in Settings?', topic: 'settings-admin' },
+    },
+    related: ['settings-admin'],
+  },
+  {
+    id: 'warehouse-layout',
+    title: 'Drawing the warehouse layout',
+    roles: ADMIN_ONLY,
+    screens: ['warehouseLayout'],
+    asks: [
+      'warehouse layout', 'draw the floor plan', 'add a cold room', 'add an area to the map',
+      'set area capacity', 'preferred stock', 'move an area', 'areas in red', 'pallet staging area',
+    ],
+    body:
+      'Warehouse layout is where an admin draws the floor plan that managers see on the ' +
+      'Inventory map. Add a dry store, cold room, floor area, pallet staging area or door, drag ' +
+      'it into place and drag its corner to size it.',
+    steps: [
+      'Choose an area to set its Name and Type, its capacity (Capacity (kg) for a store, Pallet spaces for staging) and the stock it is meant for.',
+      'Areas in red overlap. Move them apart to save the plan.',
+      'Save layout. Discard changes puts it back as it was.',
+      'The keyboard works too: arrows move an area, Shift and the arrows size it, Delete removes it.',
+    ],
+    followUp: {
+      question: 'Would you like to know what else is in Settings?',
+      topic: 'settings-admin',
+    },
+    related: ['settings-admin'],
   },
   {
     id: 'supplier-prospects',

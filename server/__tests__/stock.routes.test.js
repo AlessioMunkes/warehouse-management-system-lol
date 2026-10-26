@@ -245,15 +245,15 @@ describe('stock routes — error handling', () => {
   });
 
   it('falls back to 500 when no status is attached', async () => {
-    serviceMock.getManifest.mockRejectedValueOnce(new Error('connection terminated'));
+    serviceMock.getManifest.mockRejectedValueOnce(new Error('something unexpected broke'));
     const res = await request(app).get(BASE).set('Cookie', cookieFor(ROLES.WORKER));
     expect(res.status).toBe(500);
   });
 
   it.each([
-    ['getManifest',    'get',  BASE,                  'Failed to retrieve stock manifest.'],
-    ['getMovements',   'get',  `${BASE}/1/history`,   'Failed to retrieve stock movement history.'],
-    ['adjustManually', 'post', `${BASE}/adjust`,      'Failed to adjust stock.'],
+    ['getManifest',    'get',  BASE,                  'Could not load stock manifest. Try again, and if it keeps happening, tell an administrator.'],
+    ['getMovements',   'get',  `${BASE}/1/history`,   'Could not load stock movement history. Try again, and if it keeps happening, tell an administrator.'],
+    ['adjustManually', 'post', `${BASE}/adjust`,      'Could not adjust stock. Try again, and if it keeps happening, tell an administrator.'],
   ])('masks a raw %s failure behind a generic message', async (fn, method, path, expected) => {
     serviceMock[fn].mockRejectedValueOnce(
       new Error('password authentication failed for user "postgres"')

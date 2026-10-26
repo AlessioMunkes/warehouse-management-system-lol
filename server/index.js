@@ -86,6 +86,7 @@ import adminRouter       from './src/routes/admin.routes.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
 import savedReportsJob   from './src/jobs/savedReports.job.js';
 import { startEmailReminderScheduler } from './src/jobs/ecdCollectionReminder.job.js';
+import { sendError } from './src/utils/httpError.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
 
@@ -293,16 +294,21 @@ const loggableRequestPath = (req) =>
     ? req.path.replace(/^(\/api\/password-reset\/)[^/]+/, '$1[REDACTED]')
     : req.path;
 
+// The same wording as every controller (utils/httpError.js): a lost
+// database says to wait, a fault says to try again and tell someone.
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(`[error] ${req.method} ${loggableRequestPath(req)} —`, err.message);
-  const status = err.status || err.statusCode || 500;
-  res.status(status).json({
-    success: false,
-    message: status < 500
-      ? err.message
-      : 'An unexpected error occurred. Please try again.',
-  });
+  sendError(res, err, 'Something went wrong on the server.');
+});
+
+// A promise somebody forgot to handle used to stop the whole server:
+// since Node 15 an unhandled rejection exits the process, taking every
+// warehouse's session with it over one stray error. It is logged and
+// the server carries on; the request it belonged to has already failed
+// or answered.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandled rejection]', reason instanceof Error ? reason.stack : reason);
 });
 
 // ── Start ─────────────────────────────────────────────────────

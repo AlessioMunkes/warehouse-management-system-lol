@@ -17,6 +17,7 @@
 // note lives under /notes/:eventId, a dispatch_events id.
 // ─────────────────────────────────────────────────────────────
 import dispatchService from '../services/dispatch.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // ── The gate board ───────────────────────────────────────────
 // GET /api/dispatch?dispatchDate=&cohort=&status=&scope=
@@ -31,11 +32,7 @@ const getBoard = async (req, res) => {
     res.status(200).json({ success: true, data: board });
   } catch (err) {
     console.error('[getBoard]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve the dispatch board.',
-    });
+    sendError(res, err, 'Failed to retrieve the dispatch board.');
   }
 };
 
@@ -49,11 +46,7 @@ const getHistory = async (req, res) => {
     res.status(200).json({ success: true, data: history });
   } catch (err) {
     console.error('[getHistory]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve dispatch history.',
-    });
+    sendError(res, err, 'Failed to retrieve dispatch history.');
   }
 };
 
@@ -67,11 +60,7 @@ const sweep = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[sweep]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to run the non-collection sweep.',
-    });
+    sendError(res, err, 'Failed to run the non-collection sweep.');
   }
 };
 
@@ -85,11 +74,7 @@ const getNonCollectionHistory = async (req, res) => {
     res.status(200).json({ success: true, data: history });
   } catch (err) {
     console.error('[getNonCollectionHistory]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve non-collection history.',
-    });
+    sendError(res, err, 'Failed to retrieve non-collection history.');
   }
 };
 
@@ -103,11 +88,7 @@ const getDispatchNote = async (req, res) => {
     res.status(200).json({ success: true, data: note });
   } catch (err) {
     console.error('[getDispatchNote]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve dispatch note.',
-    });
+    sendError(res, err, 'Failed to retrieve dispatch note.');
   }
 };
 
@@ -122,11 +103,7 @@ const listDispatchNotes = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[listDispatchNotes]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve dispatch notes.',
-    });
+    sendError(res, err, 'Failed to retrieve dispatch notes.');
   }
 };
 
@@ -138,10 +115,7 @@ const getDispatchBeneficiaryOptions = async (req, res) => {
     res.status(200).json({ success: true, data: options });
   } catch (err) {
     console.error('[getDispatchBeneficiaryOptions]', err.message);
-    res.status(err.status || 500).json({
-      success: false,
-      message: 'Failed to retrieve beneficiary options.',
-    });
+    sendError(res, err, 'Failed to retrieve beneficiary options.');
   }
 };
 
@@ -155,11 +129,7 @@ const getGateView = async (req, res) => {
     res.status(200).json({ success: true, data: gateView });
   } catch (err) {
     console.error('[getGateView]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve pallet.',
-    });
+    sendError(res, err, 'Failed to retrieve pallet.');
   }
 };
 
@@ -177,11 +147,7 @@ const collect = async (req, res) => {
     res.status(result.replayed ? 200 : 201).json({ success: true, data: result });
   } catch (err) {
     console.error('[collect]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to record collection.',
-    });
+    sendError(res, err, 'Failed to record collection.');
   }
 };
 

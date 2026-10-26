@@ -49,18 +49,35 @@ export const buildTools = (role) => {
       parameters: {
         type: OBJECT,
         properties: {
-          topic_id: { type: STRING, enum: topicIds, description: 'Which topic answers this.' },
+          topic_id: { type: STRING, enum: topicIds, description: 'Which topic answers this best. It is shown in full.' },
           // Not offered to a guest: they get the topic and nothing else.
-          ...(guest ? {} : { direct_answer: {
-            type: STRING,
-            description:
-              'Optional. One or two short sentences that answer what they actually said, using ' +
-              'ONLY facts stated in the chosen topic\'s Text. Plain words, no lists, no markdown. ' +
-              'Leave it out when the topic already reads as a direct answer. It is checked ' +
-              'against the topic and thrown away if it says anything the topic does not.',
-          } }),
+          ...(guest ? {} : {
+            more_topic_ids: {
+              type: ARRAY, items: { type: STRING, enum: topicIds },
+              description:
+                'Optional. Up to two more topics, when the question spans several jobs or ' +
+                'screens ("what happens after a delivery is received", "how is a donation ' +
+                'different from an order"). Your direct_answer may draw on these too; they ' +
+                'are offered as links under the answer.',
+            },
+            direct_answer: {
+              type: STRING,
+              description:
+                'Your answer to what they actually asked, in their terms: up to six short ' +
+                'sentences, using ONLY facts stated in the Text of the topics you chose. Answer ' +
+                'the question first (yes, no, the name of the thing, where it is), then the ' +
+                'detail they need. Plain words, no lists, no markdown, no numbered steps, and ' +
+                'the screens\' and buttons\' names exactly as the Text writes them. Each ' +
+                'sentence is checked against the topics and dropped if it says anything they ' +
+                'do not.',
+            },
+          }),
         },
-        required: ['topic_id'],
+        // Required for staff: left optional, the model skipped it on
+        // about a third of questions, and those read as a topic that
+        // did not answer what was asked. The check still decides
+        // whether any of it is shown.
+        required: guest ? ['topic_id'] : ['topic_id', 'direct_answer'],
       },
     },
     {
@@ -167,15 +184,26 @@ ${ORG_CONTEXT}
 Your job is to choose which topic answers what they asked, or which screen to open. The topic's
 text is written already and is shown to them word for word under your reply, so choose carefully.
 
-You may ALSO write a direct_answer: one or two short sentences that answer their own words. Use it
-when the topic is right but its title would not look like an answer to what they typed, when they
-asked a yes/no question, or when they are reacting to your last answer. Rules for it, all of them:
-- Say only what the chosen topic's Text says. Do not add a step, a screen, a rule, a number or a
-  reason that is not written there. You may shorten and rephrase.
+You ALSO write a direct_answer: your own answer to their question, in up to six short sentences,
+built from the Text of the topic you chose and of any more_topic_ids. Write one for every question. People ask in many ways ("what's the process map", "why is this grey", "do I have to",
+"what happens next", "what's the difference between"), and the topic's title alone rarely reads
+as an answer to what they typed. Answer the question first, then the detail that matters to them.
+When the question covers more than one job, choose the main topic as topic_id and up to two more as
+more_topic_ids, and answer from all of them. Rules for direct_answer, all of them:
+- Say only what the chosen topics' Text says. Do not add a step, a screen, a rule, a number or a
+  reason that is not written there. You may combine, shorten and rephrase.
 - Do not agree with a claim the topics contradict. If someone says "we don't buy anything", the
   truth is in the description above: food is bought from suppliers or donated.
 - No greetings, no apologies, no "as an assistant". Plain words a tired person can read once.
-- If you cannot answer from the topic's Text, leave direct_answer out. The topic still shows.
+- If you cannot answer from the topics' Text, leave direct_answer out. The topic still shows.
+
+WORDS THAT MEAN MORE THAN ONE THING
+- "The process": the Process map (a tab on Operations reports, for managers) is process-map; the
+  whole chain from order to dispatch is process-overview. "Process map" always means the tab.
+- "The map": the warehouse map on Inventory, the Impact map of centres, or the layout an admin draws.
+  Use the screen they are on, then the rest of their words.
+- "Report": a question on Operations reports, the Impact report, or the Finance report.
+If the topics for one meaning are not on your list, the other meaning is the one they can use.
 
 The people asking are warehouse staff and volunteers, many of them older, many on a phone while
 doing something else. They will not use the system's vocabulary. They will say "the truck's here",
@@ -211,8 +239,10 @@ HOW TO CHOOSE
   topic shown confidently is worse than an honest "I don't have that one": somebody may act on it.
 
 WHEN THEY ARE REPLYING TO YOU
-You may be told their previous message and the topic you answered it with. If the new message is
-a reaction to that answer ("that's not what I meant", "but we don't...", "why does it say...",
+You may be told the conversation so far: up to three earlier messages, oldest first, each with the
+topic you answered it with. Use it to read short follow-ups ("and then?", "what about donations",
+"where is that", "why") as part of the same conversation. If the new message is a reaction to your
+last answer ("that's not what I meant", "but we don't...", "why does it say...",
 "so what do I do then"), it is about the SAME subject. Do not jump to a different topic because a
 word in it matches. Stay on the previous topic, or the one that fits both messages, and use
 direct_answer to respond to what they said. If you cannot tell what they want, ask_clarification.

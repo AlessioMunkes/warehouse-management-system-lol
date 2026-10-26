@@ -307,28 +307,46 @@ export const businessRead = ({ metric, lens, report, previous, figures, actions,
 
 const clean = (s, max) => (typeof s === 'string' ? s.trim().slice(0, max) : '');
 
+// PEOPLE NEVER REACH THE MODEL BY NAME. A report broken down by staff
+// member has people as its rows, and a drilled one names a person in its
+// title. Every name in `people` (everyone the system holds, from
+// knownPeople) that appears anywhere in what is sent becomes "Person A",
+// "Person B"; the real names are put back into the model's words here.
+export const aliasPeople = (payload, people = []) => {
+  const present = [...new Set(people)]
+    .filter((n) => typeof n === 'string' && n.trim().length >= 3)
+    .sort((a, b) => b.length - a.length)
+    .filter((n) => payload.includes(JSON.stringify(n).slice(1, -1)));
+  if (!present.length) return { text: payload, back: (t) => t };
+  const { map } = pseudonymise(present, 'Person');
+  let text = payload;
+  for (const n of present) text = text.split(JSON.stringify(n).slice(1, -1)).join(map.get(n));
+  return { text, back: (t) => restore(t, map) };
+};
+
 export const writeNarrative = async (input) => {
   const fallback = fallbackNarrative(input);
   if (!provider.isEnabled()) return fallback;
 
   try {
+    const { text: userMessage, back } = aliasPeople(JSON.stringify(buildPayload(input)), input.people);
     const call = await provider.callWithTools({
       systemPrompt: SYSTEM_PROMPT,
-      userMessage: JSON.stringify(buildPayload(input)),
+      userMessage,
       tools: [narrativeTool],
     });
     if (call.name !== 'write_report') return fallback;
 
     const a = call.args ?? {};
     const steps = Array.isArray(a.next_steps)
-      ? a.next_steps.map((x) => clean(x, 240)).filter(Boolean).slice(0, 3)
+      ? a.next_steps.map((x) => back(clean(x, 240))).filter(Boolean).slice(0, 3)
       : [];
 
-    const businessView = clean(a.business_view, 1400) || fallback.businessView;
+    const businessView = back(clean(a.business_view, 1400)) || fallback.businessView;
     return {
-      headline:     clean(a.headline, 200)      || fallback.headline,
-      explanation:  clean(a.explanation, 1400)  || fallback.explanation,
-      whatHappened: clean(a.what_happened, 900) || fallback.whatHappened,
+      headline:     back(clean(a.headline, 200))      || fallback.headline,
+      explanation:  back(clean(a.explanation, 1400))  || fallback.explanation,
+      whatHappened: back(clean(a.what_happened, 900)) || fallback.whatHappened,
       context:      '',
       businessView,
       // Older readers of the narrative read `meaning`.
@@ -337,7 +355,7 @@ export const writeNarrative = async (input) => {
       // One per related chart; a missing or empty one falls back to
       // why the chart was picked.
       relatedConnections: fallback.relatedConnections.map((why, i) =>
-        (Array.isArray(a.related_connections) ? clean(a.related_connections[i], 400) : '') || why),
+        (Array.isArray(a.related_connections) ? back(clean(a.related_connections[i], 400)) : '') || why),
       source: 'ai',
     };
   } catch (err) {

@@ -2,11 +2,11 @@
 // server/src/controllers/calendar.controller.js
 // ─────────────────────────────────────────────────────────────
 import calendar from '../services/calendar.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const respond = (res, err, where, fallback) => {
   if (!err.status || err.status >= 500) console.error(`[calendar] ${where}:`, err);
-  const status = err.status || 500;
-  return res.status(status).json({ success: false, message: status < 500 ? err.message : fallback });
+  return sendError(res, err, fallback);
 };
 
 const handle = (fn, where, fallback, ok = 200) => async (req, res) => {

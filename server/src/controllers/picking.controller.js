@@ -14,6 +14,7 @@
 // back to 500 with a generic message so we never leak internals to the client.
 // ─────────────────────────────────────────────────────────────
 import pickingService from '../services/picking.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // ── List slips ──────────────────────────────────────────────────
 // GET /api/picking?dispatchDate=&cohort=&status=&mine=
@@ -30,11 +31,7 @@ const getSlips = async (req, res) => {
     res.status(200).json({ success: true, data: slips });
   } catch (err) {
     console.error('[getSlips]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve picking slips.',
-    });
+    sendError(res, err, 'Failed to retrieve picking slips.');
   }
 };
 
@@ -47,11 +44,7 @@ const getSlipById = async (req, res) => {
     res.status(200).json({ success: true, data: slip });
   } catch (err) {
     console.error('[getSlipById]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve picking slip.',
-    });
+    sendError(res, err, 'Failed to retrieve picking slip.');
   }
 };
 
@@ -66,11 +59,7 @@ const generateSlips = async (req, res) => {
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     console.error('[generateSlips]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to generate picking slips.',
-    });
+    sendError(res, err, 'Failed to generate picking slips.');
   }
 };
 
@@ -84,11 +73,7 @@ const createSlip = async (req, res) => {
     res.status(201).json({ success: true, data: result });
   } catch (err) {
     console.error('[createSlip]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to create picking slip.',
-    });
+    sendError(res, err, 'Failed to create picking slip.');
   }
 };
 
@@ -104,11 +89,7 @@ const assignSlip = async (req, res) => {
     res.status(200).json({ success: true, data: slip });
   } catch (err) {
     console.error('[assignSlip]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to assign picking slip.',
-    });
+    sendError(res, err, 'Failed to assign picking slip.');
   }
 };
 
@@ -122,11 +103,7 @@ const addSecondPacker = async (req, res) => {
     res.status(200).json({ success: true, data: slip });
   } catch (err) {
     console.error('[addSecondPacker]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to add a second packer.',
-    });
+    sendError(res, err, 'Failed to add a second packer.');
   }
 };
 
@@ -141,11 +118,7 @@ const releaseSlip = async (req, res) => {
     res.status(200).json({ success: true, data: slip });
   } catch (err) {
     console.error('[releaseSlip]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to release picking slip.',
-    });
+    sendError(res, err, 'Failed to release picking slip.');
   }
 };
 
@@ -160,11 +133,7 @@ const editSlip = async (req, res) => {
     res.status(200).json({ success: true, data: slip });
   } catch (err) {
     console.error('[editSlip]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to update picking slip.',
-    });
+    sendError(res, err, 'Failed to update picking slip.');
   }
 };
 
@@ -178,11 +147,7 @@ const confirmItem = async (req, res) => {
     res.status(200).json({ success: true, data: item });
   } catch (err) {
     console.error('[confirmItem]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to confirm item.',
-    });
+    sendError(res, err, 'Failed to confirm item.');
   }
 };
 
@@ -196,11 +161,7 @@ const flagItem = async (req, res) => {
     res.status(200).json({ success: true, data: item });
   } catch (err) {
     console.error('[flagItem]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to flag item.',
-    });
+    sendError(res, err, 'Failed to flag item.');
   }
 };
 
@@ -215,11 +176,7 @@ const completeSlip = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[completeSlip]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to complete picking slip.',
-    });
+    sendError(res, err, 'Failed to complete picking slip.');
   }
 };
 
@@ -233,11 +190,7 @@ const getAssignableWorkers = async (req, res) => {
     res.status(200).json({ success: true, data: workers });
   } catch (err) {
     console.error('[getAssignableWorkers]', err.message);
-    const status = err.status || 500;
-    res.status(status).json({
-      success: false,
-      message: status < 500 ? err.message : 'Failed to retrieve assignable workers.',
-    });
+    sendError(res, err, 'Failed to retrieve assignable workers.');
   }
 };
 

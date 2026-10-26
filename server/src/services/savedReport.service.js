@@ -74,10 +74,26 @@ const toId = (v) => {
 
 export const list = (userId) => repo.listForUser(userId);
 
+// The written report ("Generate report") kept with a saved one: the
+// object the AI wrote, as the page shows it. Plain text in named fields,
+// drawn by React, so it can carry no markup; checked for shape and size
+// only. With it, the dates it was written about.
+const MAX_NARRATIVE_BYTES = 40 * 1024;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const cleanNarrative = (narrative, range) => {
+  if (narrative === undefined) return undefined;
+  if (narrative === null) return { narrative: null, range: null };
+  if (typeof narrative !== 'object' || Array.isArray(narrative)) throw fail(400, 'The written report is not in a form that can be saved.');
+  if (Buffer.byteLength(JSON.stringify(narrative)) > MAX_NARRATIVE_BYTES) throw fail(400, 'The written report is too long to save.');
+  const kept = range && DAY.test(range.from) && DAY.test(range.to) ? { from: range.from, to: range.to } : null;
+  return { narrative, range: kept };
+};
+
 export const create = async (userId, body = {}) => {
   const kind = body.kind;
   const spec = cleanSpec(kind, body.spec);
   const title = cleanTitle(body.title);
+  const written = cleanNarrative(body.narrative, body.narrativeRange);
   if ((await repo.countForUser(userId)) >= MAX_SAVED) {
     throw fail(400, `You can keep up to ${MAX_SAVED} saved reports. Remove one first.`);
   }
@@ -86,16 +102,20 @@ export const create = async (userId, body = {}) => {
     preset: checkPreset(body.preset) ?? 'last_3m',
     pinned: Boolean(body.pinned),
     schedule: checkSchedule(body.schedule) ?? 'none',
+    narrative: written?.narrative ?? null,
+    narrativeRange: written?.range ?? null,
   });
 };
 
 export const update = async (userId, id, body = {}) => {
+  const written = cleanNarrative(body.narrative, body.narrativeRange);
   const row = await repo.update({
     userId, id: toId(id),
     title: body.title === undefined ? undefined : cleanTitle(body.title),
     pinned: typeof body.pinned === 'boolean' ? body.pinned : undefined,
     schedule: checkSchedule(body.schedule),
     preset: checkPreset(body.preset),
+    written,
   });
   if (!row) throw fail(404, 'Unknown saved report.');
   return row;

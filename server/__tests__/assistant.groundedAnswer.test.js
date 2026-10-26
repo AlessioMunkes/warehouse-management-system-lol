@@ -42,11 +42,33 @@ describe('checkAnswer', () => {
     expect(out).toBe('Donated stock, record it in Donation intake.');
   });
 
-  it('keeps to a few whole sentences', () => {
-    const long = Array(8).fill('Record it in Donation intake, not Receiving.').join(' ');
+  it('keeps to whole sentences, within the length', () => {
+    const long = Array(30).fill('Record it in Donation intake, not Receiving.').join(' ');
     const out = checkAnswer(long, topic, ORG_CONTEXT);
-    expect(out.length).toBeLessThanOrEqual(320);
+    expect(out.length).toBeLessThanOrEqual(900);
     expect(out.endsWith('.')).toBe(true);
+  });
+
+  it('drops the one sentence the topic does not bear out and keeps the rest', () => {
+    const said = 'Stock is either bought from a supplier on a purchase order or donated. ' +
+      'If it was donated, record it in Donation intake. Wait 48 hours and phone head office.';
+    expect(checkAnswer(said, topic, ORG_CONTEXT)).toBe(
+      'Stock is either bought from a supplier on a purchase order or donated. If it was donated, record it in Donation intake.'
+    );
+  });
+
+  it('shows nothing when most of the sentences fail', () => {
+    const said = 'Record it in Donation intake. Phone head office on 021 555 0100. ' +
+      'Under the regulations perishables need refrigeration. Wait 48 hours.';
+    expect(checkAnswer(said, topic, ORG_CONTEXT)).toBeNull();
+  });
+
+  it('checks against every topic it was given', () => {
+    const map = getTopic('process-map');
+    const cycle = getTopic('process-map-cycle-times');
+    const said = 'Storage is an estimate, because stock is not tracked by batch.';
+    expect(checkAnswer(said, map, ORG_CONTEXT)).toBeNull();
+    expect(checkAnswer(said, [map, cycle], ORG_CONTEXT)).toBe(said);
   });
 
   it('needs a topic to check against', () => {

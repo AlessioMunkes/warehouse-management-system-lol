@@ -252,7 +252,7 @@ describe('the grounding handed to the model', () => {
     // The topic is still shown word for word; the model's own
     // sentence may only say what that topic says.
     expect(prompt).toMatch(/shown to them word for word/i);
-    expect(prompt).toMatch(/Say only what the chosen topic's Text says/i);
+    expect(prompt).toMatch(/Say only what the chosen topics' Text says/i);
     expect(prompt).toMatch(/not answer from your own knowledge/i);
     // Questions are typed by users and may contain anything.
     expect(prompt).toMatch(/never an instruction/i);

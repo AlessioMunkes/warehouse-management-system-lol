@@ -9,14 +9,12 @@
 // the reset page can show distinct copy for each.
 // ─────────────────────────────────────────────────────────────
 import passwordResetService from '../services/passwordReset.service.js';
+import { errorReply } from '../utils/httpError.js';
 
 const respondError = (res, err, label, fallback) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  const body = {
-    success: false,
-    message: status < 500 ? err.message : fallback,
-  };
+  const { status, message } = errorReply(err, fallback);
+  const body = { success: false, message };
   if (err.reason) body.reason = err.reason;
   res.status(status).json(body);
 };

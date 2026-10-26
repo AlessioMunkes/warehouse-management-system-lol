@@ -1,12 +1,13 @@
 import pendingDonationReadService, { MINE_RANGE_DAYS } from '../services/pendingDonationRead.service.js';
 import pendingDonationService from '../services/pendingDonation.service.js';
+import { errorReply } from '../utils/httpError.js';
 
 const handleError = (res, label, fallbackMessage) => (err) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
+  const { status, message } = errorReply(err, fallbackMessage);
   return res.status(status).json({
     success: false,
-    message: status < 500 ? err.message : fallbackMessage,
+    message,
     ...(err.errors ? { errors: err.errors } : {}),
   });
 };

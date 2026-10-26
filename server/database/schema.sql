@@ -108,6 +108,7 @@ CREATE TABLE public.delivery_notes (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   driver_name character varying,
   idempotency_key text,
+  delivered_at timestamp with time zone,
   CONSTRAINT delivery_notes_pkey PRIMARY KEY (id),
   CONSTRAINT delivery_notes_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id),
   CONSTRAINT delivery_notes_received_by_fkey FOREIGN KEY (received_by) REFERENCES public.users(id),
@@ -2280,3 +2281,49 @@ ALTER TABLE stock_count_lines
 -- The free-text location from before migration 050 added the address,
 -- suburb and pin. Empty, and nothing reads it.
 ALTER TABLE ecd_centres                DROP COLUMN IF EXISTS location;
+
+
+-- from 061_delivery_delivered_at
+-- ─────────────────────────────────────────────────────────────
+-- 061_delivery_delivered_at.sql
+--
+-- When a delivery arrived: the date AND the time.
+--
+-- delivery_notes.delivery_date is a calendar day the worker could
+-- change. Receiving now records the moment the delivery was signed in
+-- on the phone, in delivered_at, and works the day out from it, so
+-- neither can be typed. created_at stays what it was: when the server
+-- saved the note, which for a delivery recorded with no signal is
+-- later than the delivery itself.
+--
+-- Deliveries already recorded take created_at, the nearest moment on
+-- record.
+--
+-- Additive: one column, filled for existing rows.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE delivery_notes
+  ADD COLUMN IF NOT EXISTS delivered_at timestamptz;
+
+UPDATE delivery_notes SET delivered_at = created_at WHERE delivered_at IS NULL;
+
+
+-- from 062_saved_report_narrative
+-- ─────────────────────────────────────────────────────────────
+-- 062_saved_report_narrative.sql
+--
+-- The written report kept with a saved report.
+--
+-- "Generate report" under an Operations chart has the AI write about
+-- the chart: what it shows, the business view, what to follow up. Until
+-- now a saved report kept only the chart's settings, so that writing was
+-- lost and had to be generated again. It is now kept with the saved
+-- report, with when it was written and the dates it was written about,
+-- because the saved report itself runs over a moving period ("the last
+-- three months") and the writing describes the period it was made for.
+--
+-- Additive: three nullable columns.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE saved_reports
+  ADD COLUMN IF NOT EXISTS narrative       jsonb,
+  ADD COLUMN IF NOT EXISTS narrative_at    timestamptz,
+  ADD COLUMN IF NOT EXISTS narrative_range jsonb;

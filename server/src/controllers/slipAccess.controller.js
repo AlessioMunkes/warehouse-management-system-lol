@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import slipAccessService from '../services/slipAccess.service.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
 import { guestWarehouseClaim } from '../config/warehouses.js';
+import { sendError } from '../utils/httpError.js';
 
 // Matches the gate sign-in in volunteer.routes.js. A volunteer's day is
 // longer than a staff shift's 8 hours and they cannot reset a password
@@ -31,7 +32,7 @@ const handle = (res, error, logLabel, fallback) => {
     });
   }
   console.error(logLabel, error.message);
-  return res.status(500).json({ success: false, message: fallback });
+  return sendError(res, error, fallback);
 };
 
 const getPreviewByToken = async (req, res) => {

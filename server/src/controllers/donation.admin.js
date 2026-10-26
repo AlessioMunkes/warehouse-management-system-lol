@@ -5,6 +5,7 @@
 import donationAdminService from '../services/donationAdmin.service.js';
 import { MANAGERS_UP } from '../constants/permissions.js';
 import { DONATION_CATEGORIES } from '../constants/donationCategories.js';
+import { sendError } from '../utils/httpError.js';
 
 /**
  * Authorization Helper for Administrative Endpoints
@@ -57,10 +58,7 @@ export const getCategoryRoutings = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[DonationAdminController] Error fetching category routings:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve category routing rules.',
-    });
+    return sendError(res, error, 'Failed to retrieve category routing rules.');
   }
 };
 
@@ -94,11 +92,7 @@ export const updateCategoryRouting = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[DonationAdminController] Error updating category routing:', error);
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Failed to update category routing rule.',
-    });
+    return sendError(res, error, 'Failed to update category routing rule.');
   }
 };
 
@@ -120,10 +114,7 @@ export const getProductsWithDefaults = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[DonationAdminController] Error fetching products with defaults:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve products with classification defaults.',
-    });
+    return sendError(res, error, 'Failed to retrieve products with classification defaults.');
   }
 };
 
@@ -144,11 +135,7 @@ export const getPendingClassifications = async (req, res, next) => {
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
     console.error('[DonationAdminController] Error fetching pending classifications:', error);
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Failed to retrieve pending classifications.',
-    });
+    return sendError(res, error, 'Failed to retrieve pending classifications.');
   }
 };
 
@@ -179,11 +166,7 @@ export const finalizePendingClassification = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[DonationAdminController] Error finalizing pending classification:', error);
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Failed to finalize the pending classification.',
-    });
+    return sendError(res, error, 'Failed to finalize the pending classification.');
   }
 };
 
@@ -214,11 +197,7 @@ export const setProductClassification = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[DonationAdminController] Error setting product classification:', error);
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Failed to set product classification.',
-    });
+    return sendError(res, error, 'Failed to set product classification.');
   }
 };
 
@@ -247,11 +226,7 @@ export const removeProductClassification = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[DonationAdminController] Error removing product classification:', error);
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Failed to remove product classification.',
-    });
+    return sendError(res, error, 'Failed to remove product classification.');
   }
 };
 
@@ -304,11 +279,7 @@ export const evaluateRouting = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[DonationAdminController] Error evaluating routing:', error);
-    const status = error.status || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Failed to evaluate donation routing.',
-    });
+    return sendError(res, error, 'Failed to evaluate donation routing.');
   }
 };
 

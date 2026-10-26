@@ -48,6 +48,15 @@ const FILTER_OPTIONS = {
     { value: 'non_recipe_food', label: 'Non-recipe food' },
     { value: 'non_food',        label: 'Non-food' },
   ],
+  // Staff activity's areas (the server's STAFF_AREAS).
+  staff_area: [
+    { value: 'receiving',   label: 'Receiving' },
+    { value: 'packing',     label: 'Packing' },
+    { value: 'gate',        label: 'Dispatch gate' },
+    { value: 'decanting',   label: 'Decanting' },
+    { value: 'donations',   label: 'Donations' },
+    { value: 'adjustments', label: 'Stock adjustments' },
+  ],
 };
 
 const FILTER_LABELS = {

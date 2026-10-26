@@ -132,6 +132,12 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
        de.vehicle_reg,
        de.flagged_at,
        u.first_name         AS dispatched_by_name,
+       -- When the slip was made, and who packed it: whoever finished it,
+       -- else whoever held it, and a second packer if there was one. A
+       -- volunteer guest by first name only.
+       ps.created_at        AS slip_created_at,
+       COALESCE(pc.first_name, pa.first_name, split_part(pv.full_name, ' ', 1)) AS packed_by_name,
+       CASE WHEN pa2.id IS DISTINCT FROM COALESCE(pc.id, pa.id) THEN pa2.first_name END AS packed_by_2_name,
        COUNT(psi.id)                                        AS total_items,
        COUNT(psi.id) FILTER (WHERE psi.status = 'flagged')  AS flagged_items,
        COUNT(psi.id) FILTER (
@@ -142,9 +148,14 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
      LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
      LEFT JOIN users u ON u.id = de.dispatched_by
+     LEFT JOIN users pc  ON pc.id  = ps.completed_by
+     LEFT JOIN users pa  ON pa.id  = ps.assigned_to
+     LEFT JOIN users pa2 ON pa2.id = ps.assigned_to_2
+     LEFT JOIN volunteers pv ON pv.id = ps.assigned_volunteer_id
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      WHERE ${where.join(' AND ')}
-     GROUP BY ps.id, e.id, de.id, u.first_name, ps.beneficiary_kind, ps.beneficiary_name
+     GROUP BY ps.id, e.id, de.id, u.first_name, ps.beneficiary_kind, ps.beneficiary_name,
+              pc.id, pa.id, pa2.id, pv.id
      ORDER BY COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
   );

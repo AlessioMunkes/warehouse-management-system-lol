@@ -338,13 +338,26 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
   );
 }
 
-export default function OperationalInsight({ report, highlight, onHighlight, onLoaded }) {
+// "Written on 3 Oct 2026, about 1 Jul to 30 Sep 2026."
+const SHORT = { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Johannesburg' };
+const dayText = (day) => new Date(`${day}T12:00:00Z`).toLocaleDateString('en-ZA', SHORT);
+const savedNote = (saved) => {
+  const when = saved.writtenAt ? `Written on ${new Date(saved.writtenAt).toLocaleDateString('en-ZA', SHORT)}` : 'Saved with this report';
+  const about = saved.range?.from && saved.range?.to ? `, about ${dayText(saved.range.from)} to ${dayText(saved.range.to)}` : '';
+  return `${when}${about}. The chart above is for today’s dates: choose Regenerate report for writing about them.`;
+};
+
+// saved: the written report a saved report brought back with it, shown
+// until a new one is generated. onNarrative: told about each one this
+// writes, so the page can save it with the report.
+export default function OperationalInsight({ report, highlight, onHighlight, onLoaded, saved = null, onNarrative }) {
   const [data, setData]           = useState(null);
   // Starts loading: the page remounts this component (key = spec)
   // for every new report, so there is never stale state to clear.
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
-  const [narrative, setNarrative] = useState(null);
+  const [narrative, setNarrative] = useState(() => saved?.narrative ?? null);
+  const [fromSaved, setFromSaved] = useState(Boolean(saved?.narrative));
   const [writing, setWriting]     = useState(false);
   const [writeError, setWriteError] = useState(null);
   const [printing, setPrinting]   = useState(false);
@@ -376,6 +389,8 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
       const next = res.data ?? res;
       setData(next);
       setNarrative(next.narrative);
+      setFromSaved(false);
+      onNarrative?.(next.narrative);
     } catch (err) {
       setWriteError(err.message);
     } finally {
@@ -431,6 +446,9 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
           {/* Until a report is generated the page is just the chart and
               its table above — the write-up, figures, related views and
               actions all arrive together, in reading order. */}
+          {narrative && fromSaved && saved ? (
+            <p className="mb-3 text-xs" style={{ color: MUTED }}>{savedNote(saved)}</p>
+          ) : null}
           {narrative ? (
             <ReportBody data={data} narrative={narrative} highlight={highlight} onHighlight={onHighlight} />
           ) : (

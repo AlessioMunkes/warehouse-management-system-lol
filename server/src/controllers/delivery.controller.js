@@ -20,15 +20,12 @@
 // nothing internal leaks.
 // ─────────────────────────────────────────────────────────────
 import deliveryService from '../services/delivery.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // Every handler answers the same way, so the shape is written once.
 const respondWithError = (res, err, label, fallback) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  res.status(status).json({
-    success: false,
-    message: status < 500 ? err.message : fallback,
-  });
+  sendError(res, err, fallback);
 };
 
 // ── GET /api/deliveries ──────────────────────────────────────

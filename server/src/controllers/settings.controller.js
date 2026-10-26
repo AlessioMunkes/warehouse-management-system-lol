@@ -3,11 +3,11 @@
 // ─────────────────────────────────────────────────────────────
 import { checkConnections } from '../services/connections.service.js';
 import settings from '../services/settings.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const respond = (res, err, where, fallback) => {
   console.error(`[${where}]`, err.message);
-  const status = err.status || 500;
-  res.status(status).json({ success: false, message: status < 500 ? err.message : fallback });
+  sendError(res, err, fallback);
 };
 
 // GET /api/settings — every setting, its definition and current value.

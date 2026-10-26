@@ -21,18 +21,12 @@ import reportingService from '../services/reporting.service.js';
 import aiService        from '../services/reportingAi.service.js';
 import insightService   from '../services/reportingInsight.service.js';
 import savedReportService from '../services/savedReport.service.js';
+import { sendError } from '../utils/httpError.js';
 
 // Upstream conditions whose text is safe and useful to show.
 const PASS_THROUGH = new Set([502, 503, 504]);
 
-const send = (res, err, fallback) => {
-  const status = err.status || 500;
-  const showMessage = status < 500 || PASS_THROUGH.has(status);
-  res.status(status).json({
-    success: false,
-    message: showMessage ? err.message : fallback,
-  });
-};
+const send = (res, err, fallback) => sendError(res, err, fallback, { passThrough: [...PASS_THROUGH] });
 
 // GET /api/reporting/catalog
 const getCatalog = async (req, res) => {

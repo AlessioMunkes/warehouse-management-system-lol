@@ -100,8 +100,16 @@ export default function ReportingPage() {
 
   // One way in for a new result: a fresh report clears the scatter
   // view, the old highlight and the old report's target line.
+  // The written report for the chart on screen, keyed by its spec: the one
+  // "Generate report" wrote (saved with the report when it is saved), and
+  // the one a saved report brought back with it.
+  const [writeUp, setWriteUp] = useState(null);          // { key, narrative }
+  const [savedWriteUp, setSavedWriteUp] = useState(null); // { key, narrative, writtenAt, range }
+  const specKey = report ? JSON.stringify(report.spec) : null;
+
   const showReport = (next, { keepDrill = false } = {}) => {
     setReport(next);
+    setSavedWriteUp(null);
     setRecordsFor(null);
     setComparison(null);
     setHighlight(null);
@@ -194,6 +202,12 @@ export default function ReportingPage() {
       const res = await runReport(s.kind === 'custom' ? { custom: s.spec.custom, dateRange: range } : { ...s.spec, dateRange: range });
       const next = res.data ?? res;
       showReport(next);
+      if (s.narrative) {
+        setSavedWriteUp({
+          key: JSON.stringify(next.spec), narrative: s.narrative,
+          writtenAt: s.narrative_at, range: s.narrative_range,
+        });
+      }
       if (s.kind === 'custom') { setMode('custom'); setCustom(s.spec.custom); }
       else { setMode('prepared'); setMetricId(s.spec.metric); setDimension(s.spec.dimension); setFilters(s.spec.filters ?? {}); }
     } catch (err) {
@@ -553,7 +567,9 @@ export default function ReportingPage() {
               kind={report.spec?.custom ? 'custom' : 'report'}
               spec={report.spec?.custom ? { custom: report.spec.custom } : { metric: report.spec?.metric, dimension: report.spec?.dimension, filters: report.spec?.filters ?? {} }}
               defaultTitle={report.description?.replace(/,? \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$/, '')}
-              preset={preset === 'custom' ? 'last_3m' : preset} onSaved={loadSaved} />
+              preset={preset === 'custom' ? 'last_3m' : preset} onSaved={loadSaved}
+              narrative={writeUp?.key === specKey ? writeUp.narrative : (savedWriteUp?.key === specKey ? savedWriteUp.narrative : null)}
+              narrativeRange={writeUp?.key === specKey ? report.spec?.dateRange : savedWriteUp?.range} />
           </div>
 
           <ReportNotes meta={report.meta} />
@@ -573,6 +589,8 @@ export default function ReportingPage() {
           highlight={highlight}
           onHighlight={setHighlight}
           onLoaded={(d) => setTarget(d.target ?? null)}
+          saved={savedWriteUp?.key === specKey ? savedWriteUp : null}
+          onNarrative={(narrative) => setWriteUp({ key: specKey, narrative })}
         />
       )}
 

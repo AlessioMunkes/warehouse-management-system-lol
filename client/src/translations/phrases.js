@@ -231,6 +231,8 @@ export const PHRASES = [
   ["· Received by {}", "· Ontvang deur {}", "· Yamkelwe ngu-{}"],
   ["Received by", "Ontvang deur", "Yamkelwe ngu"],
   ["Delivery date", "Afleweringsdatum", "Umhla wokufika"],
+  ["Delivered:", "Afgelewer:", "Kufikile:"],
+  ["The date and time are recorded when you finish.", "Die datum en tyd word aangeteken wanneer jy klaarmaak.", "Umhla nexesha ziyabhalwa xa ugqiba."],
   ["Completed", "Voltooi", "Igqityiwe"],
   ["Discrepancy", "Verskil", "Umahluko"],
   ["Partially delivered", "Gedeeltelik afgelewer", "Ifike ngokuyinxenye"],

@@ -6,6 +6,7 @@
 import gmailService from '../services/gmail.service.js';
 import communications from '../services/communications.service.js';
 import { resolveAppBaseUrl } from '../config/appUrl.js';
+import { sendError } from '../utils/httpError.js';
 
 const EMAIL_INTEGRATION_PATH = '/admin/email-integration';
 
@@ -31,11 +32,7 @@ const buildEmailIntegrationRedirect = (gmailStatus) => {
 
 const respondError = (res, err, label, fallback) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  return res.status(status).json({
-    success: false,
-    message: status < 500 ? err.message : fallback,
-  });
+  return sendError(res, err, fallback);
 };
 
 const connect = async (req, res) => {

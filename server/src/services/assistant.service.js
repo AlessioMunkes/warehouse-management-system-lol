@@ -14,9 +14,15 @@
 // topic does not, so the catalogue is still the only source of what
 // the assistant says.
 //
-// Each question may carry the one before it (the previous message and
-// the topic it was answered with), so "that's not what I meant" is read
-// as a reply and not as a fresh question about whichever word matched. Every screen it can open is in
+// Each question may carry the conversation before it (up to three
+// earlier messages and the topics they were answered with), so "that's
+// not what I meant" or "and then?" is read as a reply and not as a
+// fresh question about whichever word matched.
+//
+// When the model cannot be asked, or says no topic covers it, the
+// question's own words are matched against the topics this role may
+// read (topicSearch.js), so it still ends in "these look closest"
+// rather than a dead end. Every screen it can open is in
 // SCREENS with a role list. A hallucinated id, a topic or screen
 // belonging to another role, or a prompt injection buried in the
 // question all end in the same place: a lookup that fails.
@@ -36,6 +42,7 @@
 import provider from '../features/reporting/provider.js';
 import { buildTools, buildSystemPrompt, ORG_CONTEXT } from '../features/assistant/toolSchema.js';
 import { checkAnswer } from '../features/assistant/groundedAnswer.js';
+import { searchTopics, CONFIDENT_SCORE } from '../features/assistant/topicSearch.js';
 import {
   SCREENS, getTopic, topicsForRole, screensForRole, screenForRole,
   suggestionsFor, publicTopic, publicScreen,
@@ -50,7 +57,12 @@ const fail = (status, message) => {
   return err;
 };
 
-const MAX_QUESTION = 300;
+const MAX_QUESTION = 500;
+// Earlier turns the model is told about, and the topics it may add to
+// the main one.
+const MAX_HISTORY = 3;
+const MAX_MORE_TOPICS = 2;
+const MAX_SUGGESTIONS = 3;
 // A guest is a volunteer for a shift, not a member of staff: shorter
 // questions, no sentence of the model's own, no memory of the turn
 // before. They get the topic, word for word, and nothing else.
@@ -84,6 +96,20 @@ const rephrase = (err) => {
 
 const screenById = new Map(SCREENS.map((s) => [s.id, s]));
 
+// A topic this role may read, or null. Every id the model or the client
+// sends goes through this.
+const topicFor = (id, role) => {
+  const topic = getTopic(id);
+  return topic && topic.roles.includes(role) ? topic : null;
+};
+
+const refOf = (topic) => ({ id: topic.id, title: topic.title });
+
+// The provider failures worth answering from the catalogue instead: the
+// model could not be asked this time. A broken setup (model_missing) is
+// still said plainly, so somebody fixes it.
+const SEARCH_INSTEAD = new Set(['rate_limit', 'busy', 'timeout', 'unreachable', 'error']);
+
 /**
  * The catalogue as the client needs it: what this role may be told,
  * where it may be taken, and the starter chips per screen. One call
@@ -111,7 +137,14 @@ export const getTopicForRole = (id, role) => {
   return { type: 'topic', topic: publicTopic(topic, role) };
 };
 
-export const ask = async ({ question, screen, userId, role, previous }) => {
+// The turns before this one, oldest first. `history` is the list the
+// client keeps; `previous` is the single turn older clients send.
+const earlierTurns = (history, previous) => {
+  const list = Array.isArray(history) ? history : previous ? [previous] : [];
+  return list.filter((t) => t && typeof t === 'object').slice(-MAX_HISTORY);
+};
+
+export const ask = async ({ question, screen, userId, role, previous, history }) => {
   if (!provider.isEnabled()) {
     throw fail(503, 'The help assistant is not switched on.');
   }
@@ -148,21 +181,30 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
   const { names, keep } = await knownPeople.listNames();
   const safe  = redactText(question, names, keep).text;
 
-  // The turn before this one, when the client sent it. Treated like
+  // The turns before this one, when the client sent them. Treated like
   // the question: text someone typed, redacted, never an instruction.
-  // The topic id is checked against this role's catalogue, so a client
+  // Each topic id is checked against this role's catalogue, so a client
   // cannot use it to make the model read a topic it may not see.
+  const turns = isGuest ? [] : earlierTurns(history, previous);
   const before = [];
-  if (!isGuest && previous && typeof previous === 'object') {
-    if (typeof previous.question === 'string' && previous.question.trim()) {
-      const said = redactText(previous.question.slice(0, MAX_QUESTION), names, keep).text;
-      before.push(`Their previous message: ${said}`);
+  turns.forEach((turn, i) => {
+    const latest = i === turns.length - 1;
+    if (typeof turn.question === 'string' && turn.question.trim()) {
+      const said = redactText(turn.question.slice(0, MAX_QUESTION), names, keep).text;
+      before.push(latest ? `Their previous message: ${said}` : `Earlier they asked: ${said}`);
     }
-    const lastTopic = getTopic(previous.topicId);
-    if (lastTopic && lastTopic.roles.includes(role)) {
-      before.push(`You answered it with the topic: ${lastTopic.id} (${lastTopic.title})`);
+    const lastTopic = topicFor(turn.topicId, role);
+    if (lastTopic) {
+      before.push(latest
+        ? `You answered it with the topic: ${lastTopic.id} (${lastTopic.title})`
+        : `  (answered with ${lastTopic.id})`);
     }
-  }
+  });
+
+  // The catalogue's own reading of the question, for when the model
+  // cannot help: role-scoped, best first.
+  const searched = (exclude = []) =>
+    searchTopics(safe, role, { limit: MAX_SUGGESTIONS, exclude });
 
   const base = [
     ...before,
@@ -189,13 +231,22 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
           lastError = `Unknown topic: ${call.args?.topic_id}`;
           continue;
         }
+        // The other topics the answer draws on, each one this role may
+        // read, none repeated. An id that fails is dropped, not retried:
+        // the main topic is already a good answer.
+        const more = isGuest ? [] : [...new Set(Array.isArray(call.args?.more_topic_ids) ? call.args.more_topic_ids : [])]
+          .filter((id) => id !== topic.id)
+          .map((id) => topicFor(id, role))
+          .filter(Boolean)
+          .slice(0, MAX_MORE_TOPICS);
         log('topic', { topicId: topic.id });
         return {
           type: 'topic',
           topic: publicTopic(topic, role),
-          // The model's own sentence or two, only if every word of it
-          // is the topic's. null is the ordinary case, not a failure.
-          answer: isGuest ? null : checkAnswer(call.args?.direct_answer, topic, ORG_CONTEXT),
+          // The model's own answer, only the sentences the topics bear
+          // out. null is an ordinary case, not a failure.
+          answer: isGuest ? null : checkAnswer(call.args?.direct_answer, [topic, ...more], ORG_CONTEXT),
+          also: more.map(refOf),
         };
       }
 
@@ -228,16 +279,22 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
       }
 
       if (call.name === 'not_covered') {
-        const closest = getTopic(call.args?.closest_topic_id);
+        // Offered, not asserted: the model has just said it does not
+        // think this is the answer. Role-checked, so a refusal cannot
+        // leak what it is refusing.
+        const closest = topicFor(call.args?.closest_topic_id, role);
+        // And what the question's own words point at, in case the
+        // model missed a topic that does cover it. A guest asking
+        // about anything else is meant to ask a person, so is offered
+        // only the model's own pick.
+        const others = isGuest ? [] : searched(closest ? [closest.id] : [])
+          .slice(0, MAX_SUGGESTIONS - (closest ? 1 : 0))
+          .map((r) => refOf(r.topic));
         log('not_covered');
         return {
           type: 'not_covered',
-          // Offered, not asserted: the model has just said it does
-          // not think this is the answer. Role-checked, so a refusal
-          // cannot leak what it is refusing.
-          closest: closest && closest.roles.includes(role)
-            ? { id: closest.id, title: closest.title }
-            : null,
+          closest: closest ? refOf(closest) : null,
+          suggestions: others,
         };
       }
 
@@ -255,7 +312,21 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
       // reading "I could not work out which part of the system that
       // is about" instead of "you have asked a lot this hour".
       log('error', { errorMessage: err.message });
-      throw rephrase(err);
+      const out = rephrase(err);
+      // Somebody stuck still gets the closest topic, said to be the
+      // closest and not the answer, when the words point clearly at
+      // one. Otherwise the message, which says whether to try again.
+      const [best] = SEARCH_INSTEAD.has(err.code) ? searched() : [];
+      if (best && best.score >= CONFIDENT_SCORE) {
+        return {
+          type: 'topic',
+          topic: publicTopic(best.topic, role),
+          answer: null,
+          also: [],
+          notice: `${out.message} This is the closest help topic to what you asked.`,
+        };
+      }
+      throw out;
     }
   }
 

@@ -635,10 +635,10 @@ describe('POST /api/slip/release', () => {
     expect(slipAccessRepo.releaseForVolunteer).not.toHaveBeenCalled();
   });
 
-  it('a database failure is a generic 500, not a raw message', async () => {
+  it('a database failure says to wait and try again, not a raw message', async () => {
     slipAccessRepo.releaseForVolunteer.mockRejectedValue(new Error('connection terminated'));
     const res = await request(app).post('/api/slip/release').set('Cookie', authCookie(GUEST));
-    expect(res.status).toBe(500);
-    expect(res.body.message).toBe('Could not return your pallet.');
+    expect(res.status).toBe(503);
+    expect(res.body.message).toBe('The database cannot be reached right now. Wait a minute and try again.');
   });
 });

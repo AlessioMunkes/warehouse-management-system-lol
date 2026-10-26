@@ -156,14 +156,14 @@ describe('POST /api/volunteers/sign-out', () => {
       expect(signOutVolunteer).not.toHaveBeenCalled();
     });
 
-  it('returns 500 rather than a stack trace when the write fails', async () => {
+  it('says the database cannot be reached, rather than a stack trace, when the write fails', async () => {
     signOutVolunteer.mockRejectedValue(new Error('connection terminated'));
 
     const res = await request(app)
       .post('/api/volunteers/sign-out')
       .set('Cookie', authCookie(GUEST));
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     expect(res.body.success).toBe(false);
     expect(JSON.stringify(res.body)).not.toContain('connection terminated');
   });

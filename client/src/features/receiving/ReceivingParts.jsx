@@ -7,7 +7,7 @@
 // and the saving stay in ReceivingFlow.jsx.
 // ─────────────────────────────────────────────────────────────
 import PhotoButton from '../staff/PhotoButton';
-import { DateField, ChoiceList, Notice, KeyValues } from '../staff/StepPrimitives';
+import { ChoiceList, Notice, KeyValues } from '../staff/StepPrimitives';
 import SignaturePad from './SignaturePad';
 import { LOCATIONS } from './receivingText';
 
@@ -31,16 +31,19 @@ const SignatureField = ({ value, onChange }) => (
 
 // Beside the lines in both views: the date, a photo, the short-line
 // warning and the driver's signature.
-export function SignInPanel({ deliveryDate, onDeliveryDate, orderId, shortCount, signature, onSignature }) {
+// When it arrived is not typed: the date and time are recorded when the
+// delivery is finished, and shown here, read-only, until then.
+const deliveredText = (at) => at.toLocaleString('en-ZA', {
+  day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  timeZone: 'Africa/Johannesburg',
+});
+
+export function SignInPanel({ now, orderId, shortCount, signature, onSignature }) {
   return (
     <div className="stf-summary">
       <p className="stf-summary-title">Sign it in</p>
-      <DateField
-        id="stf-full-date"
-        label="Delivery date"
-        value={deliveryDate}
-        onChange={onDeliveryDate}
-      />
+      <KeyValues pairs={[['Delivered', deliveredText(now)]]} />
+      <p className="stf-field-hint">The date and time are recorded when you finish.</p>
       {/* A picture of the delivery as it arrived, kept against its
           order. Optional, and saved the moment it is taken. */}
       {orderId ? (

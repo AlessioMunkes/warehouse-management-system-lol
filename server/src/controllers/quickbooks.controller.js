@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import quickbooksService from '../services/quickbooks.service.js';
 import { resolveAppBaseUrl } from '../config/appUrl.js';
+import { sendError } from '../utils/httpError.js';
 
 const SETTINGS_PATH = '/admin/settings';
 
@@ -30,8 +31,9 @@ const returnTo = (outcome) => {
 
 const respond = (res, err, label, fallback) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  return res.status(status).json({ success: false, message: status < 500 || err.quickbooks ? err.message : fallback });
+  // A QuickBooks error's own message was written for the reader.
+  if (err.quickbooks && err.message) return res.status(err.status || 500).json({ success: false, message: err.message });
+  return sendError(res, err, fallback);
 };
 
 // GET /api/quickbooks/connect — an admin, sent on to Intuit to sign in.

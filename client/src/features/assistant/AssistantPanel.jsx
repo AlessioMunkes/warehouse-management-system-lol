@@ -14,10 +14,11 @@
 // page would make the help and the work mutually exclusive, which is
 // the opposite of the point.
 //
-// Nothing here is generated. Every answer is a block of text the
-// server chose out of helpCatalog.js, so this file's job is to lay
-// out four fixed shapes — a topic, a pointer to a screen, a question
-// back, and an honest "not covered" — and nothing else.
+// Every answer is a block of text the server chose out of
+// helpCatalog.js, with at most the model's own answer above it, each
+// sentence of which the server checked against the topics. So this
+// file's job is to lay out four fixed shapes (a topic, a pointer to a
+// screen, a question back, and an honest "not covered") and nothing else.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
@@ -31,7 +32,7 @@ import { BATCHES_LOGO } from './brand';
 
 // ── One answer ───────────────────────────────────────────────
 
-function TopicAnswer({ topic, answer, onOpenTopic, onClose, here, role }) {
+function TopicAnswer({ topic, answer, also = [], notice, onOpenTopic, onClose, here, role }) {
   // Where the answer's screens are, as links — minus the one they are
   // already on, and minus any id this build has no route for.
   const links = (topic.open ?? [])
@@ -42,15 +43,25 @@ function TopicAnswer({ topic, answer, onOpenTopic, onClose, here, role }) {
   // The follow-up is offered as a question, so it is not repeated
   // among the chips as well.
   const followUp = topic.followUp ?? null;
-  const related = (topic.related ?? []).filter((r) => r.id !== followUp?.topic.id);
+  // The other topics the answer drew on come first: they are part of
+  // this answer. Then the topic's own related ones, without repeats.
+  const seen = new Set([topic.id, followUp?.topic.id]);
+  const related = [...also, ...(topic.related ?? [])].filter((r) => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
 
   return (
     <div className="space-y-2">
-      {/* A sentence or two answering what was actually typed, when the
-          server let one through (it is checked against this topic).
-          The topic underneath is still the answer of record. */}
+      {/* Said when the model could not be asked: this is the topic the
+          question's words point at, not an answer written for it. */}
+      {notice ? <p className="text-xs text-muted-foreground">{notice}</p> : null}
+      {/* The answer to what was actually typed, when the server let it
+          through (each sentence is checked against the topics). The
+          topic underneath is still the answer of record. */}
       {answer ? <p className="rounded-lg bg-muted px-3 py-2">{answer}</p> : null}
-      <p className="font-semibold">{topic.title}</p>
+      <p className="font-semibold">{answer ? `From the help: ${topic.title}` : topic.title}</p>
 
       {/* The catalog writes in paragraphs separated by a blank line.
           Split rather than dangerouslySetInnerHTML: this text is
@@ -166,23 +177,31 @@ function ClarifyAnswer({ question, options, onPick }) {
   );
 }
 
-function NotCoveredAnswer({ closest, onOpenTopic }) {
+function NotCoveredAnswer({ closest, suggestions = [], onOpenTopic }) {
+  // The model's own pick first, then what the question's words point at.
+  const offers = [closest, ...suggestions].filter(Boolean);
   return (
     <div className="space-y-2">
       {/* Says what to do next. "I don't know" on its own leaves
           someone exactly as stuck as they were. */}
       <p>
-        I do not have an answer for that one. Someone on the floor or your
-        manager will know.
+        {offers.length > 0
+          ? 'I do not have an answer for exactly that. One of these may help, or ask someone on the floor or your manager.'
+          : 'I do not have an answer for that one. Someone on the floor or your manager will know.'}
       </p>
-      {closest && (
-        <button
-          type="button"
-          onClick={() => onOpenTopic(closest.id, closest.title)}
-          className="rounded-[4px] border px-2.5 py-1.5 text-xs hover:bg-muted/60"
-        >
-          Did you mean: {closest.title}?
-        </button>
+      {offers.length > 0 && (
+        <div className="flex flex-col items-start gap-1.5">
+          {offers.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onOpenTopic(t.id, t.title)}
+              className="rounded-[4px] border px-2.5 py-1.5 text-left text-xs hover:bg-muted/60"
+            >
+              {t.title}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -190,10 +209,10 @@ function NotCoveredAnswer({ closest, onOpenTopic }) {
 
 function Answer({ entry, onOpenTopic, onPick, onClose, here, role }) {
   switch (entry.kind) {
-    case 'topic':       return <TopicAnswer topic={entry.topic} answer={entry.answer} onOpenTopic={onOpenTopic} onClose={onClose} here={here} role={role} />;
+    case 'topic':       return <TopicAnswer topic={entry.topic} answer={entry.answer} also={entry.also} notice={entry.notice} onOpenTopic={onOpenTopic} onClose={onClose} here={here} role={role} />;
     case 'navigate':    return <NavigateAnswer screen={entry.screen} onClose={onClose} role={role} />;
     case 'clarify':     return <ClarifyAnswer question={entry.question} options={entry.options} onPick={onPick} />;
-    case 'not_covered': return <NotCoveredAnswer closest={entry.closest} onOpenTopic={onOpenTopic} />;
+    case 'not_covered': return <NotCoveredAnswer closest={entry.closest} suggestions={entry.suggestions} onOpenTopic={onOpenTopic} />;
     default:            return <p>{entry.text}</p>;
   }
 }
@@ -372,7 +391,7 @@ export default function AssistantPanel({ open, onOpenChange, screen, role }) {
               onChange={(e) => setDraft(e.target.value)}
               placeholder={enabled ? 'How do I…' : 'Questions are switched off here'}
               aria-label="Ask a question"
-              maxLength={300}
+              maxLength={500}
               disabled={busy || !enabled}
             />
             <Button

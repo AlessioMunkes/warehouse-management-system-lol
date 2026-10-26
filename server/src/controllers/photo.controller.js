@@ -5,11 +5,11 @@
 // other controllers.
 // ─────────────────────────────────────────────────────────────
 import photoService from '../services/photo.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const respondError = (res, err, label, fallback) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  res.status(status).json({ success: false, message: status < 500 ? err.message : fallback });
+  sendError(res, err, fallback);
 };
 
 // POST /api/photos — { entityType, entityId, dataUrl }

@@ -385,6 +385,7 @@ export default function PurchaseOrdersPage() {
             key={mode === 'edit' ? `edit-${selected?.id}` : 'create'}
             suppliers={suppliers}
             products={products}
+            loading={isLoading}
             busy={busy}
             error={formError}
             invalidProductIds={invalidProductIds}

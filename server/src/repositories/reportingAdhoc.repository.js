@@ -14,8 +14,14 @@ import pool from '../config/db.js';
 
 export const runQuery = (sql, params) => pool.query(sql, params);
 
+// A person has a first and last name, not a `name`: matched the way the
+// staff breakdown writes it (reportingStaff.sql.js).
+const NAME_OF = {
+  users: `NULLIF(TRIM(first_name || ' ' || COALESCE(last_name, '')), '')`,
+};
+
 export const findIdByName = async (table, name) => {
-  const { rows } = await pool.query(`SELECT id FROM ${table} WHERE name = $1 ORDER BY id LIMIT 1`, [name]);
+  const { rows } = await pool.query(`SELECT id FROM ${table} WHERE ${NAME_OF[table] ?? 'name'} = $1 ORDER BY id LIMIT 1`, [name]);
   return rows[0]?.id ?? null;
 };
 

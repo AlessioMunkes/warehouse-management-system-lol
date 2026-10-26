@@ -117,7 +117,7 @@ describe('finance email settings and send routes', () => {
       .set('Cookie', cookieFor(ROLES.ADMIN));
 
     expect(res.status).toBe(502);
-    expect(res.body.message).toBe('Failed to send finance report link.');
+    expect(res.body.message).toBe('Could not send finance report link. Try again, and if it keeps happening, tell an administrator.');
   });
 
   it.each([ROLES.WORKER, ROLES.MANAGER, ROLES.GUEST, 'finance'])('does not let %s manage finance email settings', async (role) => {
@@ -243,6 +243,6 @@ describe('finance report route - controller contract', () => {
     const res = await request(app).get(BASE).set('Cookie', cookieFor(ROLES.ADMIN));
 
     expect(res.status).toBe(500);
-    expect(res.body).toEqual({ success: false, message: 'Failed to retrieve finance report.' });
+    expect(res.body).toEqual({ success: false, message: 'Could not load finance report. Try again, and if it keeps happening, tell an administrator.' });
   });
 });

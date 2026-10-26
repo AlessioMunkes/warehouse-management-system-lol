@@ -7,11 +7,11 @@
 // ─────────────────────────────────────────────────────────────
 import impactService from '../services/impactMap.service.js';
 import locationService from '../services/centreLocation.service.js';
+import { sendError } from '../utils/httpError.js';
 
 const failWith = (res, label, fallback) => (err) => {
   console.error(`[${label}]`, err.message);
-  const status = err.status || 500;
-  res.status(status).json({ success: false, message: status < 500 ? err.message : fallback });
+  sendError(res, err, fallback);
 };
 
 // GET /api/impact-map?from=YYYY-MM-DD&to=YYYY-MM-DD

@@ -169,18 +169,60 @@ const networkError = () => {
 };
 
 // ── GET ───────────────────────────────────────────────────────
-export const apiGet = async (endpoint, options = {}) => {
-  let res;
+// A read that never answers used to leave its screen on a spinner for
+// good, which looks like the app has hung. So a read gives up after
+// GET_TIMEOUT_MS and says so, and one that failed on the network is
+// tried once more after a moment: a phone that has just come back into
+// range often fails the first. Only reads: they change nothing, so
+// trying again is always safe. Writes are not timed out or repeated
+// here, because a write that timed out may still have happened.
+const GET_TIMEOUT_MS = 30000;
+const GET_RETRY_DELAY_MS = 1000;
+
+const timedOut = () => {
+  const error = new Error('That took too long to load. Check your connection and try again.');
+  error.isTimeout = true;
+  return error;
+};
+
+const getOnce = async (url, callerSignal) => {
+  const controller = new AbortController();
+  let expired = false;
+  const timer = setTimeout(() => { expired = true; controller.abort(); }, GET_TIMEOUT_MS);
+  const passOn = () => controller.abort();
+  callerSignal?.addEventListener?.('abort', passOn);
+  if (callerSignal?.aborted) controller.abort();
   try {
-    res = await fetchWaking(`${API_BASE}${endpoint}`, {
+    return await fetchWaking(url, {
       method:      'GET',
       credentials: 'include', // sends the httpOnly cookie automatically
       headers:     { 'Content-Type': 'application/json' },
-      signal:      options.signal,
+      signal:      controller.signal,
     });
   } catch (err) {
+    if (expired) throw timedOut();
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener?.('abort', passOn);
+  }
+};
+
+export const apiGet = async (endpoint, options = {}) => {
+  const url = `${API_BASE}${endpoint}`;
+  let res;
+  try {
+    res = await getOnce(url, options.signal);
+  } catch (err) {
+    if (err.isTimeout || options.signal?.aborted) throw err;
     if (err.name === 'AbortError') throw err;
-    throw networkError();
+    try {
+      await sleep(GET_RETRY_DELAY_MS);
+      res = await getOnce(url, options.signal);
+    } catch (again) {
+      if (again.isTimeout || again.name === 'AbortError') throw again;
+      throw networkError();
+    }
   }
   return handleResponse(res);
 };

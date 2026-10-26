@@ -292,6 +292,27 @@ describe('createDelivery — what counts as a count, and as a date', () => {
     expect(repoMock.createDelivery).not.toHaveBeenCalled();
   });
 
+  // The moment the phone signed it in decides both the time and the day.
+  it('takes the day and the time from when it was signed in, not from a typed date', async () => {
+    repoMock.createDelivery.mockResolvedValueOnce({ note: { id: 1 }, duplicate: false, warnings: [] });
+    const at = new Date(Date.now() - 60 * 60 * 1000);
+    await deliveryService.createDelivery(body({ deliveryDate: undefined, deliveredAt: at.toISOString() }), USER_ID)
+      .catch(() => {});
+    const sent = repoMock.createDelivery.mock.calls[0]?.[0];
+    expect(sent.deliveredAt).toBe(at.toISOString());
+    expect(sent.deliveryDate).toBe(new Date(at.getTime() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  });
+
+  it.each([
+    ['in the future', () => new Date(Date.now() + 60 * 60 * 1000).toISOString(), 'in the future'],
+    ['more than a week ago', () => new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(), 'more than a week ago'],
+    ['not a time at all', () => 'yesterday-ish', 'Invalid delivery time'],
+  ])('refuses a delivery time %s', async (_label, at, message) => {
+    await expect(deliveryService.createDelivery(body({ deliveredAt: at() }), USER_ID))
+      .rejects.toMatchObject({ status: 400, message: expect.stringContaining(message) });
+    expect(repoMock.createDelivery).not.toHaveBeenCalled();
+  });
+
   it('a delivery dated after today is refused', async () => {
     await expect(deliveryService.createDelivery(body({ deliveryDate: '2099-01-01' }), USER_ID))
       .rejects.toMatchObject({ status: 400, message: 'Delivery date cannot be after today.' });

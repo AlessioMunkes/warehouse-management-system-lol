@@ -3,20 +3,19 @@
 //
 // The conversation state behind the help panel.
 //
-// A "conversation" here is a transcript the USER can read back, not
-// a context the model sees. Every question is answered on its own —
-// the server is given the question and the screen, nothing else.
-// That is deliberate: a help answer that depends on what was asked
-// four turns ago is a help answer nobody can predict or test, and
-// it would put earlier questions into every later prompt.
-//
-// So this holds a list of things that have been said, and each new
-// question starts clean.
+// A "conversation" here is mostly a transcript the USER can read back.
+// The server is given the question, the screen, and the last three
+// questions with the topic each was answered with (HISTORY), so "and
+// then?" or "that's not what I meant" is read as part of the same
+// conversation. No more than that: a help answer that depends on what
+// was asked ten turns ago is one nobody can predict or test.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchAssistantCatalog, fetchTopic, askAssistant,
 } from '../../services/assistantAPI';
+
+const HISTORY = 3;
 
 let nextId = 0;
 const withId = (entry) => ({ ...entry, key: `m${nextId++}` });
@@ -59,9 +58,10 @@ export default function useAssistant({ open, screen, onNavigate }) {
     }
   }, [push]);
 
-  // The last thing asked and the topic it was answered with. Sent with
-  // the next question so the assistant can tell a reply from a new one.
-  const lastTurn = useRef(null);
+  // The last few things asked and the topic each was answered with.
+  // Sent with the next question so the assistant can tell a reply from
+  // a new one.
+  const turns = useRef([]);
 
   const ask = useCallback(async (question) => {
     const text = question.trim();
@@ -70,8 +70,11 @@ export default function useAssistant({ open, screen, onNavigate }) {
     push({ from: 'user', text });
     setBusy(true);
     try {
-      const res = await askAssistant(text, screen ?? undefined, lastTurn.current);
-      lastTurn.current = { question: text, topicId: res.type === 'topic' ? res.topic?.id : lastTurn.current?.topicId };
+      const sent = turns.current;
+      const res = await askAssistant(text, screen ?? undefined, sent.length ? sent : null);
+      // A turn not answered with a topic keeps the subject of the one before.
+      const topicId = res.type === 'topic' ? res.topic?.id : sent[sent.length - 1]?.topicId;
+      turns.current = [...sent, { question: text, topicId }].slice(-HISTORY);
       push({ from: 'assistant', kind: res.type, ...res });
       // "Take me to inventory" should take them to inventory. The
       // server has already checked the screen against their role —
@@ -95,7 +98,7 @@ export default function useAssistant({ open, screen, onNavigate }) {
     }
   }, [busy, push, screen, onNavigate]);
 
-  const clear = useCallback(() => { lastTurn.current = null; setEntries([]); }, []);
+  const clear = useCallback(() => { turns.current = []; setEntries([]); }, []);
 
   // The chips for the screen they are on, falling back to the
   // general ones so the panel is never blank.

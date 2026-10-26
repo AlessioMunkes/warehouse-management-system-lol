@@ -253,7 +253,7 @@ wording. One flat folder per area, with no folders inside.
 | `calendar` | South African public holidays |
 | `recipes` | Which recipe applies on a date, and how a slip quantity is worked out |
 | `units` | Converting between units, and the whole-number rule for items that are not decantable |
-| `assistant` | What the chat helper knows |
+| `assistant` | What the chat helper knows (`helpCatalog.js`: every help topic and screen), the check on what it writes (`groundedAnswer.js`), and the word search it falls back on when the AI cannot be asked (`topicSearch.js`). A feature with no topic is one it cannot help with: add one there |
 | `privacy` | Removing personal details from logs |
 | `warehouseMap` | What each area of the map holds now, worked out from the counts (`placement.js`), and the checks on a floor plan (`layout.js`) |
 | `impactMap` | The Impact map's period in South African days (`impactRange.js`) |

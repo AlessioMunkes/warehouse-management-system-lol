@@ -80,6 +80,7 @@ const getDeliveries = async ({
        dn.delivery_date,
        dn.status,
        dn.created_at,
+       dn.delivered_at,
        dn.driver_name,
        dn.purchase_order_id,
        s.id                  AS supplier_id,
@@ -141,6 +142,7 @@ const getDeliveryById = async (id) => {
        dn.delivery_date,
        dn.status,
        dn.created_at,
+       dn.delivered_at,
        dn.signature,
        dn.purchase_order_id,
        po.po_number,
@@ -281,6 +283,7 @@ const getPurchaseOrder = async (id) => {
 const createDelivery = async ({
   supplierId,
   deliveryDate,
+  deliveredAt = null,
   receivedBy,
   purchaseOrderId,
   signatureData,
@@ -364,8 +367,8 @@ const createDelivery = async ({
     const noteResult = await client.query(
       `INSERT INTO delivery_notes
          (supplier_id, delivery_date, received_by, purchase_order_id, signature, status,
-          idempotency_key)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+          idempotency_key, delivered_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, now()))
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
        RETURNING *`,
       [
@@ -376,6 +379,7 @@ const createDelivery = async ({
         signatureData || null,
         hasDiscrepancy ? "flagged" : "recorded",
         idempotencyKey,
+        deliveredAt,
       ],
     );
 

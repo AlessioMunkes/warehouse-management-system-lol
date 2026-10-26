@@ -48,6 +48,11 @@ const pickRelated = async (candidates, runOne) => {
   return [...withData, ...empty].slice(0, RELATED_COUNT);
 };
 import comparisonRepo from '../repositories/reportingComparison.repository.js';
+import knownPeople from '../repositories/knownPeople.repository.js';
+
+// Everyone the system holds, so the write-up can send them as aliases
+// (narrative.js aliasPeople). An empty list if it cannot be read.
+const peopleNames = async () => (await knownPeople.listNames().catch(() => ({ names: [] }))).names ?? [];
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -292,6 +297,7 @@ const buildCustomInsight = async ({ spec, narrate }) => {
     const metric = { label: ds.label, unit, description: ds.description, caveat: report.meta.caveat };
     result.narrative = await writeNarrative({
       metric, lens: area ? LENSES[area] : null, report, previous, figures, related, actions: [], target: null,
+      people: await peopleNames(),
     });
   }
   return result;
@@ -385,6 +391,7 @@ export const buildInsight = async ({ spec, narrate = false, userId } = {}) => {
   if (narrate) {
     result.narrative = await writeNarrative({
       metric, lens: LENSES[cfg.area], report, previous, figures, related, actions, target,
+      people: await peopleNames(),
     });
   }
 
