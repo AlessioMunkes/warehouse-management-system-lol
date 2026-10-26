@@ -300,7 +300,7 @@ const getPurchaseOrderById = async (id) => {
   // the PO's own created_at/status_changed_at.
     pool.query(
     `SELECT dn.id, dn.delivery_date, COALESCE(dn.delivered_at, dn.created_at) AS recorded_at, dn.status, dn.driver_name,
-            u.first_name AS received_by_name,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS received_by_name,
             COALESCE(disc.discrepancy_count, 0) > 0 AS has_discrepancies
        FROM delivery_notes dn
        LEFT JOIN users u ON u.id = dn.received_by

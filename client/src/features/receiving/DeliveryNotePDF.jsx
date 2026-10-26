@@ -112,15 +112,13 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         </tbody>
       </table>
 
+      {/* Who received it is said once, in the details at the top, beside
+          when it was delivered; it is not repeated here. */}
       <NoteSignatures
         signed={{
           label: 'Driver’s signature',
           image: delivery.signature,
           name: delivery.driver_name || null,
-        }}
-        by={{
-          label: 'Received by',
-          name: `${delivery.received_by_name || 'Warehouse Worker'} · ${delivery.delivered_at ? formatDateTime(delivery.delivered_at) : formatDate(delivery.delivery_date)}`,
         }}
       />
     </NoteSheet>

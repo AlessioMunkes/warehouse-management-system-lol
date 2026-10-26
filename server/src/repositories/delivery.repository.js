@@ -85,7 +85,7 @@ const getDeliveries = async ({
        dn.purchase_order_id,
        s.id                  AS supplier_id,
        s.name                AS supplier_name,
-       u.first_name          AS received_by_name,
+       TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS received_by_name,
        po.status     AS po_status,
        po.po_number,
        po.status             AS po_status,
@@ -155,7 +155,7 @@ const getDeliveryById = async (id) => {
        s.name           AS supplier_name,
        s.address        AS supplier_address,
        s.contact_phone  AS supplier_phone,
-       u.first_name     AS received_by_name
+       TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS received_by_name
      FROM delivery_notes dn
      LEFT JOIN suppliers s ON s.id = dn.supplier_id
      LEFT JOIN users u ON u.id = dn.received_by

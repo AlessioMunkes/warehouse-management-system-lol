@@ -131,7 +131,7 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
        de.driver_name,
        de.vehicle_reg,
        de.flagged_at,
-       u.first_name         AS dispatched_by_name,
+       TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS dispatched_by_name,
        -- When the slip was made, and who packed it: whoever finished it,
        -- else whoever held it, and a second packer if there was one. A
        -- volunteer guest by first name only.
@@ -154,7 +154,7 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
      LEFT JOIN volunteers pv ON pv.id = ps.assigned_volunteer_id
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      WHERE ${where.join(' AND ')}
-     GROUP BY ps.id, e.id, de.id, u.first_name, ps.beneficiary_kind, ps.beneficiary_name,
+     GROUP BY ps.id, e.id, de.id, u.first_name, u.last_name, ps.beneficiary_kind, ps.beneficiary_name,
               pc.id, pa.id, pa2.id, pv.id
      ORDER BY COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
@@ -640,7 +640,7 @@ const getDispatchNote = async (eventId) => {
        ps.beneficiary_kind::text AS beneficiary_kind,
        e.contact_name,
        e.child_count,
-       u.first_name  AS dispatched_by_name,
+       TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS dispatched_by_name,
        o.first_name  AS override_by_name
      FROM dispatch_events de
      JOIN picking_slips ps ON ps.id = de.picking_slip_id
@@ -719,7 +719,7 @@ const listDispatchNotes = async ({
        COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
        e.contact_name,
        e.child_count,
-       u.first_name         AS dispatched_by_name,
+       TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS dispatched_by_name,
        COALESCE(l.line_count, 0)    AS line_count,
        COALESCE(l.variance_count, 0) AS variance_count,
        COUNT(*) OVER ()             AS total_count
