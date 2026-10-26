@@ -34,7 +34,7 @@ export default function CustomReportBuilder({ datasets, value, preset, onChange,
         <div className={field}>
           <Label htmlFor="cr-dataset">Count</Label>
           <Select value={ds.id} onValueChange={(id) => onChange(defaultCustom(datasets.find((d) => d.id === id)))}>
-            <SelectTrigger id="cr-dataset"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full" id="cr-dataset"><SelectValue /></SelectTrigger>
             <SelectContent>
               {datasets.map((d) => <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>)}
             </SelectContent>
@@ -44,7 +44,7 @@ export default function CustomReportBuilder({ datasets, value, preset, onChange,
         <div className={field}>
           <Label htmlFor="cr-group">Break down by</Label>
           <Select value={g1 ?? NONE} onValueChange={(v) => set({ groupBy: v === NONE ? [] : [v, g2].filter((x) => x && x !== v) })}>
-            <SelectTrigger id="cr-group"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full" id="cr-group"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={NONE}>Total only</SelectItem>
               {ds.groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>)}
@@ -59,7 +59,7 @@ export default function CustomReportBuilder({ datasets, value, preset, onChange,
             onValueChange={(v) => set({ groupBy: [g1, v === NONE ? null : v].filter(Boolean) })}
             disabled={!g1}
           >
-            <SelectTrigger id="cr-group2"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full" id="cr-group2"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value={NONE}>Nothing else</SelectItem>
               {ds.groups.filter((g) => g.id !== g1).map((g) => <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>)}
@@ -71,7 +71,7 @@ export default function CustomReportBuilder({ datasets, value, preset, onChange,
           <div className={field}>
             <Label htmlFor="cr-measure">Measure</Label>
             <Select value={value?.measure ?? ds.measures[0].id} onValueChange={(v) => set({ measure: v })}>
-              <SelectTrigger id="cr-measure"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full" id="cr-measure"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {ds.measures.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
               </SelectContent>
@@ -90,7 +90,7 @@ export default function CustomReportBuilder({ datasets, value, preset, onChange,
                 set({ filters });
               }}
             >
-              <SelectTrigger id={`cr-f-${f.id}`}><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full" id={`cr-f-${f.id}`}><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>All</SelectItem>
                 {f.values.map((v) => <SelectItem key={v} value={v}>{words(v)}</SelectItem>)}
@@ -103,7 +103,7 @@ export default function CustomReportBuilder({ datasets, value, preset, onChange,
           <div className={field}>
             <Label htmlFor="cr-period">Period</Label>
             <Select value={preset} onValueChange={onPresetChange}>
-              <SelectTrigger id="cr-period"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full" id="cr-period"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {RANGE_PRESETS.filter((p) => p.id !== 'custom').map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>

@@ -102,10 +102,12 @@ export default function ReportBuilder({
     <div className="rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
-        <div className={field}>
+        {/* Two columns wide on a computer: report names are long
+            ("Stock in and out (opening to closing)"). */}
+        <div className={`${field} sm:col-span-2`}>
           <Label htmlFor="metric">Report</Label>
           <Select value={metricId ?? ''} onValueChange={onMetricChange}>
-            <SelectTrigger id="metric"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full" id="metric"><SelectValue /></SelectTrigger>
             <SelectContent>
               {catalog?.metrics.map((m) => (
                 <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
@@ -117,7 +119,7 @@ export default function ReportBuilder({
         <div className={field}>
           <Label htmlFor="dimension">Break down by</Label>
           <Select value={dimension} onValueChange={onDimensionChange}>
-            <SelectTrigger id="dimension"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full" id="dimension"><SelectValue /></SelectTrigger>
             <SelectContent>
               {metric?.dimensions.map((d) => (
                 <SelectItem key={d.id} value={d.id}>{d.label}</SelectItem>
@@ -130,7 +132,7 @@ export default function ReportBuilder({
           <div className={field}>
             <Label htmlFor="period">Period</Label>
             <Select value={preset} onValueChange={onPresetChange}>
-              <SelectTrigger id="period"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full" id="period"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {RANGE_PRESETS.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
@@ -165,7 +167,7 @@ export default function ReportBuilder({
               value={filters[key] !== undefined && filters[key] !== null ? String(filters[key]) : ALL}
               onValueChange={(v) => onFilterChange(key, v === ALL ? null : v)}
             >
-              <SelectTrigger id={key}><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full" id={key}><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All</SelectItem>
                 {options.map((o) => (

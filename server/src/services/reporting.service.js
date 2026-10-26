@@ -45,12 +45,19 @@ const todayISO = () => new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().s
 // aiEnabled drives whether the ask box renders. When the key lapses
 // after handover the input disappears and the dropdowns carry on —
 // the feature degrades rather than breaking.
+// A description is read by the AI that picks reports and by the people
+// on the page. "Run this when asked ..." is for the AI alone: it is
+// left out of what the page shows.
+const forReaders = (text) => String(text ?? '')
+  .replace(/\s*Run this (?:when|for)\b.*?(?:\.["”]?(?=\s|$)|$)/g, '')
+  .trim();
+
 const getCatalog = () => ({
   aiEnabled: aiProvider.isEnabled(),
   metrics: Object.values(METRICS).map((m) => ({
     id: m.id,
     label: m.label,
-    description: m.description,
+    description: forReaders(m.description),
     unit: m.unit,
     temporal: m.temporal,
     defaultChart: m.defaultChart,
