@@ -463,7 +463,7 @@ export const TOPICS = [
       'Catalogue: products and suppliers.',
       'Donations: the classification queue and Section 18A certificates.',
       'Logs: the activity log (staff and volunteers), the archive and message history.',
-      'Settings: email, reminders, stock rules, reporting and certificates; and the finance report.',
+      'Settings: email, reminders, stock rules, recipes and reporting; and the finance report.',
     ],
     followUp: {
       question: 'Would you like to know how to set up a new user?',
@@ -2267,15 +2267,14 @@ export const TOPICS = [
     asks: [
       'what is on the reports page', 'what are the tabs on reports', 'operations reports',
       'what can reporting do', 'what does each tab do', 'where is the process map',
-      'where is the reorder planner', 'where are the alerts',
+      'where are the alerts',
     ],
     body:
-      'Operations reports has six tabs, under the title.',
+      'Operations reports has five tabs, under the title. The reorder planner is on the Stock ledger.',
     steps: [
       'Overview: your own set of report cards, and your saved reports.',
       'Reports: ask a question, browse every report, or build a prepared or custom report.',
       'Process map: how work really moves from purchase order to dispatch, and how long each step takes.',
-      'Reorder planner: when each product runs out, the date to order by and how much.',
       'Exception alerts: the weekly measures that moved outside their normal range.',
       'Chart a spreadsheet: chart a CSV or Excel file, or a Google Sheets link.',
     ],
@@ -2441,14 +2440,14 @@ export const TOPICS = [
     id: 'reorder-planner',
     title: 'The reorder planner',
     roles: MANAGERS_UP,
-    screens: ['reporting'],
+    screens: ['stockLedger'],
     asks: [
-      'reorder planner', 'when will we run out', 'what do I need to order', 'how much should I order',
+      'reorder planner', 'where is the reorder planner', 'when will we run out', 'what do I need to order', 'how much should I order',
       'order by date', 'days of cover', 'suggested order', 'stock forecast', 'run out date',
       'what should I buy', 'are we going to run out of rice',
     ],
     body:
-      'The Reorder planner is a tab on Operations reports. For each product it works out when ' +
+      'The Reorder planner is the last tab on the Stock ledger. For each product it works out when ' +
       'stock runs out at the rate it is going, the date an order has to be raised by to arrive ' +
       'in time, and how much to order. It uses the same figures as the Days of stock left report.',
     steps: [
@@ -3451,7 +3450,7 @@ export const TOPICS = [
     screens: ['settings'],
     asks: [
       'settings', 'change the cut off time', 'reminder time', 'expiry warning',
-      'how long do invites last', 'certificate settings', 'impact rates',
+      'how long do invites last', 'impact rates',
     ],
     body:
       'Settings holds how the system is set up, in sections. Changes apply to ' +
@@ -3463,7 +3462,7 @@ export const TOPICS = [
       'Stock rules: when managers are warned about stock nearing its expiry date.',
       'Recipes: what picking slips are made from.',
       'Reporting: the rates that turn kilograms into people fed.',
-      'Certificates and Accounts: certificate details, and how long invite links last.',
+      'Accounts: how long invite links last.',
     ],
     followUp: {
       question: 'Would you like to know how email settings work?',

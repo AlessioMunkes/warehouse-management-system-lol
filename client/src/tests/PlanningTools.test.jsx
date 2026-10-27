@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────
 // src/tests/PlanningTools.test.jsx
 //
-// Two tools on the Operations reports page: the reorder planner and the
-// exception alerts. (The workload heatmap is a report now, drawn by
+// Two planning tools: the reorder planner (on the Stock ledger) and the
+// exception alerts (on Operations reports). (The workload heatmap is a report now, drawn by
 // OperationalChart: see OperationalChart.test.jsx.) Plus the root cause
 // analysis under the flow map. Each must show what the server worked
 // out in terms a manager can act on, and narrow or open as asked.

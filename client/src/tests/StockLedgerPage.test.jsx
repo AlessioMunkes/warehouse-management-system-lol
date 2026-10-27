@@ -18,6 +18,7 @@ const api = {
 };
 
 vi.mock('../services/stockAPI', () => api);
+vi.mock('../features/reporting/ReorderPlanner', () => ({ default: () => <div>the reorder planner</div> }));
 
 const { default: StockLedgerPage } = await import('../pages/StockLedgerPage');
 
@@ -162,6 +163,12 @@ describe('StockLedgerPage', () => {
 
     expect(await screen.findByText('Tinned Pilchards')).toBeInTheDocument();
     expect(screen.getByText(/1 product out of balance/i)).toBeInTheDocument();
+  });
+
+  it('has the reorder planner as its last tab, without loading movements for it', async () => {
+    renderPage('/noc/stock-ledger?status=planning');
+    expect(await screen.findByText('the reorder planner')).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').at(-1)).toHaveAccessibleName('Reorder planner');
   });
 
   it('surfaces a load failure without blanking the page', async () => {

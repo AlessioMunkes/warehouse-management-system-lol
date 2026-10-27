@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/ReorderPlanner.jsx
 //
-// THE REORDER PLANNER on the Operations reports page: for each product,
+// THE REORDER PLANNER, a tab on the Stock ledger: for each product,
 // when it runs out at the rate it is going, the date an order has to
 // be raised by, and how much to order to cover the planning horizon.
 //
