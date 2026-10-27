@@ -198,15 +198,39 @@ const dispatchVolume = (spec) => dispatchedKgQuery({ ...spec, impactOnly: false 
 // measurement stays inspectable and a factor change needs no re-query.
 const mealsEnabled   = (spec) => dispatchedKgQuery({ ...spec, impactOnly: true });
 
-// Soup kitchens only, forced rather than left to the caller — this is
-// not a general "pick a beneficiary kind" report, it IS the adults
-// number. NFR-20 keeps dignity kitchens out of impact reporting
-// entirely, so there is no other beneficiary kind this could mean.
-const adultsReached = (spec) => dispatchedKgQuery({
-  ...spec,
-  impactOnly: false,
-  filters: { ...spec.filters, beneficiary_kind: 'soup_kitchen' },
-});
+// Adults served, counted as meals (migration 068): every collected
+// pallet for a soup kitchen or the Dignity Kitchen is as many adults as
+// its kitchen feeds per collection, one meal each. A pallet is matched
+// to its kitchen by kind and name, the way the slip names it. Kitchens
+// with no adult count, and pallets for a kitchen nobody registered, add
+// nothing, and the meta says how many pallets that was.
+const ADULT_KITCHEN_KINDS = ['soup_kitchen', 'dignity_kitchen'];
+
+const adultsReached = async ({ dimension, filters = {}, dateRange }) => {
+  const dim = slipDimension(dimension, LEFT_DAY);
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `${LEFT_DAY} BETWEEN $1::date AND $2::date`,
+    `de.status = ANY($${params.push(COLLECTED_STATUSES)}::text[])`,
+    `ps.beneficiary_kind = ANY($${params.push(ADULT_KITCHEN_KINDS)}::beneficiary_type[])`,
+  ];
+  if (filters.cohort) { params.push(filters.cohort); where.push(`ps.cohort = $${params.length}`); }
+
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label,
+            SUM(k.adult_count)::numeric AS value,
+            COUNT(*) FILTER (WHERE k.adult_count IS NULL)::int AS uncounted
+       FROM picking_slips ps
+       JOIN dispatch_events de ON de.picking_slip_id = ps.id
+  LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+  LEFT JOIN kitchens k ON k.kind = ps.beneficiary_kind AND lower(k.name) = lower(ps.beneficiary_name)
+      WHERE ${where.join(' AND ')}
+      ${dim.group ? `GROUP BY ${dim.group}` : ''}
+      ORDER BY ${orderFor(dimension)}`,
+    params
+  );
+  return rows.map((r) => ({ label: r.label, value: num(r.value ?? 0), meta: { uncounted: r.uncounted } }));
+};
 
 // Same shape as adultsReached, forced to dignity_kitchen instead —
 // see reportCatalog.js's dignity_kitchen_served entry for why this

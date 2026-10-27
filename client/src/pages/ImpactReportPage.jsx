@@ -15,23 +15,21 @@
 // Meals served's own default, 'group_month', is both at once — three
 // beneficiary groups clustered per month, "compared over time."
 //
-// NFR-20 / dignity kitchens: adults served is deliberately scoped to
-// soup kitchens only (reporting.repository.js's adultsReached forces
-// beneficiary_kind='soup_kitchen'), and dignity kitchens stay out of
-// THE four headline numbers above, per the project's own visit notes.
-// They do appear, aggregate-only, in the "Beneficiaries by type"
-// comparison further down (dignity_kitchen_served, community_served)
-// — a rough estimate from real kilograms dispatched, requested
-// separately from NFR-20's own scope, never broken down by kitchen.
+// ADULTS SERVED IS MEALS, ONE PER ADULT (migration 068). The sponsor
+// counts adults at soup kitchens and the Dignity Kitchen alike: each
+// kitchen on Beneficiaries, Kitchens says how many adults it feeds per
+// collection, and every collected pallet counts that many. So the
+// Dignity Kitchen is in adults served now, and no longer has a kilogram
+// estimate of its own in "Beneficiaries by type", which would count it
+// twice.
 //
 // PAPER SAVED IS REAL DATA, NOT AN ESTIMATE.
 // It counts rows already in delivery_notes, dispatch_events and
 // decanting_records — no new instrumentation, no factor, cannot 503.
 //
-// ADULTS SERVED AND MEALS SERVED CAN 503.
-// They need a reporting_factors row (kg_to_meals / kg_to_adults_served,
-// and for the two "Beneficiaries by type" estimates,
-// kg_to_dignity_kitchen_served / kg_to_community_served) that has to
+// MEALS SERVED AND HOUSEHOLDS CAN 503.
+// They need a reporting_factors row (kg_to_meals, and for the
+// households estimate, kg_to_community_served) that has to
 // come from the organisation — see MISSING_FACTOR_STATUS below. The
 // "Adjust estimates" dialog on this page is the real, live way to set
 // one, rather than a gap only fixable by hand-editing SQL.
@@ -115,7 +113,7 @@ const STAT_DEFS = [
   {
     metric: 'adults_reached', label: 'Adults served',
     unit: 'adults', color: 'var(--chart-tan)', image: '/images/person-waving.svg',
-    staticCaption: 'Soup kitchens only · estimated from kg',
+    staticCaption: 'Soup kitchens and the Dignity Kitchen · one meal per adult',
   },
   {
     metric: 'compost_processed', label: 'Compost processed',
@@ -140,16 +138,14 @@ const STAT_DEFS = [
 // served bars.
 const BENEFICIARY_TYPE_DEFS = [
   { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: BENEFICIARY_COLOURS.children },
-  { metric: 'adults_reached', label: 'Adults (soup kitchens)', unit: 'adults', color: BENEFICIARY_COLOURS.adults },
-  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens', unit: 'people', color: BENEFICIARY_COLOURS.dignity },
+  { metric: 'adults_reached', label: 'Adults (soup kitchens and the Dignity Kitchen)', unit: 'adults', color: BENEFICIARY_COLOURS.adults },
   { metric: 'community_served', label: 'Households (community requests)', unit: 'people', color: BENEFICIARY_COLOURS.households },
 ];
 
 // Fetched the same way as STAT_DEFS but not rendered as a poster
-// card — these two only feed BeneficiaryTypeChart, so they need no
+// card — it only feeds BeneficiaryTypeChart, so it needs no
 // image/staticCaption.
 const EXTRA_METRIC_DEFS = [
-  { metric: 'dignity_kitchen_served' },
   { metric: 'community_served' },
 ];
 

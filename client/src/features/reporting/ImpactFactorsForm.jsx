@@ -21,7 +21,6 @@ import reportingAPI from '../../services/reportingAPI';
 
 const FACTOR_DEFS = [
   { key: 'kg_to_meals',                  label: 'How many meals does 1 kg feed?' },
-  { key: 'kg_to_adults_served',          label: 'How many soup kitchen adults does 1 kg feed?' },
   { key: 'kg_to_dignity_kitchen_served', label: 'How many dignity kitchen guests does 1 kg feed?' },
   { key: 'kg_to_community_served',       label: 'How many people via community requests does 1 kg feed?' },
 ];

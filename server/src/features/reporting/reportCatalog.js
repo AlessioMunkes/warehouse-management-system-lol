@@ -255,14 +255,14 @@ export const METRICS = {
   adults_reached: {
     id: 'adults_reached', label: 'Adults reached', temporal: 'range',
     description:
-      'Estimated adults served through soup kitchens. Converted from kilograms ' +
-      'dispatched to soup kitchens using a factor the manager can edit, the same ' +
-      'way meals enabled works. Dignity kitchens and ECDs are not counted here.',
+      'Adults served at soup kitchens and the Dignity Kitchen, counted as meals: each ' +
+      'collected pallet is as many adults as its kitchen feeds per collection (set on ' +
+      'Beneficiaries, Kitchens). ECDs are not counted here.',
     repoFn: 'adultsReached', unit: 'adults',
-    dimensions: ['none', 'month', 'week', 'cohort'],
+    dimensions: ['none', 'month', 'week', 'beneficiary', 'ecd_centre'],
     filters: ['cohort'],
-    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_adults_served',
-    caveat: 'Estimate based on the kilograms-to-adults-served factor on record. Soup kitchens only.',
+    defaultChart: 'line', impactOnly: true,
+    caveat: 'One meal per adult. Pallets for a kitchen with no adult count on Beneficiaries are not counted.',
   },
 
   // Same shape as adults_reached (real kg dispatched -> a manager-set
