@@ -60,6 +60,7 @@ CREATE TABLE public.products (
   archived_by integer,
   unit_cost numeric CHECK (unit_cost IS NULL OR unit_cost >= 0::numeric),
   quantity_per_meal numeric,
+  preferred_supplier_id integer,
   CONSTRAINT products_pkey PRIMARY KEY (id),
   CONSTRAINT products_programme_id_fkey FOREIGN KEY (programme_id) REFERENCES public.programmes(id),
   CONSTRAINT products_default_location_id_fkey FOREIGN KEY (default_location_id) REFERENCES public.storage_locations(id),
@@ -122,6 +123,7 @@ CREATE TABLE public.volunteers (
   source text NOT NULL DEFAULT 'guest_login'::text,
   consent_given boolean NOT NULL DEFAULT false,
   retention_delete_after date,
+  last_active_at timestamp with time zone,
   CONSTRAINT volunteers_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.decanting_records (
@@ -372,6 +374,9 @@ CREATE TABLE public.donations (
   section_18a_form_token_expires_at timestamp with time zone,
   section_18a_form_submitted_at timestamp with time zone,
   section_18a_donor_form jsonb,
+  value_estimated boolean NOT NULL DEFAULT false,
+  value_verified_at timestamp with time zone,
+  value_verified_by integer,
   CONSTRAINT donations_pkey PRIMARY KEY (id),
   CONSTRAINT donations_programme_id_fkey FOREIGN KEY (programme_id) REFERENCES public.programmes(id),
   CONSTRAINT donations_received_by_fkey FOREIGN KEY (received_by) REFERENCES public.users(id),
@@ -520,6 +525,8 @@ CREATE TABLE public.dispatch_events (
   idempotency_key uuid UNIQUE,
   notes text,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  followed_up_at timestamp with time zone,
+  followed_up_by integer,
   CONSTRAINT dispatch_events_pkey PRIMARY KEY (id),
   CONSTRAINT dispatch_events_picking_slip_id_fkey FOREIGN KEY (picking_slip_id) REFERENCES public.picking_slips(id),
   CONSTRAINT dispatch_events_dispatched_by_fkey FOREIGN KEY (dispatched_by) REFERENCES public.users(id),
@@ -680,6 +687,7 @@ CREATE TABLE public.pending_donations (
   donor_identification_type character varying CHECK (donor_identification_type::text = ANY (ARRAY['south_african_id'::character varying, 'foreign_passport'::character varying]::text[])),
   donor_identification_country_of_issue character varying,
   donor_identification_number character varying,
+  value_estimated boolean NOT NULL DEFAULT false,
   CONSTRAINT pending_donations_pkey PRIMARY KEY (id),
   CONSTRAINT pending_donations_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
   CONSTRAINT pending_donations_programme_id_fkey FOREIGN KEY (programme_id) REFERENCES public.programmes(id),
@@ -992,6 +1000,52 @@ CREATE TABLE public.collection_kits (
   assigned_at date NOT NULL DEFAULT CURRENT_DATE,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT collection_kits_pkey PRIMARY KEY (id)
+);
+
+-- Soup kitchens and the Dignity Kitchen, with the adults each feeds per
+-- collection (migration 068). Their pallets match them by kind and name.
+CREATE TABLE public.kitchens (
+  id integer NOT NULL DEFAULT nextval('kitchens_id_seq'::regclass),
+  kind USER-DEFINED NOT NULL CHECK (kind = ANY (ARRAY['soup_kitchen'::beneficiary_type, 'dignity_kitchen'::beneficiary_type])),
+  name character varying NOT NULL CHECK (btrim(name::text) <> ''::text),
+  adult_count integer CHECK (adult_count IS NULL OR adult_count >= 0),
+  contact_name character varying,
+  contact_phone character varying,
+  address text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT kitchens_pkey PRIMARY KEY (id)
+);
+
+-- Feed the Soil drop-off sites and the compost logged at them by QR code
+-- (migration 069).
+CREATE TABLE public.fts_drop_points (
+  id integer NOT NULL DEFAULT nextval('fts_drop_points_id_seq'::regclass),
+  name character varying NOT NULL CHECK (btrim(name::text) <> ''::text),
+  suburb character varying,
+  address text,
+  public_token uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+  is_active boolean NOT NULL DEFAULT true,
+  created_by integer,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT fts_drop_points_pkey PRIMARY KEY (id),
+  CONSTRAINT fts_drop_points_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
+);
+CREATE TABLE public.fts_dropoffs (
+  id integer NOT NULL DEFAULT nextval('fts_dropoffs_id_seq'::regclass),
+  drop_point_id integer NOT NULL,
+  kg_compost numeric NOT NULL CHECK (kg_compost > 0::numeric AND kg_compost <= 200::numeric),
+  donor_name character varying,
+  donor_email character varying,
+  status character varying NOT NULL DEFAULT 'logged'::character varying CHECK (status::text = ANY (ARRAY['logged'::character varying, 'rejected'::character varying]::text[])),
+  thanks_status character varying CHECK (thanks_status::text = ANY (ARRAY['sent'::character varying, 'stubbed'::character varying, 'failed'::character varying]::text[])),
+  submitted_at timestamp with time zone NOT NULL DEFAULT now(),
+  reviewed_by integer,
+  reviewed_at timestamp with time zone,
+  CONSTRAINT fts_dropoffs_pkey PRIMARY KEY (id),
+  CONSTRAINT fts_dropoffs_drop_point_id_fkey FOREIGN KEY (drop_point_id) REFERENCES public.fts_drop_points(id),
+  CONSTRAINT fts_dropoffs_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.collection_kit_records (
   id integer NOT NULL DEFAULT nextval('collection_kit_records_id_seq'::regclass),
