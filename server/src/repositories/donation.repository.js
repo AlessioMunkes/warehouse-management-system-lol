@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
+import { readUnitSizes } from '../features/units/unitConversion.js';
 
 const donationAuditEntityId = (donationId) =>
   `00000000-0000-0000-0000-${String(donationId).padStart(12, '0')}`;
@@ -113,6 +114,7 @@ const createDonation = async ({
   section18aQualifying,
   receivedBy,
   items,
+  valueEstimated = false,
 }) => {
   const client = await pool.connect();
   try {
@@ -122,8 +124,8 @@ const createDonation = async ({
       `INSERT INTO donations
          (donation_category, programme_id, estimated_value_zar, donor_name, donor_contact,
           donor_tax_reference, donor_consent_given, notes, idempotency_key,
-          section_18a_status, section_18a_qualifying, received_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          section_18a_status, section_18a_qualifying, received_by, value_estimated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
        RETURNING id`,
       [
@@ -139,6 +141,7 @@ const createDonation = async ({
         section18aStatus,
         section18aQualifying === true,
         receivedBy,
+        valueEstimated === true,
       ]
     );
 
@@ -516,14 +519,56 @@ const reclassifyDonation = async ({ donationId, category, reason, actorId }) => 
 // QuickBooks, 'qualifying_pending_donor' is money that qualified but
 // has no donor to issue to. Finance needs both, because the second is
 // the recoverable case — someone can still phone the donor back.
+// ── What the catalogue says items are worth ───────────────────
+// For the "estimate it for me" on intake: each product's unit cost, in
+// the unit it is costed in, and the unit sizes to convert a crate or a
+// bag into it.
+const getProductCosts = async (productIds) => {
+  const client = await pool.connect();
+  try {
+    // readUnitSizes reads inside a savepoint, which needs a transaction.
+    await client.query('BEGIN READ ONLY');
+    const result = await client.query(
+      `SELECT id, name, unit_cost, default_unit FROM products WHERE id = ANY($1::int[])`,
+      [productIds]
+    );
+    const sizes = await readUnitSizes(client);
+    await client.query('COMMIT');
+    return { products: result.rows, sizes };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── A manager verifies (or corrects) a donation's value ────────
+// Not once its certificate has been issued: the certificate says the
+// value it was issued for.
+const verifyDonationValue = async ({ donationId, valueZar, actorId }) => {
+  const result = await pool.query(
+    `UPDATE donations
+        SET estimated_value_zar = $2, value_verified_at = now(), value_verified_by = $3
+      WHERE id = $1 AND section_18a_status IS DISTINCT FROM 'issued'
+      RETURNING id, estimated_value_zar, value_estimated, value_verified_at`,
+    [donationId, valueZar, actorId]
+  );
+  if (result.rows[0]) return { ok: true, donation: result.rows[0] };
+  const exists = await pool.query(`SELECT 1 FROM donations WHERE id = $1`, [donationId]);
+  return exists.rows[0] ? { issued: true } : { notFound: true };
+};
+
 const listSection18AQueue = async () => {
   const result = await pool.query(
     `SELECT d.id, d.estimated_value_zar, d.donor_name, d.donor_contact, d.donor_tax_reference,
             donor_consent_given, received_at, section_18a_status,
             section_18a_certificate_ref, section_18a_issued_at,
-            c.certificate_number, c.issue_date
+            c.certificate_number, c.issue_date,
+            d.value_estimated, d.value_verified_at, vu.first_name AS value_verified_by_name
      FROM donations d
      LEFT JOIN section18a_certificates c ON c.donation_id = d.id
+     LEFT JOIN users vu ON vu.id = d.value_verified_by
      WHERE d.section_18a_status IN ('qualifying_pending_donor', 'queued', 'issued')
      ORDER BY d.received_at ASC, d.id ASC`
   );
@@ -878,6 +923,8 @@ const getDonationEvents = async (donationId) => {
 };
 
 export default {
+  getProductCosts,
+  verifyDonationValue,
   getSection18AThreshold,
   getEligibleEcdCentres,
   findByIdempotencyKey,

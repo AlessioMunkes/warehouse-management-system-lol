@@ -1042,3 +1042,50 @@ describe('Section 18A certificate email failure', () => {
     }));
   });
 });
+
+// ── The value: estimated by the system, verified by a manager ──
+describe('estimating and verifying a donation value', () => {
+  beforeEach(() => {
+    repoMock.getProductCosts = vi.fn(async () => ({
+      products: [
+        { id: 3, name: 'Rice', unit_cost: '20', default_unit: 'kg' },
+        { id: 4, name: 'Beans', unit_cost: '0', default_unit: 'kg' },
+      ],
+      sizes: { bag: 10 },
+    }));
+    repoMock.verifyDonationValue = vi.fn(async () => ({ ok: true, donation: { id: 9, estimated_value_zar: '450.00' } }));
+  });
+
+  it('prices matched lines at catalogue cost, converting the unit, and counts the lines it could not', async () => {
+    const estimate = await donationService.estimateDonationValue({ items: [
+      { productId: 3, quantity: 2, unit: 'bag' },     // 20 kg x R20
+      { productId: 3, quantity: 500, unit: 'g' },     // 0.5 kg x R20
+      { productId: 4, quantity: 5, unit: 'kg' },      // no cost on record
+      { productId: null, quantity: 1, unit: 'each' }, // not matched
+    ] });
+    expect(estimate).toEqual({ valueZar: 410, pricedCount: 2, itemCount: 4 });
+  });
+
+  it('asks for the items first', async () => {
+    await expect(donationService.estimateDonationValue({ items: [] })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('records the estimate when the donation is created', async () => {
+    repoMock.createDonation.mockResolvedValueOnce({ duplicate: true });
+    repoMock.findByIdempotencyKey.mockResolvedValue(null);
+    await donationService.createDonation(validBody({ valueEstimated: true }), USER_ID).catch(() => {});
+    expect(repoMock.createDonation).toHaveBeenCalledWith(expect.objectContaining({ valueEstimated: true }));
+  });
+
+  it('lets a manager verify or correct the value, until its certificate is issued', async () => {
+    await expect(donationService.verifyDonationValue('9', { estimatedValueZar: 450 }, USER_ID))
+      .resolves.toMatchObject({ id: 9 });
+    expect(repoMock.verifyDonationValue).toHaveBeenCalledWith({ donationId: 9, valueZar: 450, actorId: USER_ID });
+
+    await expect(donationService.verifyDonationValue(9, { estimatedValueZar: -1 }, USER_ID)).rejects.toMatchObject({ status: 400 });
+    repoMock.verifyDonationValue.mockResolvedValueOnce({ issued: true });
+    await expect(donationService.verifyDonationValue(9, { estimatedValueZar: 10 }, USER_ID)).rejects.toMatchObject({ status: 409 });
+    repoMock.verifyDonationValue.mockResolvedValueOnce({ notFound: true });
+    await expect(donationService.verifyDonationValue(99, { estimatedValueZar: 10 }, USER_ID)).rejects.toMatchObject({ status: 404 });
+  });
+});

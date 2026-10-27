@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Section18AManagementPage from '../pages/Section18AManagementPage';
 
@@ -17,6 +17,7 @@ vi.mock('../services/donationManagementAPI', () => ({
     getEmailHistory: vi.fn(),
     generateCertificate: vi.fn(),
     resendEmail: vi.fn(),
+    verifyDonationValue: vi.fn(),
   },
 }));
 
@@ -123,5 +124,29 @@ describe('Section18AManagementPage', () => {
     await user.selectOptions(screen.getByLabelText('Sort certificate queue'), 'date-desc');
     const donations = screen.getAllByText(/DON-100[12]/).map((node) => node.textContent);
     expect(donations).toEqual(['DON-1002', 'DON-1001']);
+  });
+
+  // An estimated value is verified, or corrected, by a manager before a
+  // certificate goes out; an issued one is left as it is.
+  it('lets a manager verify an estimated value, and not an issued one', async () => {
+    const user = userEvent.setup();
+    api.getSection18AQueue.mockResolvedValue([
+      { ...mockQueueItems[0], value_estimated: true },
+      mockQueueItems[1],
+    ]);
+    api.verifyDonationValue.mockResolvedValue({});
+    render(<Section18AManagementPage />);
+
+    const row = (await screen.findByText('Jane Doe')).closest('tr');
+    expect(within(row).getByText('Estimated from the items')).toBeInTheDocument();
+    expect(within(screen.getByText('Acme Corp').closest('tr')).queryByRole('button', { name: 'Verify value' })).toBeNull();
+
+    await user.click(within(row).getByRole('button', { name: 'Verify value' }));
+    const amount = within(row).getByLabelText('Value of donation DON-1001');
+    await user.clear(amount);
+    await user.type(amount, '450');
+    await user.click(within(row).getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(api.verifyDonationValue).toHaveBeenCalledWith('DON-1001', 450));
   });
 });
