@@ -183,8 +183,15 @@ export async function generateSlips({ dispatchDate, cohort }) {
 // when given, replaces the usual pull from the centre's standing
 // order (ecd_order_lines) — a manager typed or adjusted the lines by
 // hand instead of taking the standing order as-is.
-export async function createSlip({ ecdId, dispatchDate, cohort, force, items }) {
-  const body = { ecdId, dispatchDate, cohort, force };
+//
+// A soup or dignity kitchen has no centre: it is named on the slip
+// (`beneficiaryKind`, `beneficiaryName`) and has no `ecdId` or cohort.
+// Both have to reach the server, or it takes the slip for a centre and
+// asks for one.
+export async function createSlip({ ecdId, beneficiaryKind, beneficiaryName, dispatchDate, cohort, force, items }) {
+  const body = beneficiaryKind && beneficiaryKind !== 'ecd'
+    ? { beneficiaryKind, beneficiaryName, dispatchDate, force }
+    : { ecdId, dispatchDate, cohort, force };
   if (items !== undefined) body.items = items;
   return request('', { method: 'POST', body: JSON.stringify(body) });
 }
