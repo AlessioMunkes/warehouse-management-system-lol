@@ -364,7 +364,7 @@ const compostDimension = (dimension) => {
   switch (dimension) {
     case 'none':   return { expr: `'Total'`,                        group: null };
     case 'month':  return { expr: bucketMonth('bucket_date'),        group: bucketMonth('bucket_date') };
-    case 'region': return { expr: `COALESCE(ck.suburb, 'Unspecified')`, group: `COALESCE(ck.suburb, 'Unspecified')` };
+    case 'region': return { expr: `COALESCE(t.suburb, 'Unspecified')`, group: `COALESCE(t.suburb, 'Unspecified')` };
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -373,11 +373,20 @@ const compostProcessed = async ({ dimension, dateRange }) => {
   const dim = compostDimension(dimension);
   const params = [dateRange.from, dateRange.to];
   const { rows } = await pool.query(
+    // Kits weighed at the warehouse, and compost logged by QR code at a
+    // drop-off site (migration 069) unless staff rejected it. A site's
+    // region is its own suburb.
     `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost), 0)::numeric AS value
-       FROM (SELECT ${sastDate('logged_at')} AS bucket_date, kg_compost, kit_id
-               FROM collection_kit_records
-              WHERE ${sastDate('logged_at')} BETWEEN $1::date AND $2::date) t
-       LEFT JOIN collection_kits ck ON ck.id = t.kit_id
+       FROM (SELECT ${sastDate('r.logged_at')} AS bucket_date, r.kg_compost, ck.suburb
+               FROM collection_kit_records r
+               LEFT JOIN collection_kits ck ON ck.id = r.kit_id
+              WHERE ${sastDate('r.logged_at')} BETWEEN $1::date AND $2::date
+             UNION ALL
+             SELECT ${sastDate('d.submitted_at')}, d.kg_compost, COALESCE(p.suburb, p.name)
+               FROM fts_dropoffs d
+               JOIN fts_drop_points p ON p.id = d.drop_point_id
+              WHERE d.status = 'logged'
+                AND ${sastDate('d.submitted_at')} BETWEEN $1::date AND $2::date) t
        ${dim.group ? `GROUP BY ${dim.group}` : ''}
        ORDER BY ${dimension === 'region' ? '2 DESC, 1' : '1'}`,
     params

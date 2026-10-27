@@ -322,13 +322,13 @@ export const METRICS = {
   compost_processed: {
     id: 'compost_processed', label: 'Compost processed', temporal: 'range',
     description:
-      'Kilograms of compost collected through Feed the Soil, logged against a ' +
-      'community member\'s collection kit each time it is weighed in. Can be seen as a ' +
-      'running total, a monthly trend, or broken down by the suburb each kit is assigned to.',
+      'Kilograms of compost collected through Feed the Soil: kits weighed in at the ' +
+      'warehouse, and compost logged by QR code at a drop-off site such as a pop-up stand. ' +
+      'Can be seen as a running total, a monthly trend, or broken down by region.',
     repoFn: 'compostProcessed', unit: 'kg',
     dimensions: ['region', 'none', 'month'], filters: [],
     defaultChart: 'bar', impactOnly: true,
-    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet. Region is the kit owner\'s registered suburb, not where the compost ends up.',
+    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet, and every site drop-off staff have not rejected. Region is the kit owner\'s registered suburb, or the drop-off site\'s, not where the compost ends up.',
   },
 
   // ══ Dispatch ═══════════════════════════════════════════════

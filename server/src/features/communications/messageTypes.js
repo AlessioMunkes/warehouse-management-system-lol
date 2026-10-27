@@ -18,6 +18,7 @@ export const MESSAGE_TYPES = Object.freeze({
   finance_report_link:    { label: 'Finance report link',       related: 'finance_report_link' },
   collection_reminder:    { label: 'Collection reminder',       related: 'ecd_collection_reminder' },
   donation_thank_you:     { label: 'Donation thank-you',        related: 'donation' },
+  compost_thank_you:      { label: 'Feed the Soil thank-you',   related: 'fts_dropoff' },
   section_18a:            { label: 'Section 18A certificate',   related: 'donation' },
   section_18a_handoff:    { label: 'Section 18A details to finance', related: 'donation' },
   scheduled_report:       { label: 'Scheduled report',          related: 'saved_report' },

@@ -183,7 +183,10 @@ describe('compostProcessed', () => {
 
     const [sql, params] = poolMock.query.mock.calls[0];
     expect(sql).toMatch(/FROM collection_kit_records/);
-    expect(sql).not.toMatch(/status/);
+    // A kit's record counts whatever its status; a site drop-off unless rejected.
+    expect(sql).not.toMatch(/r\.status/);
+    expect(sql).toMatch(/FROM fts_dropoffs d/);
+    expect(sql).toMatch(/d\.status = 'logged'/);
     expect(sql).toMatch(/SUM\(kg_compost\)/);
     expect(params).toEqual([RANGE.from, RANGE.to]);
     expect(result).toEqual([{ label: 'Total', value: 16.5 }]);
@@ -194,8 +197,10 @@ describe('compostProcessed', () => {
     await repo.compostProcessed({ dimension: 'region', dateRange: RANGE });
 
     const [sql] = poolMock.query.mock.calls[0];
-    expect(sql).toMatch(/LEFT JOIN collection_kits ck ON ck\.id = t\.kit_id/);
-    expect(sql).toMatch(/COALESCE\(ck\.suburb, 'Unspecified'\)/);
+    // The kit owner's suburb, or the drop-off site's.
+    expect(sql).toMatch(/LEFT JOIN collection_kits ck ON ck\.id = r\.kit_id/);
+    expect(sql).toMatch(/COALESCE\(p\.suburb, p\.name\)/);
+    expect(sql).toMatch(/COALESCE\(t\.suburb, 'Unspecified'\)/);
     expect(sql).toMatch(/ORDER BY 2 DESC, 1/);
   });
 
