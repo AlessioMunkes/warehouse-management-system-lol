@@ -133,6 +133,7 @@ the classification queue and Section 18A.
 | `donationManagement` | The classification queue and reconciliation | Manager, Admin |
 | `dashboard` | The customisable dashboard and its widgets | Manager, Admin |
 | `notifications` | The bell, the notification list, phone alerts | Everyone |
+| `reminders` | The one collection reminder for a WhatsApp group or broadcast list | Manager |
 | `assistant` | The chat helper | Everyone |
 | `users` | Inviting and editing users | Admin |
 | `products` | The product form, its barcodes (`ProductBarcodes.jsx`), Add product from a barcode (`ProductBarcodeStart.jsx`) and Print labels (`PrintLabels.jsx`) | Admin |
