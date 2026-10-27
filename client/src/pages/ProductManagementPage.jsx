@@ -16,6 +16,7 @@ import ProductBarcodes from '../features/products/ProductBarcodes';
 import ProductBarcodeStart from '../features/products/ProductBarcodeStart';
 import { linkBarcode } from '../services/productBarcodeAPI';
 import productAPI   from '../services/productAPI';
+import { getSuppliers } from '../services/supplierAPI';
 import ConfirmRemoveDialog from '../features/masterdata/ConfirmRemoveDialog';
 import useOpenFromQuery    from '../features/masterdata/useOpenFromQuery';
 import useTableView        from '../features/masterdata/useTableView';
@@ -205,6 +206,17 @@ export default function ProductManagementPage() {
     () => Object.fromEntries(VIEWS.map((v) => [v.id, products.filter(v.test).length])),
     [products],
   );
+
+  // For the product form's Preferred supplier. A failure leaves the
+  // list empty rather than the page broken.
+  const [suppliers, setSuppliers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    getSuppliers({ includeInactive: true })
+      .then((rows) => { if (!cancelled) setSuppliers(rows); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const loadProducts = useCallback(async () => {
     setError(null);
@@ -422,7 +434,7 @@ export default function ProductManagementPage() {
             onSeed={(values) => setSeed((s) => ({ key: s.key + 1, values }))}
           />
           <ProductForm
-            key={seed.key} seed={seed.values}
+            key={seed.key} seed={seed.values} suppliers={suppliers}
             onSubmit={create} onCancel={() => setMode('list')} busy={busy}
           />
         </DetailPanel>
@@ -432,6 +444,7 @@ export default function ProductManagementPage() {
         <DetailPanel open onClose={() => setMode('list')} eyebrow="Edit" title={selected.name}>
           <ProductForm
             initial={selected}
+            suppliers={suppliers}
             submitLabel="Save changes"
             onSubmit={save}
             onCancel={() => setMode('list')}

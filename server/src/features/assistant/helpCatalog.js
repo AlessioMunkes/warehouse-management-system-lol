@@ -2456,7 +2456,7 @@ export const TOPICS = [
       'The list is most urgent first: Out of stock, Order now, Order within 7 days, Order later, Covered, No demand.',
       'Select a product to see its week by week projection, and which demand and lead time it used. Missing data says what held a figure back.',
       'Search by product or supplier, and export the plan to Excel as an order sheet.',
-      'To order, raise a purchase order as usual.',
+      'Create purchase orders raises the suggestions in view as orders to approve: one per supplier (the product’s preferred supplier, or the one it was last ordered from), at the suggested quantity, due the longest lead time. Products with no supplier are named and left out.',
     ],
     followUp: {
       question: 'Would you like to know how to raise a purchase order?',
@@ -3091,8 +3091,9 @@ export const TOPICS = [
     body:
       'On Inventory, open the Low stock (or Shortfall) tab, tick the products you ' +
       'want and choose Raise purchase order. A new order opens with those products ' +
-      'already on it, each with enough to bring it back up to its reorder level; pick ' +
-      'the supplier, check the quantities and save.',
+      'already on it, each with enough to bring it back up to its reorder level. When ' +
+      'they share a preferred supplier the order starts on it, due that supplier’s ' +
+      'lead time from today; check the quantities and save.',
     followUp: {
       question: 'Would you like to know how approving the order works?',
       topic: 'po-approve',

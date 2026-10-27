@@ -11,8 +11,9 @@
 // report and the dashboard's stock outlook. Each product says which
 // demand and lead time it used, and what missing data held it back.
 // This lays it out most urgent first, lets the list be narrowed to one
-// status, opens a product to its week-by-week projection, and exports
-// the plan as an order sheet.
+// status, opens a product to its week-by-week projection, exports the
+// plan as an order sheet, and raises the suggestions in view as orders
+// to approve (CreateOrdersFromPlan.jsx).
 // ─────────────────────────────────────────────────────────────
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import NativeSelect from '@/components/ui/native-select';
@@ -42,6 +43,7 @@ const PLAN_FILTERS = [
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBanner from '@/components/ui/error-banner';
 import { getReorderPlan } from '../../services/reportingAPI';
+import CreateOrdersFromPlan from './CreateOrdersFromPlan';
 import { exportExcel } from '../../lib/excelExport';
 import { fmtQtyUnit, weeklyUseText } from '../../lib/stockWording';
 
@@ -244,6 +246,11 @@ export default function ReorderPlanner() {
             {chip('covered', STATUS.covered.label, data.summary.covered)}
             {chip('no_demand', STATUS.no_demand.label, data.summary.no_demand)}
             {chip('all', 'All products', data.items.length)}
+          </div>
+
+          {/* The suggestions in this view, as orders to approve. */}
+          <div className="mt-3 flex flex-wrap items-start gap-2">
+            <CreateOrdersFromPlan key={`${status}|${query}|${weeks}`} items={items} />
           </div>
 
           {items.length === 0 ? (

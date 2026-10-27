@@ -47,6 +47,23 @@ import { calendarDay } from '@/features/receipts/noteFormat';
 const todayInSAST = () =>
   new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
+// Today plus the supplier's agreed lead time, as YYYY-MM-DD: when the
+// order should arrive if it goes out today. Null without one.
+const afterLeadTime = (days) => {
+  if (days === null || days === undefined || !Number.isFinite(Number(days))) return null;
+  const d = new Date(`${todayInSAST()}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + Math.max(0, Math.round(Number(days))));
+  return d.toISOString().slice(0, 10);
+};
+
+// The one preferred supplier every product shares, as the select's value,
+// or '' when they have none or differ.
+const sharedPreferredSupplier = (products) => {
+  const ids = new Set(products.map((p) => p.preferredSupplierId ?? null));
+  const [only] = ids;
+  return ids.size === 1 && only !== null ? String(only) : '';
+};
+
 export default function PurchaseOrderForm({
   suppliers = [],
   products = [],
@@ -79,8 +96,17 @@ export default function PurchaseOrderForm({
     quickbooksPoId: initialValue.quickbooksPoId ?? '',
     notes: initialValue.notes ?? '',
   } : {
-    supplierId: '', expectedDeliveryDate: '', quickbooksPoId: '', notes: '',
+    // Raised from Low stock: on the products' preferred supplier, when
+    // they all have the same one.
+    supplierId: sharedPreferredSupplier(initialProducts),
+    expectedDeliveryDate: afterLeadTime(
+      suppliers.find((s) => String(s.id) === sharedPreferredSupplier(initialProducts))?.expectedLeadTimeDays,
+    ) ?? '',
+    quickbooksPoId: '', notes: '',
   }));
+  // The date follows the supplier's lead time until someone sets it
+  // themselves. An order being edited already has its date.
+  const [dateChosen, setDateChosen] = useState(Boolean(initialValue));
   const [lines, setLines] = useState(() => (
     initialValue?.items?.length
       ? initialValue.items.map((item) => ({
@@ -122,7 +148,8 @@ export default function PurchaseOrderForm({
   // would be refused on save, and a row showing a product its own picker
   // no longer lists reads as a fault.
   const chooseSupplier = (supplierId) => {
-    setForm((f) => ({ ...f, supplierId }));
+    const leadDate = afterLeadTime(suppliers.find((s) => String(s.id) === String(supplierId))?.expectedLeadTimeDays);
+    setForm((f) => ({ ...f, supplierId, ...(!dateChosen && leadDate ? { expectedDeliveryDate: leadDate } : {}) }));
     const allowed = suppliedIds(supplierId);
     if (allowed.length === 0) return;
     const kept = lines.filter((l) => !l.productId || allowed.includes(Number(l.productId)));
@@ -130,6 +157,10 @@ export default function PurchaseOrderForm({
   };
 
   const filled = lines.filter((l) => l.productId && Number(l.expectedQuantity) > 0);
+
+  // The chosen supplier's agreed lead time, said under the date.
+  const chosenSupplier = suppliers.find((s) => String(s.id) === String(form.supplierId)) ?? null;
+  const chosenLeadDays = chosenSupplier?.expectedLeadTimeDays ?? null;
 
   const problems = [];
   if (!form.supplierId) problems.push('Choose a supplier.');
@@ -197,10 +228,13 @@ export default function PurchaseOrderForm({
             id="po-date" type="date"
             min={todayInSAST()}
             value={form.expectedDeliveryDate}
-            onChange={set('expectedDeliveryDate')}
+            onChange={(e) => { setDateChosen(true); set('expectedDeliveryDate')(e); }}
             disabled={busy}
           />
           <FieldDescription>
+            {chosenLeadDays !== null
+              ? `${chosenSupplier.name} usually delivers in ${chosenLeadDays} ${chosenLeadDays === 1 ? 'day' : 'days'}. `
+              : ''}
             Receiving lists purchase orders by this date, and on-time reporting measures against it.
           </FieldDescription>
         </Field>

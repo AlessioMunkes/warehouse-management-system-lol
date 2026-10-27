@@ -36,6 +36,8 @@ const PRODUCT_COLUMNS = `
   p.is_active, p.created_at, p.category, p.is_perishable, p.is_decantable,
   p.default_unit, p.storage_type, p.default_location_id,
   p.archived_at, p.unit_cost, p.quantity_per_meal,
+  p.preferred_supplier_id,
+  (SELECT s.name FROM suppliers s WHERE s.id = p.preferred_supplier_id) AS preferred_supplier_name,
   COALESCE(sl.reorder_threshold, 0) AS reorder_threshold,
   sl.unit AS ledger_unit,
   COALESCE(
@@ -139,7 +141,7 @@ const createProduct = async ({
   name, stockKeepingUnit, weightKg = null,
   defaultUnit = 'kg', category = null, isPerishable = false, isDecantable = false,
   storageType = null, defaultLocationId = null, reorderThreshold = null,
-  unitCost = null,
+  unitCost = null, preferredSupplierId = null,
 }) => {
   // default_unit is NOT NULL DEFAULT 'kg' in the schema, so the default
   // above keeps a payload that omits it valid rather than relying on the
@@ -152,12 +154,13 @@ const createProduct = async ({
       `INSERT INTO products
          (name, stock_keeping_unit, weight_kg, default_unit, category,
           is_perishable, storage_type, default_location_id, unit_cost,
-          is_decantable, is_active, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, $9, $10, true, NOW())
+          is_decantable, preferred_supplier_id, is_active, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, $9, $10, $11, true, NOW())
        RETURNING id`,
       [
         name, stockKeepingUnit, weightKg, defaultUnit, category,
         isPerishable, storageType, defaultLocationId, unitCost, isDecantable,
+        preferredSupplierId,
       ],
     );
     const id = rows[0].id;
@@ -203,6 +206,8 @@ const PRODUCT_PATCH_COLUMNS = {
   // "meals to serve" quantity calculator on Create Slip. Null means
   // "no ratio set for this product yet," not zero.
   quantityPerMeal:   'quantity_per_meal',
+  // Who it is usually ordered from (migration 066).
+  preferredSupplierId: 'preferred_supplier_id',
 };
 
 // Wrapped in a transaction because a patch touching defaultUnit or

@@ -64,6 +64,9 @@ export const toProduct = (row) => ({
   unitCost:         row.unit_cost === null || row.unit_cost === undefined
                       ? null
                       : Number(row.unit_cost),
+  // Who it is usually ordered from (migration 066): reordering uses it.
+  preferredSupplierId:   row.preferred_supplier_id ?? null,
+  preferredSupplierName: row.preferred_supplier_name ?? "",
   // Null means "no ratio set for this product" — drives the "meals to
   // serve" calculator on Create Slip (PickingSlipManagementPage.jsx).
   // Same null-survives guard as weightKg/unitCost above.
