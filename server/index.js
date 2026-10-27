@@ -145,7 +145,12 @@ app.use(helmet({
                    'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
       fontSrc:    ["'self'", 'data:',
                    'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
-      imgSrc:     ["'self'", "data:"],           // data: needed for base64 signature images
+      // data: for base64 signature images. OpenStreetMap for the map
+      // tiles on the landing page, the Impact map and the location
+      // picker: without it the browser blocks every tile and the maps
+      // are blank in production (Vite's dev server sends no CSP, so
+      // they still work locally).
+      imgSrc:     ["'self'", "data:", 'https://tile.openstreetmap.org'],
       connectSrc: ["'self'", ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : [])],
       objectSrc:  ["'none'"],
       frameSrc:   ["'none'"],
