@@ -99,9 +99,11 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
   const gmailResult = searchParams.get('gmail');
   const oauthFeedback = gmailResult === 'connected'
     ? { type: 'success', message: 'Gmail connected.' }
-    : gmailResult === 'error'
-      ? { type: 'error', message: 'Could not complete Gmail connection.' }
-      : null;
+    : gmailResult === 'no_send'
+      ? { type: 'error', message: 'Gmail was not connected: Google was not allowed to send email. Connect again and tick "Send email on your behalf".' }
+      : gmailResult === 'error'
+        ? { type: 'error', message: 'Could not complete Gmail connection.' }
+        : null;
 
   // Clear the ?gmail= query parameter after a short delay so the message can
   // be read. A ref guards against re-firing: setSearchParams changes
