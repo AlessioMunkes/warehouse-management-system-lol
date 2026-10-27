@@ -40,10 +40,10 @@ import {
   AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import {
-  BadgeCheck, CircleCheck, Pencil, RotateCcw, CopyPlus, Trash2, TriangleAlert, Truck, Undo2,
+  BadgeCheck, CircleCheck, Pencil, RotateCcw, Trash2, TriangleAlert, Truck, Undo2,
 } from 'lucide-react';
 import {
-  RECEIVABLE_PO_STATUSES, canMovePurchaseOrder, needsFollowUp,
+  canMovePurchaseOrder, BALANCE_OUTSTANDING, hasBalanceOutstanding,
 } from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 import PhotoStrip from '@/components/ui/photo-strip';
@@ -69,7 +69,7 @@ const Section = ({ title, children }) => (
 );
 
 export default function PurchaseOrderDetail({
-  purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onCreateFollowUp, onOpenOrder, onSetQuickbooksRef,
+  purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onOpenOrder, onSetQuickbooksRef,
   onMarkInTransit, onNotInTransit, onMarkReturned, onCloseOrder,
   onResendFinanceEmail, onEdit, onDelete, onClose,
 }) {
@@ -77,25 +77,17 @@ export default function PurchaseOrderDetail({
   const canEditOrDelete = canManage && pending;
   // Approved and still expecting goods: the only orders a follow-up
   // means anything on. Not a pending one — reopening a followed-up order
-  // returns it to Approved, which would skip the approval.
-  const canFollowUp = canManage && !pending && RECEIVABLE_PO_STATUSES.includes(po.status);
+  // returns it to Approved, which would skip the approval. Not a part
+  // received one either: its balance outstanding already says so.
+  const canFollowUp = canManage && canMovePurchaseOrder(po.status, 'follow_up_required');
 
-  // Something is still owed on it: only then is there anything for a
-  // follow-up order to carry.
+  // Something is still owed on it: closing it is then a decision.
   const outstanding = po.items.some((l) => l.receivedToDate < l.expectedQuantity);
   const followUps = po.followUpOrders ?? [];
-  // The follow-up flag (see needsFollowUp): shown as the message box
-  // under the status, and what the follow-up buttons hang off.
-  const flagged = needsFollowUp(po);
-  const [creatingFollowUp, setCreatingFollowUp] = useState(false);
-  const createFollowUp = async () => {
-    setCreatingFollowUp(true);
-    try {
-      await onCreateFollowUp();
-    } finally {
-      setCreatingFollowUp(false);
-    }
-  };
+  // Came in short, and the rest is still to come on this order.
+  const balanceOutstanding = hasBalanceOutstanding(po);
+  // Marked for follow-up by a manager: reopening it is theirs to do.
+  const flagged = po.status === 'follow_up_required';
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]           = useState(false);
@@ -205,14 +197,6 @@ export default function PurchaseOrderDetail({
           {pending ? (
             <Button type="button" size="sm" onClick={onApprove}>
               <BadgeCheck /> Approve
-            </Button>
-          ) : null}
-          {/* What to do about a short delivery: order the rest (the usual
-              answer), or reopen this order if the supplier will bring the
-              rest against it. */}
-          {flagged && outstanding && onCreateFollowUp ? (
-            <Button type="button" size="sm" onClick={createFollowUp} disabled={creatingFollowUp} loading={creatingFollowUp}>
-              <CopyPlus /> {creatingFollowUp ? 'Creating…' : 'Create follow-up order'}
             </Button>
           ) : null}
           {flagged ? (
@@ -338,14 +322,24 @@ export default function PurchaseOrderDetail({
 
       {/* Mandatory on Returned (BR-07B, enforced in SQL) and on a
           recorded follow-up — so if there is one, it is on screen. */}
-      {flagged ? (
+      {balanceOutstanding ? (
+        <div role="status" className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
+          <p className="flex items-center gap-1.5 font-semibold">
+            <TriangleAlert className="size-4" aria-hidden="true" /> {BALANCE_OUTSTANDING}
+          </p>
+          <p className="mt-1">
+            {po.statusReason || 'Some of this order has not arrived.'}
+            {` The order stays open as ${po.poNumber}: receive the rest against it when it arrives, or close the order if it is not coming.`}
+          </p>
+        </div>
+      ) : flagged ? (
         <div role="status" className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
           <p className="flex items-center gap-1.5 font-semibold">
             <TriangleAlert className="size-4" aria-hidden="true" /> Follow-up required
           </p>
           <p className="mt-1">
-            {po.statusReason || 'Some of this order has not arrived.'}
-            {outstanding ? ' Create a follow-up order for the rest, or reopen this one if the supplier will still deliver against it.' : ''}
+            {po.statusReason || 'Something on this order needs following up.'}
+            {' Reopen it for receiving if the supplier will still deliver against it.'}
           </p>
         </div>
       ) : po.statusReason ? (

@@ -236,6 +236,14 @@ describe('createDelivery — the purchase order must match the note', () => {
     await expect(deliveryService.createDelivery(body(), USER_ID))
       .rejects.toMatchObject({ status });
   });
+
+  // An order from before same-order receiving, whose rest was moved to a
+  // follow-up order: the delivery goes against the follow-up.
+  it('sends a delivery for an order whose rest is on a follow-up order to that order', async () => {
+    repoMock.createDelivery.mockResolvedValue({ purchaseOrderNotOpen: true, status: 'partially_received', restElsewhere: true });
+    await expect(deliveryService.createDelivery(body(), USER_ID))
+      .rejects.toMatchObject({ status: 409, message: expect.stringContaining('follow-up order') });
+  });
 });
 
 // ── Idempotency ───────────────────────────────────────────────

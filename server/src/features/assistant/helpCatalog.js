@@ -1671,7 +1671,8 @@ export const TOPICS = [
     ],
     body:
       'Pending approval: raised, not signed off. Approved: ready to send to the ' +
-      'supplier. In transit: on its way. Partially received: some of it has come. ' +
+      'supplier. In transit: on its way. Partially received: some of it has come, and ' +
+      'it is labelled Balance outstanding; the rest is received against the same order. ' +
       'Completed: everything arrived. Returned and Follow-up required are for when ' +
       'the supplier got it wrong.\n\n' +
       'Deliveries move an order along by themselves; the tabs Open, Awaiting approval,' +
@@ -3060,13 +3061,17 @@ export const TOPICS = [
     asks: [
       'record a follow up', 'supplier sent the wrong thing', 'chase the supplier',
       'reopen an order', 'follow-up required', 'the rest never came',
+      'balance outstanding', 'delivered short', 'follow-up order',
     ],
     body:
       'Open the order and choose Record follow-up, with a short reason. It moves to ' +
       'the Follow-up required tab, so it isn’t forgotten, and no more can be received ' +
       'against it until you decide.\n\n' +
       'If the supplier sorts it out, choose Reopen for receiving to put it back to ' +
-      'Approved.',
+      'Approved.\n\n' +
+      'A delivery that came in short needs none of this: the order stays open as ' +
+      'Partially received, labelled Balance outstanding, and the rest is received ' +
+      'against the same order number. If the rest is not coming, choose Close order.',
     followUp: {
       question: 'Would you like to know what each status means?',
       topic: 'po-status',

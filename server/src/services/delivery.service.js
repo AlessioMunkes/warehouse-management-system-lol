@@ -376,6 +376,9 @@ const createDelivery = async (data, userId) => {
     fail(409, 'That purchase order belongs to a different supplier. Check the order number on the delivery note.');
   }
   if (result.purchaseOrderNotOpen) {
+    if (result.restElsewhere) {
+      fail(409, 'The rest of this order is on its follow-up order. Receive the delivery against that order instead.');
+    }
     if (result.status === 'pending') {
       fail(409, 'This purchase order has not been approved yet. Ask a manager to approve it before signing the delivery in.');
     }
@@ -402,8 +405,8 @@ const createDelivery = async (data, userId) => {
   const { warnings = [] } = result;
   const note = await deliveryModel.getDeliveryById(result.id);
   // follow_up rides on the note: { required, reason } when this delivery
-  // left the order part received, so the receiving screen can show the
-  // "Follow-up required" flag to the person who counted it in.
+  // left the order part received, so the receiving screen can tell the
+  // person who counted it in that the rest is still to come.
   return {
     note: note ? { ...note, follow_up: result.follow_up ?? { required: false, reason: null } } : note,
     warnings,

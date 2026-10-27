@@ -715,13 +715,13 @@ export default function ReceivingFlow({ onCrumbChange }) {
         <p className="stf-step-sub">
           {queued ? offlineLine('Do not count it again.') : 'Stock updated.'}
         </p>
-        {/* The follow-up flag: the order is part received, and the
-            manager sees the same flag on it. */}
+        {/* The order is part received, and the manager sees the same
+            label on it. The rest comes in on this same order. */}
         {followUp && !queued ? (
           <Notice tone="warn">
-            <p style={{ margin: 0, fontWeight: 600 }}>Follow-up required</p>
+            <p style={{ margin: 0, fontWeight: 600 }}>Balance outstanding</p>
             <p style={{ margin: '4px 0 0' }}>{followUp}</p>
-            <p style={{ margin: '4px 0 0' }}>The order is marked Partially received. Your manager has been flagged to follow up on the rest.</p>
+            <p style={{ margin: '4px 0 0' }}>The order stays open. When the rest arrives, receive it against the same order. Your manager has been told.</p>
           </Notice>
         ) : null}
       </SuccessDialog>

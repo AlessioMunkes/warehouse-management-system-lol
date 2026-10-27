@@ -83,7 +83,7 @@ describe('setPurchaseOrderStatus', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('closes an order that is waiting on a follow-up as "completed"', async () => {
+  it('closes an order that is waiting on the rest as "completed"', async () => {
     for (const from of ['follow_up_required', 'partially_received']) {
       repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: from }));
       await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'completed' }))
@@ -102,24 +102,16 @@ describe('setPurchaseOrderStatus', () => {
         reached.add(status);
       }
     }
-    reached.add('partially_received');                          // set by raising a follow-up order
+    reached.add('partially_received');                          // set by a short delivery
     expect([...reached].sort()).toEqual([...PO_STATUSES].sort());
   });
 
-  it('reopens a part-received order for receiving only while no follow-up order is on its way', async () => {
-    // Flagged for follow-up, nothing raised yet: the supplier may still deliver against it.
-    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'partially_received', follow_up_orders: [] }));
-    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' })).resolves.toBeTruthy();
-
-    // A follow-up that was returned is not on its way either.
-    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'partially_received', follow_up_orders: [{ id: 9, po_number: 'PO-2026-0009', status: 'returned' }] }));
-    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' })).resolves.toBeTruthy();
-
-    // The rest is coming on another order: receiving both would count it twice.
-    repoMock.updatePurchaseOrderStatus.mockClear();
-    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'partially_received', follow_up_orders: [{ id: 9, po_number: 'PO-2026-0009', status: 'approved' }] }));
+  // A part-received order is still open and receivable on the same
+  // order number, so there is nothing to reopen.
+  it('has no reopen for a part-received order', async () => {
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'partially_received' }));
     await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' }))
-      .rejects.toMatchObject({ status: 409, message: 'The rest of this order is on follow-up order PO-2026-0009. Receive against that order instead.' });
+      .rejects.toMatchObject({ status: 409 });
     expect(repoMock.updatePurchaseOrderStatus).not.toHaveBeenCalled();
   });
 
