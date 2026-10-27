@@ -352,7 +352,20 @@ const insertCounts = async (client, { areaId, lines, countedBy }) => {
   }
 };
 
+// One area's capacity, from the map: kilograms for a store, pallet
+// spaces for staging. Null clears it.
+const setAreaCapacity = async (id, { capacityKg, palletSpaces }, db = pool) => {
+  const { rows } = await db.query(
+    `UPDATE warehouse_areas SET capacity_kg = $2, pallet_spaces = $3
+      WHERE id = $1 AND is_active
+      RETURNING id`,
+    [id, capacityKg, palletSpaces]
+  );
+  return rows[0] ?? null;
+};
+
 export default {
+  setAreaCapacity,
   listAreas, getArea, listLatestCounts, listMapProducts, listToPack, listPackedPallets, listDayActivity, readUnitSizes, productsForCount, saveLayout,
   latestCountsForArea, insertCounts,
 };

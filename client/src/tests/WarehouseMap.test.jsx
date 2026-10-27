@@ -22,9 +22,10 @@ vi.mock('../services/warehouseMapAPI', () => ({
   getWarehouseMap: vi.fn(),
   saveWarehouseLayout: vi.fn(),
   recordAreaCount: vi.fn(),
+  setAreaCapacity: vi.fn(),
 }));
 
-const { getWarehouseMap, saveWarehouseLayout, recordAreaCount } = await import('../services/warehouseMapAPI');
+const { getWarehouseMap, saveWarehouseLayout, recordAreaCount, setAreaCapacity } = await import('../services/warehouseMapAPI');
 const { default: WarehouseMapTab } = await import('../features/warehouseMap/WarehouseMapTab');
 const { default: WarehouseLayoutPage } = await import('../pages/WarehouseLayoutPage');
 
@@ -164,6 +165,29 @@ describe('WarehouseMapTab', () => {
     expect(panel.getByText(/All areas: 30 kg counted, 50 kg on the shelves/)).toBeInTheDocument();
     await user.click(panel.getByRole('button', { name: /Adjust stock/ }));
     expect(onAdjust).toHaveBeenCalledWith(1);
+  });
+
+  // A manager changes what an area holds from its panel; a worker cannot.
+  it('lets a manager change an area’s capacity from the map', async () => {
+    const user = userEvent.setup();
+    setAreaCapacity.mockImplementation(async () => getWarehouseMap());
+    render(<WarehouseMapTab canAdjust />);
+    await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    await user.click(panel.getByRole('button', { name: 'Edit capacity' }));
+    const input = panel.getByLabelText('Capacity of Dry store 1 in kg');
+    await user.clear(input);
+    await user.type(input, '250');
+    await user.click(panel.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(setAreaCapacity).toHaveBeenCalledWith(1, { capacityKg: 250 }));
+  });
+
+  it('gives a worker no capacity control', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.queryByRole('button', { name: /capacity/ })).toBeNull();
   });
 
   it('never makes a door a button', async () => {
