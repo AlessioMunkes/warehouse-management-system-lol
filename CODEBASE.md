@@ -137,7 +137,7 @@ the classification queue and Section 18A.
 | `users` | Inviting and editing users | Admin |
 | `products` | The product form, its barcodes (`ProductBarcodes.jsx`), Add product from a barcode (`ProductBarcodeStart.jsx`) and Print labels (`PrintLabels.jsx`) | Admin |
 | `suppliers` | The supplier form | Admin |
-| `settings` | Recipes, unit sizes, email and certificate settings | Admin |
+| `settings` | Recipes, unit sizes and email settings | Admin |
 | `activityLog` | Staff activity, the volunteer sign-in log, links from a log line to its record | Admin |
 | `finance` | The warehouse movement report | Admin |
 | `masterdata` | The table behind every list screen: sorting, columns, opening a row | Manager, Admin |

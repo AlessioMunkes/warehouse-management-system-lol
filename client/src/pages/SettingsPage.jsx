@@ -20,7 +20,6 @@
 //   Reporting                how kilograms become people fed (the
 //                            impact factors). Targets are each
 //                            manager's own, on Operations Reports.
-//   Certificates             what Section 18A certificates say
 //   Accounts                 how long an invite link lasts
 //
 // The section is in ?section=. /admin/email-integration opens this
@@ -37,7 +36,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import GmailSettingsPage from './GmailSettingsPage';
 import AppSettingsSection from '../features/settings/AppSettingsSection';
-import CertificateSettingsForm from '../features/settings/CertificateSettingsForm';
 import ConnectionsSection from '../features/settings/ConnectionsSection';
 import RecipesSection from '../features/settings/RecipesSection';
 import ImpactFactorsForm from '../features/reporting/ImpactFactorsForm';
@@ -52,7 +50,6 @@ const SECTIONS = [
   { id: 'stock',         label: 'Stock rules' },
   { id: 'recipes',       label: 'Recipes' },
   { id: 'reporting',     label: 'Reporting' },
-  { id: 'certificates',  label: 'Certificates' },
   { id: 'accounts',      label: 'Accounts' },
 ];
 
@@ -132,7 +129,6 @@ export default function SettingsPage({ defaultSection = 'email' }) {
           </Card>
         ) : null}
 
-        {section === 'certificates' ? <CertificateSettingsForm /> : null}
       </div>
     </PageShell>
   );
