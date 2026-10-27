@@ -256,6 +256,12 @@ export default function SlipList({
                     if (c.key === 'status') return (
                       <TableCell key={c.key}>
                         <StatusBadge kind="pickingSlip" status={state}>{SLIP_STATE_LABEL[state] ?? state}</StatusBadge>
+                        {/* Which centres still have to hear from us. */}
+                        {state === 'not_collected' ? (
+                          <span className={`block text-xs ${slip.followed_up_at ? 'text-muted-foreground' : 'text-warn'}`}>
+                            {slip.followed_up_at ? 'Followed up' : 'To follow up'}
+                          </span>
+                        ) : null}
                       </TableCell>
                     );
                     if (c.key === 'packer') return (

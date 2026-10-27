@@ -20,6 +20,7 @@ vi.mock('../services/pickingAPI', () => ({
   assignSlip: vi.fn(),
   releaseSlip: vi.fn(),
   addSecondPacker: vi.fn(),
+  followUpSlip: vi.fn(),
   generateSlips: vi.fn(),
   createSlip: vi.fn(),
   editSlip: vi.fn(),
@@ -206,6 +207,31 @@ describe('PickingSlipManagementPage', () => {
 
     expect(await screen.findByText(/Pop-up blocked/)).toBeInTheDocument();
     expect(buildPickingSlipPdf).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  // A pallet nobody came for: the centre is followed up from its panel,
+  // and the list says which ones still have to be.
+  it('follows up a pallet that was not collected, on WhatsApp', async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const link = 'https://wa.me/27825550101?text=Hello';
+    api.fetchPickingSlip.mockImplementation(async (id) => ({
+      ...SLIPS.find((s) => s.id === Number(id)), items: [],
+      follow_up: { message: 'Hello', whatsappNumber: '+27825550101', whatsappLink: link },
+    }));
+    api.followUpSlip.mockResolvedValue({});
+    router.params = new URLSearchParams('status=notcollected');
+    render(<PickingSlipManagementPage />);
+
+    expect(within((await screen.findByText('Hope House')).closest('tr')).getByText('To follow up')).toBeInTheDocument();
+    await user.click(screen.getByText('Hope House'));
+    const panel = within(await screen.findByRole('dialog', { name: 'Hope House' }));
+    expect(panel.getByText(/nobody has followed it up yet/)).toBeInTheDocument();
+    await user.click(panel.getByRole('button', { name: /Follow up on WhatsApp/ }));
+
+    expect(open).toHaveBeenCalledWith(link, '_blank', 'noopener,noreferrer');
+    await waitFor(() => expect(api.followUpSlip).toHaveBeenCalledWith(4));
     open.mockRestore();
   });
 

@@ -128,6 +128,7 @@ const MANAGER = [
       'Create a new slip makes one slip for one centre. Use the override for a make-up delivery on another day.',
       'Open a slip to assign a packer, edit its lines while it is still on the floor, or release a claimed pallet.',
       'Slips marked not collected need a decision: the pallet is still in the warehouse.',
+      'Open one to follow up the centre: Follow up on WhatsApp opens a message to their mobile, and the slip keeps who followed up and when.',
     ] },
   { title: 'Beneficiaries, reminders and the calendar',
     steps: [
