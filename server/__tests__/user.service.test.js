@@ -216,7 +216,7 @@ describe('email on accounts', () => {
   describe('update', () => {
     it('sets an email, trimmed and lowercased', async () => {
       await userService.updateUser(OTHER_ID, { email: '  Jane.Doe@Example.COM ' }, ADMIN_ID);
-      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('jane.doe@example.com');
+      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('jane.doe@example.com', { role: expect.any(String) });
       expect(repoMock.updateUser).toHaveBeenCalledWith(
         OTHER_ID, { email: 'jane.doe@example.com' }, expect.anything(), ADMIN_ID,
       );
@@ -249,9 +249,17 @@ describe('email on accounts', () => {
     it('409s when another account already has the email, whatever its case', async () => {
       repoMock.findUserByEmail.mockResolvedValue({ id: 99, username: 'other', email: 'taken@example.com' });
       await expect(userService.updateUser(OTHER_ID, { email: 'TAKEN@Example.com' }, ADMIN_ID))
-        .rejects.toMatchObject({ status: 409, message: 'Another user already has this email address. Use a different one.' });
-      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('taken@example.com');
+        .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/^Another .+ account already has this email address\./) });
+      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('taken@example.com', { role: expect.any(String) });
       expect(repoMock.updateUser).not.toHaveBeenCalled();
+    });
+
+    // One account per role on an address (migration 065): the clash is
+    // looked for in the role the account will have.
+    it('checks the address against the role the account will have', async () => {
+      repoMock.getUserById.mockResolvedValue(existingUser({ email: 'grizel@example.com', role: 'manager' }));
+      await userService.updateUser(OTHER_ID, { role: 'admin' }, ADMIN_ID);
+      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('grizel@example.com', { role: 'admin' });
     });
 
     it('lets an account re-save its own email', async () => {
@@ -290,6 +298,12 @@ describe('email on accounts', () => {
       await expect(userService.createUser(body({ email: 'nope' }), ADMIN_ID))
         .rejects.toMatchObject({ status: 400 });
       expect(repoMock.insertUser).not.toHaveBeenCalled();
+    });
+
+    it('looks for a clash only among accounts in the same role', async () => {
+      await userService.createUser(body({ email: 'grizel@example.com', role: 'admin' }), ADMIN_ID);
+      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('grizel@example.com', { role: 'admin' });
+      expect(repoMock.insertUser).toHaveBeenCalled();
     });
 
     it('409s on a duplicate email', async () => {

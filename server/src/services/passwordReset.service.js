@@ -23,6 +23,12 @@
 // returns the generic response FIRST, and performRequestSideEffects
 // runs after that, fire-and-forget, with its own rejection swallowed.
 //
+// ONE ADDRESS, SEVERAL ACCOUNTS. An address may be on one account of
+// each role (migration 065): an admin who also manages has two. A reset
+// for the address sends a link for each active account, each email
+// naming the account it resets, so the person chooses which password
+// to change and the other stays as it is.
+//
 // A reset ends every existing session for the account: the password
 // write raises users.session_version (migration 055), and
 // auth.middleware.js refuses any token carrying the old number.
@@ -33,6 +39,7 @@ import resetRepo     from '../repositories/passwordReset.repository.js';
 import userRepo       from '../repositories/user.repository.js';
 import communications from './communications.service.js';
 import { appBaseUrl } from '../config/appUrl.js';
+import { escapeHtml } from '../utils/emailTemplate.js';
 import { fail, clean, validPassword } from '../utils/userAccountFields.js';
 
 const BCRYPT_COST      = 10;
@@ -43,10 +50,16 @@ const GENERIC_MESSAGE = "If that email is registered, we've sent a link to reset
 const hashToken    = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 const generateToken = () => crypto.randomBytes(32).toString('base64url');
 
-const composeResetEmail = (email, url) => {
+const ROLE_WORDS = { admin: 'admin', manager: 'manager', warehouse_worker: 'warehouse worker' };
+
+const composeResetEmail = (email, url, account = null) => {
   const expiresLine = 'This link expires in 1 hour and can only be used once.';
+  // Which account, when the address has more than one.
+  const which = account?.username
+    ? `the ${ROLE_WORDS[account.role] ?? account.role} account ${account.username}`
+    : 'this account';
   const text = [
-    'Someone (hopefully you) asked to reset the password on this account.',
+    `Someone (hopefully you) asked to reset the password on ${which}.`,
     '',
     `Reset it here: ${url}`,
     '',
@@ -54,13 +67,15 @@ const composeResetEmail = (email, url) => {
     '',
     "If you didn't ask for this, you can ignore this email. Your password will not change.",
   ].join('\n');
-  const html = `<p>Someone (hopefully you) asked to reset the password on this account.</p>`
+  const html = `<p>Someone (hopefully you) asked to reset the password on ${escapeHtml(which)}.</p>`
     + `<p><a href="${url}">${url}</a></p>`
     + `<p>${expiresLine}</p>`
     + `<p>If you didn't ask for this, you can ignore this email. Your password will not change.</p>`;
   return {
     to: email,
-    subject: "Reset your Ladles of Love Warehouse Management password",
+    subject: account?.username
+      ? `Reset the password for ${account.username}`
+      : "Reset your Ladles of Love Warehouse Management password",
     text,
     html,
   };
@@ -72,12 +87,12 @@ const composeResetEmail = (email, url) => {
 // EMAIL_ENABLED=false returns { sent: true, stubbed: true }, and
 // treating that as 'sent' would record an email as delivered when
 // nothing was transmitted. Never throws.
-const sendResetEmail = async (reset, email, url) => {
+const sendResetEmail = async (reset, email, url, account = null) => {
   let outcome;
   try {
     const result = await communications.send({
       type: 'password_reset',
-      ...composeResetEmail(email, url),
+      ...composeResetEmail(email, url, account),
       related: { type: 'password_reset', id: reset.id },
       sendAs: null,
     });
@@ -99,14 +114,19 @@ const sendResetEmail = async (reset, email, url) => {
 // file header. Deliberately returns nothing and never needs to: there
 // is no response left to shape by the time this runs.
 const performRequestSideEffects = async (email, ip) => {
-  const user = await userRepo.findUserByEmail(email);
-  if (!user) return;
+  const users = await userRepo.findUsersByEmail(email);
+  // One link per account on the address; the email names it when there
+  // is more than one.
+  const named = users.length > 1;
+  for (const user of users) {
+    await resetOneAccount(user, email, ip, named);
+  }
+};
 
-  // Re-fetch for is_active/archived_at — findUserByEmail's SELECT list
-  // is intentionally narrow (id, username, email only; see
-  // user.repository.js) because it was written for the invite flow's
-  // "does this address already belong to someone" check, which never
-  // needed more than that.
+const resetOneAccount = async (user, email, ip, named) => {
+  // Re-fetch for is_active/archived_at — findUsersByEmail's SELECT list
+  // is intentionally narrow (id, username, email, role; see
+  // user.repository.js).
   const account = await userRepo.getUserById(user.id);
   if (!account || !account.is_active || account.archived_at) return;
 
@@ -131,7 +151,7 @@ const performRequestSideEffects = async (email, ip) => {
     requestedIp: ip || null,
   });
 
-  await sendResetEmail(reset, email, `${base}/reset-password/${encodeURIComponent(token)}`);
+  await sendResetEmail(reset, email, `${base}/reset-password/${encodeURIComponent(token)}`, named ? user : null);
 };
 
 // ── Request (public) ─────────────────────────────────────────
