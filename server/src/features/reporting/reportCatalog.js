@@ -100,6 +100,8 @@ export const DIMENSIONS = {
   reason:            { id: 'reason',            label: 'Reason',              chart: 'hbar' },
   routing_status:    { id: 'routing_status',    label: 'Routing status',      chart: 'bar'  },
   event:             { id: 'event',             label: 'Event',               chart: 'hbar' },
+  // Volunteer hours only: warehouse guests or volunteer events.
+  source:            { id: 'source',            label: 'Where it was given',  chart: 'bar'  },
   product_category:  { id: 'product_category',  label: 'Product category',    chart: 'bar'  },
   storage_type:      { id: 'storage_type',      label: 'Storage type',        chart: 'bar'  },
   // Busy days: seven bars Monday to Sunday, or a week × day heatmap.
@@ -833,14 +835,15 @@ export const METRICS = {
   volunteer_hours: {
     id: 'volunteer_hours', label: 'Volunteer hours', temporal: 'range',
     description:
-      'Hours contributed by volunteers on site. Aggregate only; this report cannot ' +
-      'be broken down by individual volunteer.',
+      'Hours given by volunteers: guests packing in the warehouse (sign-in to ' +
+      'sign-out) and volunteers checked in at volunteer events (the length of their ' +
+      'timeslot). Aggregate only; this report cannot be broken down by individual volunteer.',
     repoFn: 'volunteerHours', unit: 'hours',
-    dimensions: ['month', 'week', 'none', 'day'], filters: [],
+    dimensions: ['month', 'week', 'none', 'day', 'source'], filters: [],
     defaultChart: 'line',
     // Sessions with no sign-out have no duration. Counting them as
     // zero would understate; excluding them and saying so is honest.
-    caveat: 'Excludes sessions where the volunteer never signed out.',
+    caveat: 'Excludes guest visits with no sign-out. A visit idle for four hours is signed out when the guest last did something.',
   },
 };
 

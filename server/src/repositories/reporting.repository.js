@@ -942,27 +942,47 @@ const communityRequestOutcomes = async ({ dimension, filters = {}, dateRange }) 
 // ══ Volunteers ═════════════════════════════════════════════════
 // Aggregate hours only. full_name is never selected, grouped by, or
 // filtered on — this must not become a per-volunteer timesheet.
-// Sessions with no sign-out are excluded rather than counted as
-// zero: a volunteer who forgot to sign out worked an unknown number
-// of hours, not none.
+//
+// Two kinds of time given, added together:
+//   Warehouse guests   a guest's visit, sign-in to sign-out. A visit
+//                      with no sign-out is excluded rather than counted
+//                      as zero; since migration 067 a visit idle for
+//                      four hours is signed out when the guest last did
+//                      something, so few are left without one.
+//   Volunteer events   each booking checked in at a volunteer event,
+//                      for the length of its timeslot.
+const VOLUNTEER_SOURCES = ['Warehouse guests', 'Volunteer events'];
+
 const volunteerHours = async ({ dimension, dateRange }) => {
-  const d = sastDate('v.signed_in_at');
+  const d = 'h.day';
   const expr = {
-    none:  `'Total'`,
-    month: bucketMonth(d),
-    week:  bucketWeek(d),
-    day:   bucketDay(d),
+    none:   `'Total'`,
+    month:  bucketMonth(d),
+    week:   bucketWeek(d),
+    day:    bucketDay(d),
+    source: 'h.source',
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
   const { rows } = await pool.query(
-    `SELECT ${expr} AS label,
-            ROUND(SUM(EXTRACT(EPOCH FROM (v.signed_out_at - v.signed_in_at)) / 3600.0)::numeric, 1) AS value,
+    `WITH h AS (
+       SELECT ${sastDate('v.signed_in_at')} AS day, '${VOLUNTEER_SOURCES[0]}'::text AS source,
+              EXTRACT(EPOCH FROM (v.signed_out_at - v.signed_in_at)) / 3600.0 AS hours
+         FROM volunteers v
+        WHERE v.signed_out_at IS NOT NULL AND v.signed_out_at > v.signed_in_at
+       UNION ALL
+       SELECT ${sastDate('t.start_time')}, '${VOLUNTEER_SOURCES[1]}'::text,
+              EXTRACT(EPOCH FROM (t.end_time - t.start_time)) / 3600.0
+         FROM attendance a
+         JOIN volunteer_bookings b ON b.booking_id = a.booking_id
+         JOIN event_timeslots t    ON t.timeslot_id = b.timeslot_id
+        WHERE a.checked_in = true AND t.end_time > t.start_time
+     )
+     SELECT ${expr} AS label,
+            ROUND(SUM(h.hours)::numeric, 1) AS value,
             COUNT(*)::int AS sessions
-       FROM volunteers v
+       FROM h
       WHERE ${d} BETWEEN $1::date AND $2::date
-        AND v.signed_out_at IS NOT NULL
-        AND v.signed_out_at > v.signed_in_at
       ${dimension === 'none' ? '' : `GROUP BY ${expr}`} ORDER BY 1`,
     [dateRange.from, dateRange.to]
   );

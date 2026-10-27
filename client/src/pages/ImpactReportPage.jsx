@@ -75,13 +75,14 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  Sprout, Download, Settings2, Utensils,
+  Sprout, Download, Settings2, Utensils, HandHeart,
 } from 'lucide-react';
 
 const DIMENSION_LABELS = {
   none: 'Total', month: 'Month', week: 'Week',
   cohort: 'Cohort', ecd_centre: 'By name', beneficiary: 'Beneficiary type',
   group: 'By group (this period)', group_month: 'By group, over time', region: 'Region',
+  source: 'Where it was given',
 };
 
 // Matches ReportBuilder.jsx's own COHORT options exactly — this page
@@ -446,6 +447,17 @@ export default function ImpactReportPage() {
             color="var(--chart-sage)"
           />
         </div>
+
+        {/* The time volunteers give: guests packing in the warehouse and
+            volunteers at events. Totals only, never one person's hours. */}
+        <ImpactPanel
+          title="Volunteer hours"
+          metric="volunteer_hours"
+          dimensions={['source', 'month', 'none']}
+          defaultDimension="source"
+          icon={HandHeart}
+          color="var(--chart-tan)"
+        />
       </div>
 
     {pdfOpen ? (

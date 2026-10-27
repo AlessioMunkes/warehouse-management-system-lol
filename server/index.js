@@ -84,6 +84,7 @@ import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
 import adminRouter       from './src/routes/admin.routes.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
+import guestIdleJob      from './src/jobs/guestIdle.job.js';
 import savedReportsJob   from './src/jobs/savedReports.job.js';
 import { startEmailReminderScheduler } from './src/jobs/ecdCollectionReminder.job.js';
 import { sendError } from './src/utils/httpError.js';
@@ -323,6 +324,8 @@ app.listen(port, () => {
   console.log(`[env] PORT: ${process.env.PORT || 5000}`);
   console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
   expiryWarningJob.startExpiryWarningJob();
+  // Guest visits idle for four hours are signed out (migration 067).
+  if (process.env.NODE_ENV !== 'test') guestIdleJob.startGuestIdleJob();
   if (process.env.NODE_ENV !== 'test' && process.env.SAVED_REPORTS_SCHEDULER !== 'false') {
     savedReportsJob.startSavedReportsJob();
   }

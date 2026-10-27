@@ -75,6 +75,14 @@ const checkCurrentAccount = async (req, res, next, claims) => {
       const visit = await sessionRepo.findGuestSession(req.user.id);
       if (!visit) refusal = 'Session expired. Please sign in again.';
       else if (visit.signed_out_at) refusal = 'This visit has been signed out.';
+      else if (visit.idle) {
+        // Four hours with nothing done (migration 067): the visit ends
+        // when they last did something.
+        await sessionRepo.closeIdleGuestSession(req.user.id);
+        refusal = 'You were signed out after 4 hours with nothing done. Please sign in again.';
+      } else if (visit.stale) {
+        await sessionRepo.touchGuestSession(req.user.id);
+      }
     } else {
       const account = await sessionRepo.findStaffSession(req.user.id);
       if (!account || account.archived_at) {

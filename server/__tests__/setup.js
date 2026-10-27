@@ -110,6 +110,9 @@ vi.mock('../src/repositories/calendar.repository.js', () => ({
 vi.mock('../src/repositories/session.repository.js', () => ({
   default: {
     findStaffSession: vi.fn(async (id) => ({ id, is_active: true, archived_at: null, session_version: 0 })),
-    findGuestSession: vi.fn(async (id) => ({ id, signed_out_at: null })),
+    findGuestSession: vi.fn(async (id) => ({ id, signed_out_at: null, idle: false, stale: false })),
+    touchGuestSession: vi.fn(async () => {}),
+    closeIdleGuestSession: vi.fn(async () => {}),
+    closeIdleGuestSessions: vi.fn(async () => 0),
   },
 }));
