@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // src/tests/FtsDropOff.test.jsx
 //
-// Feed the Soil drop-off sites (migration 069): the public form behind
-// a site's QR poster, and the managers' Drop-off sites tab.
+// Feed the Soil drop-off sites (migrations 069, 070): the public form
+// behind a site's QR poster or the general poster, and the managers'
+// Drop-off sites tab.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -10,7 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 const api = vi.hoisted(() => ({
-  getPublicDropSite: vi.fn(), submitPublicDropoff: vi.fn(),
+  getPublicDropSite: vi.fn(), submitPublicDropoff: vi.fn(), getPublicDropSites: vi.fn(), submitAnyDropoff: vi.fn(),
   getDropPoints: vi.fn(), createDropPoint: vi.fn(), updateDropPoint: vi.fn(), getDropoffs: vi.fn(), setDropoffStatus: vi.fn(),
 }));
 vi.mock('../services/ftsDropPointAPI', () => api);
@@ -59,6 +60,52 @@ describe('the drop-off form behind the QR code', () => {
   });
 });
 
+const renderGeneral = () => render(
+  <MemoryRouter initialEntries={['/fts']}>
+    <Routes><Route path="/fts" element={<FtsDropOffPage />} /></Routes>
+  </MemoryRouter>,
+);
+
+describe('the form behind the general poster', () => {
+  beforeEach(() => {
+    api.getPublicDropSites.mockResolvedValue([{ id: 3, name: 'Muizenberg pop-up', suburb: 'Muizenberg' }]);
+    api.submitAnyDropoff.mockResolvedValue({ site: 'Kalk Bay market', kg: 2, thanksEmailed: false });
+  });
+
+  it('logs a drop-off at a site chosen from the dropdown', async () => {
+    const user = userEvent.setup();
+    renderGeneral();
+    await user.selectOptions(await screen.findByLabelText('Where are you dropping off?'), 'Muizenberg pop-up (Muizenberg)');
+    await user.type(screen.getByLabelText('Weight of your compost (kg)'), '2');
+    await user.click(screen.getByRole('button', { name: /Log my drop-off/ }));
+    await waitFor(() => expect(api.submitAnyDropoff).toHaveBeenCalledWith({ kg: 2, name: '', email: '', dropPointId: 3 }));
+    expect(api.getPublicDropSite).not.toHaveBeenCalled();
+  });
+
+  it('takes a typed place under Somewhere else, and waits for it', async () => {
+    const user = userEvent.setup();
+    renderGeneral();
+    await user.selectOptions(await screen.findByLabelText('Where are you dropping off?'), 'Somewhere else');
+    await user.type(screen.getByLabelText('Weight of your compost (kg)'), '2');
+    const submit = screen.getByRole('button', { name: /Log my drop-off/ });
+    expect(submit).toBeDisabled();
+    await user.type(screen.getByLabelText('Where are you?'), 'Kalk Bay market');
+    await user.click(submit);
+    await waitFor(() => expect(api.submitAnyDropoff).toHaveBeenCalledWith({ kg: 2, name: '', email: '', place: 'Kalk Bay market' }));
+    expect(await screen.findByText(/compost at Kalk Bay market is logged/)).toBeInTheDocument();
+  });
+
+  it('asks only for the place when no sites are set up', async () => {
+    api.getPublicDropSites.mockResolvedValue([]);
+    renderGeneral();
+    expect(await screen.findByLabelText('Where are you dropping off?')).toHaveAttribute('id', 'fts-place');
+  });
+
+  it('points the general poster at the form with no site', () => {
+    expect(dropOffUrlFor(undefined, 'https://wms-lol.onrender.com')).toBe('https://wms-lol.onrender.com/fts');
+  });
+});
+
 describe('the Drop-off sites tab', () => {
   beforeEach(() => {
     api.getDropPoints.mockResolvedValue([{ id: 3, name: 'Muizenberg pop-up', suburb: 'Muizenberg', publicToken: TOKEN, isActive: true, dropoffCount: 2, kgTotal: 9, lastDropoffAt: null }]);
@@ -71,6 +118,8 @@ describe('the Drop-off sites tab', () => {
     render(<DropPointsTab />);
     await user.click(await screen.findByRole('button', { name: 'Print QR poster for Muizenberg pop-up' }));
     expect(poster.openDropPointPoster).toHaveBeenCalledWith(expect.objectContaining({ publicToken: TOKEN }));
+    await user.click(screen.getByRole('button', { name: /General QR poster/ }));
+    expect(poster.openDropPointPoster).toHaveBeenLastCalledWith(null);
 
     const row = within(screen.getByRole('region', { name: 'Latest drop-offs' }).querySelector('tbody'));
     await user.click(row.getByRole('button', { name: 'Reject' }));

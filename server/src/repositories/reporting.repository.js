@@ -382,9 +382,9 @@ const compostProcessed = async ({ dimension, dateRange }) => {
                LEFT JOIN collection_kits ck ON ck.id = r.kit_id
               WHERE ${sastDate('r.logged_at')} BETWEEN $1::date AND $2::date
              UNION ALL
-             SELECT ${sastDate('d.submitted_at')}, d.kg_compost, COALESCE(p.suburb, p.name)
+             SELECT ${sastDate('d.submitted_at')}, d.kg_compost, COALESCE(p.suburb, p.name, d.place_name)
                FROM fts_dropoffs d
-               JOIN fts_drop_points p ON p.id = d.drop_point_id
+               LEFT JOIN fts_drop_points p ON p.id = d.drop_point_id
               WHERE d.status = 'logged'
                 AND ${sastDate('d.submitted_at')} BETWEEN $1::date AND $2::date) t
        ${dim.group ? `GROUP BY ${dim.group}` : ''}

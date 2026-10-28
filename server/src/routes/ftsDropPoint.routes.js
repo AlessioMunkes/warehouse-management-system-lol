@@ -3,6 +3,9 @@
 //
 // Feed the Soil drop-off sites (migration 069), mounted at /api/fts.
 //
+//   /drop               the public form behind the general poster: the
+//                       open sites for its dropdown, and a drop-off at
+//                       one of them or at a place typed (migration 070).
 //   /drop/:token        the public form behind a site's QR code: no
 //                       account, rate limited. The token is the site's
 //                       unguessable public_token.
@@ -21,6 +24,8 @@ import controller from '../controllers/ftsDropPoint.controller.js';
 
 const router = express.Router();
 
+router.get('/drop',         publicSlipRateLimiter, controller.getPublicSites);
+router.post('/drop',        publicFtsDropoffRateLimiter, controller.submitAnyDropoff);
 router.get('/drop/:token',  publicSlipRateLimiter, controller.getPublicSite);
 router.post('/drop/:token', publicFtsDropoffRateLimiter, controller.submitDropoff);
 

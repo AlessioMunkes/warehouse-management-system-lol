@@ -301,6 +301,8 @@
   "centreLocation.routes.js PATCH /:id": "admin,manager",
   "donation.routes.js POST /estimate-value": "admin,manager,warehouse_worker",
   "donation.routes.js PATCH /:id/value": "admin,manager",
+  "ftsDropPoint.routes.js GET /drop": "no role check",
+  "ftsDropPoint.routes.js POST /drop": "no role check",
   "ftsDropPoint.routes.js GET /drop/:token": "no role check",
   "ftsDropPoint.routes.js POST /drop/:token": "no role check",
   "ftsDropPoint.routes.js GET /drop-points": "admin,manager",

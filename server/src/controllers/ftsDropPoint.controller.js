@@ -26,4 +26,7 @@ export default {
   // Public, behind the QR code
   getPublicSite:    handle('getFtsDropSite', 'Could not open this drop-off form.', (req) => service.getPublicSite(req.params.token)),
   submitDropoff:    handle('submitFtsDropoff', 'Could not record your drop-off. Please try again.', (req) => service.submitDropoff(req.params.token, req.body), 201),
+  // Public, behind the general poster
+  getPublicSites:   handle('getFtsDropSites', 'Could not open this drop-off form.', () => service.getPublicSites()),
+  submitAnyDropoff: handle('submitFtsAnyDropoff', 'Could not record your drop-off. Please try again.', (req) => service.submitAnyDropoff(req.body), 201),
 };

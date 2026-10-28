@@ -8,8 +8,11 @@
 // a thank-you. What they log counts in compost processed unless staff
 // reject it.
 //
-// THE PUBLIC FORM has no account behind it, so it trusts nothing but
-// the site's token: an unguessable uuid, rate limited at the route. The
+// THE PUBLIC FORM has no account behind it. A site's own poster
+// carries its token, an unguessable uuid. The general poster (migration
+// 070) opens it without one: the person picks an open site, or types
+// the place when the stall is somewhere new. Both are rate limited at
+// the route. The
 // weight is bounded (more than 200 kg is not a bucket of compost), and
 // the thank-you is sent only to an address the person typed for it,
 // without waiting on it: a slow mail server never holds up the person
@@ -151,9 +154,13 @@ const sendThanks = async (dropoff, { name, kg, site, email }) => {
   await repo.recordThanks(dropoff.id, status).catch((err) => console.error('[ftsDropoff:thanks]', err.message));
 };
 
-const submitDropoff = async (token, body = {}) => {
-  const site = await siteFor(token);
+// The general poster's dropdown: the open sites, names only.
+const getPublicSites = async () =>
+  (await repo.listOpenSites()).map((s) => ({ id: s.id, name: s.name, suburb: s.suburb ?? null }));
 
+// Weight, name and email, the same from either poster. `where` is a
+// site ({ id, name }) or a typed place ({ place }).
+const recordDropoff = async (where, body) => {
   const kg = Number(body.kg);
   if (!Number.isFinite(kg) || kg <= 0) fail(400, 'Enter the weight of your compost in kilograms.');
   if (kg > MAX_KG) fail(400, `That is more than ${MAX_KG} kg. Check the weight, or ask at the stand.`);
@@ -164,19 +171,38 @@ const submitDropoff = async (token, body = {}) => {
   if (email.error) fail(400, email.error);
 
   const dropoff = await repo.createDropoff({
-    dropPointId: site.id, kgCompost: kg, donorName: name, donorEmail: email.value || null,
+    dropPointId: where.id ?? null, placeName: where.id ? null : where.place,
+    kgCompost: kg, donorName: name, donorEmail: email.value || null,
   });
+  const site = where.name ?? where.place;
 
   // Not awaited: the person at the stand is thanked on screen now.
   if (email.value) {
-    sendThanks(dropoff, { name, kg, site: site.name, email: email.value })
+    sendThanks(dropoff, { name, kg, site, email: email.value })
       .catch((err) => console.error('[ftsDropoff:thanks]', err.message));
   }
 
-  return { site: site.name, kg, thanksEmailed: Boolean(email.value) };
+  return { site, kg, thanksEmailed: Boolean(email.value) };
+};
+
+// From a site's own poster: the token names the site.
+const submitDropoff = async (token, body = {}) => recordDropoff(await siteFor(token), body);
+
+// From the general poster: an open site from the dropdown, or the
+// place typed under "Somewhere else".
+const submitAnyDropoff = async (body = {}) => {
+  if (body.dropPointId !== undefined && body.dropPointId !== null && body.dropPointId !== '') {
+    if (!isPositiveInt(body.dropPointId)) fail(400, 'Choose where you are dropping off.');
+    const site = await repo.findActiveById(Number(body.dropPointId));
+    if (!site) fail(400, 'That site is closed now. Choose another, or type where you are.');
+    return recordDropoff(site, body);
+  }
+  const place = optional(body.place, 120, 'The place');
+  if (!place) fail(400, 'Choose where you are dropping off, or type the place.');
+  return recordDropoff({ place }, body);
 };
 
 export default {
   listDropPoints, createDropPoint, updateDropPoint, listDropoffs, setDropoffStatus,
-  getPublicSite, submitDropoff,
+  getPublicSite, submitDropoff, getPublicSites, submitAnyDropoff,
 };

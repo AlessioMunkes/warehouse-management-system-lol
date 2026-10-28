@@ -53,6 +53,22 @@ const updateDropPoint = async (id, patch) => {
   return rows[0] ?? null;
 };
 
+// The open sites, for the general poster's dropdown: names only.
+const listOpenSites = async () => {
+  const { rows } = await pool.query(
+    `SELECT id, name, suburb FROM fts_drop_points WHERE is_active ORDER BY lower(name)`
+  );
+  return rows;
+};
+
+const findActiveById = async (id) => {
+  const { rows } = await pool.query(
+    `SELECT id, name, suburb FROM fts_drop_points WHERE id = $1 AND is_active`,
+    [id]
+  );
+  return rows[0] ?? null;
+};
+
 // The site a QR code names, for the public form. Only an active site.
 const findActiveByToken = async (token) => {
   const { rows } = await pool.query(
@@ -62,12 +78,13 @@ const findActiveByToken = async (token) => {
   return rows[0] ?? null;
 };
 
-const createDropoff = async ({ dropPointId, kgCompost, donorName, donorEmail }) => {
+// A site, or a place typed on the general form (migration 070).
+const createDropoff = async ({ dropPointId = null, placeName = null, kgCompost, donorName, donorEmail }) => {
   const { rows } = await pool.query(
-    `INSERT INTO fts_dropoffs (drop_point_id, kg_compost, donor_name, donor_email)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, drop_point_id, kg_compost, donor_name, donor_email, status, submitted_at`,
-    [dropPointId, kgCompost, donorName, donorEmail]
+    `INSERT INTO fts_dropoffs (drop_point_id, place_name, kg_compost, donor_name, donor_email)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, drop_point_id, place_name, kg_compost, donor_name, donor_email, status, submitted_at`,
+    [dropPointId, placeName, kgCompost, donorName, donorEmail]
   );
   return rows[0];
 };
@@ -79,10 +96,11 @@ const recordThanks = async (id, status) => {
 // The latest drop-offs at every site, newest first, for staff to check.
 const listDropoffs = async ({ limit = 100 } = {}) => {
   const { rows } = await pool.query(
-    `SELECT d.id, d.drop_point_id, p.name AS drop_point_name, d.kg_compost, d.donor_name,
+    `SELECT d.id, d.drop_point_id, COALESCE(p.name, d.place_name) AS drop_point_name,
+            p.id IS NULL AS typed_place, d.kg_compost, d.donor_name,
             d.donor_email IS NOT NULL AS asked_for_thanks, d.thanks_status, d.status, d.submitted_at
        FROM fts_dropoffs d
-       JOIN fts_drop_points p ON p.id = d.drop_point_id
+       LEFT JOIN fts_drop_points p ON p.id = d.drop_point_id
       ORDER BY d.submitted_at DESC, d.id DESC
       LIMIT $1`,
     [limit]
@@ -100,6 +118,6 @@ const setDropoffStatus = async (id, status, reviewedBy) => {
 };
 
 export default {
-  listDropPoints, createDropPoint, updateDropPoint, findActiveByToken,
+  listDropPoints, createDropPoint, updateDropPoint, listOpenSites, findActiveById, findActiveByToken,
   createDropoff, recordThanks, listDropoffs, setDropoffStatus,
 };

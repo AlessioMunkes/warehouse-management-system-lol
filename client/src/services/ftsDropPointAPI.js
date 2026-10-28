@@ -22,6 +22,8 @@ const toSite = (row) => ({
 const toDropoff = (row) => ({
   id: row.id,
   site: row.drop_point_name,
+  // Typed under "Somewhere else" on the general poster's form.
+  typedPlace: Boolean(row.typed_place),
   kg: Number(row.kg_compost),
   donorName: row.donor_name ?? "",
   askedForThanks: Boolean(row.asked_for_thanks),
@@ -56,7 +58,14 @@ export const getPublicDropSite = (token) => publicCall(`/api/fts/drop/${encodeUR
 export const submitPublicDropoff = (token, values) =>
   publicCall(`/api/fts/drop/${encodeURIComponent(token)}`, { method: "POST", body: JSON.stringify(values) });
 
+// The general poster (migration 070): the open sites for its dropdown,
+// and a drop-off at one of them ({ dropPointId }) or a place typed
+// ({ place }).
+export const getPublicDropSites = () => publicCall("/api/fts/drop", { method: "GET" });
+export const submitAnyDropoff = (values) =>
+  publicCall("/api/fts/drop", { method: "POST", body: JSON.stringify(values) });
+
 export default {
   getDropPoints, createDropPoint, updateDropPoint, getDropoffs, setDropoffStatus,
-  getPublicDropSite, submitPublicDropoff,
+  getPublicDropSite, submitPublicDropoff, getPublicDropSites, submitAnyDropoff,
 };
