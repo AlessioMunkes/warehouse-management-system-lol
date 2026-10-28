@@ -2,7 +2,7 @@
 -- new-database.sql — a new, empty Batches warehouse database
 --
 -- Written by server/scripts/export-new-database.mjs on 2026-10-28,
--- from a database on PostgreSQL 17.6, with 62 migrations applied
+-- from a database on PostgreSQL 17.6, with 63 migrations applied
 -- (the last: 2026_08_13_donations). Do not edit by hand: change the
 -- database through a migration, then run `npm run export-database` again.
 --
@@ -597,7 +597,7 @@ CREATE TABLE public."fts_drop_points" (
 
 CREATE TABLE public."fts_dropoffs" (
   "id" integer DEFAULT nextval('fts_dropoffs_id_seq'::regclass) NOT NULL,
-  "drop_point_id" integer NOT NULL,
+  "drop_point_id" integer,
   "kg_compost" numeric(7,2) NOT NULL,
   "donor_name" character varying(120),
   "donor_email" character varying(254),
@@ -605,7 +605,8 @@ CREATE TABLE public."fts_dropoffs" (
   "thanks_status" character varying(20),
   "submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
   "reviewed_by" integer,
-  "reviewed_at" timestamp with time zone
+  "reviewed_at" timestamp with time zone,
+  "place_name" character varying(120)
 );
 
 CREATE TABLE public."gmail_connections" (
@@ -1447,6 +1448,7 @@ ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_em
 ALTER TABLE public."finance_report_email_settings" ADD CONSTRAINT "finance_report_email_settings_id_check" CHECK ((id = 1));
 ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_name_check" CHECK ((btrim((name)::text) <> ''::text));
 ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_kg_compost_check" CHECK (((kg_compost > (0)::numeric) AND (kg_compost <= (200)::numeric)));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_site_or_place" CHECK (((drop_point_id IS NOT NULL) OR ((place_name IS NOT NULL) AND (btrim((place_name)::text) <> ''::text))));
 ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_status_check" CHECK (((status)::text = ANY ((ARRAY['logged'::character varying, 'rejected'::character varying])::text[])));
 ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_thanks_status_check" CHECK (((thanks_status)::text = ANY ((ARRAY['sent'::character varying, 'stubbed'::character varying, 'failed'::character varying])::text[])));
 ALTER TABLE public."idempotency_keys" ADD CONSTRAINT "idempotency_keys_key_check" CHECK (((char_length(key) >= 8) AND (char_length(key) <= 100)));
@@ -2120,6 +2122,7 @@ INSERT INTO public.schema_migrations (id, notes) VALUES
   ('067_guest_last_active', 'In new-database.sql'),
   ('068_kitchens', 'In new-database.sql'),
   ('069_fts_drop_points', 'In new-database.sql'),
+  ('070_fts_dropoff_any_place', 'In new-database.sql'),
   ('2026_08_02_schema_gap_migration', 'In new-database.sql'),
   ('2026_08_13_donations', 'In new-database.sql');
 
