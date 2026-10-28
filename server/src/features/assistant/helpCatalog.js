@@ -3092,8 +3092,9 @@ export const TOPICS = [
       'On Inventory, open the Low stock (or Shortfall) tab, tick the products you ' +
       'want and choose Raise purchase order. A new order opens with those products ' +
       'already on it, each with enough to bring it back up to its reorder level. When ' +
-      'they share a preferred supplier the order starts on it, due that supplier’s ' +
-      'lead time from today; check the quantities and save.',
+      'they share a preferred supplier the order starts on it, and the form shows ' +
+      'that supplier’s lead time under the delivery date. Set the date, check the ' +
+      'quantities and save.',
     followUp: {
       question: 'Would you like to know how approving the order works?',
       topic: 'po-approve',
