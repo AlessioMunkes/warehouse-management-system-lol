@@ -91,6 +91,10 @@ function LocationsMap({ locations }) {
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
+      // The server sends Referrer-Policy: no-referrer, and OpenStreetMap
+      // refuses tiles asked for with no Referer (403 "Access blocked").
+      // The tiles alone send our origin, never the path.
+      referrerPolicy: 'strict-origin-when-cross-origin',
     }).addTo(map);
 
     const markers = locations.map((loc) =>
