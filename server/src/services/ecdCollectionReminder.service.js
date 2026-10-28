@@ -2,6 +2,7 @@ import reminderRepository from '../repositories/ecdCollectionReminder.repository
 import communications from './communications.service.js';
 import { closureOn } from './calendar.service.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
+import { normaliseSaMobileToE164, whatsappLink } from '../utils/whatsapp.js';
 
 const DEFAULT_CHANNELS = ['sms'];
 const EMAIL_CHANNEL = 'email';
@@ -207,31 +208,15 @@ const buildReminderMessage = (reminder) => {
   ].join('\n\n');
 };
 
-const normaliseSaMobileToE164 = (value) => {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-
-  const hasPlus = raw.startsWith('+');
-  const digits = raw.replace(/\D/g, '');
-
-  if (hasPlus && digits.startsWith('27') && digits.length === 11) return `+${digits}`;
-  if (digits.startsWith('27') && digits.length === 11) return `+${digits}`;
-  if (digits.startsWith('0') && digits.length === 10) return `+27${digits.slice(1)}`;
-  if (/^[6-8]\d{8}$/.test(digits)) return `+27${digits}`;
-
-  return null;
-};
-
 const decorateWhatsAppReminder = (reminder) => {
   const message = buildReminderMessage(reminder);
   const e164 = normaliseSaMobileToE164(reminder.mobile_number);
-  const waNumber = e164 ? e164.replace(/^\+/, '') : null;
 
   return {
     ...reminder,
     whatsappMessage: message,
     whatsappNumber: e164,
-    whatsappLink: waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}` : null,
+    whatsappLink: e164 ? whatsappLink(e164, message) : null,
   };
 };
 

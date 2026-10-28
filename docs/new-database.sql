@@ -1,8 +1,8 @@
 -- -------------------------------------------------------------
 -- new-database.sql — a new, empty Batches warehouse database
 --
--- Written by server/scripts/export-new-database.mjs on 2026-10-25,
--- from a database on PostgreSQL 17.6, with 55 migrations applied
+-- Written by server/scripts/export-new-database.mjs on 2026-10-28,
+-- from a database on PostgreSQL 17.6, with 62 migrations applied
 -- (the last: 2026_08_13_donations). Do not edit by hand: change the
 -- database through a migration, then run `npm run export-database` again.
 --
@@ -75,6 +75,9 @@ CREATE SEQUENCE public."ecd_order_lines_id_seq" AS integer INCREMENT BY 1 MINVAL
 CREATE SEQUENCE public."expiry_warning_dismissals_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE public."finance_report_access_links_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE public."finance_report_email_logs_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."fts_drop_points_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."fts_dropoffs_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."kitchens_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE public."notifications_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE public."operating_closures_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE public."outbound_messages_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
@@ -347,7 +350,9 @@ CREATE TABLE public."dispatch_events" (
   "override_reason" text,
   "idempotency_key" uuid,
   "notes" text,
-  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "followed_up_at" timestamp with time zone,
+  "followed_up_by" integer
 );
 
 CREATE TABLE public."donation_allocations" (
@@ -455,7 +460,10 @@ CREATE TABLE public."donations" (
   "section_18a_form_token_hash" text,
   "section_18a_form_token_expires_at" timestamp with time zone,
   "section_18a_form_submitted_at" timestamp with time zone,
-  "section_18a_donor_form" jsonb
+  "section_18a_donor_form" jsonb,
+  "value_estimated" boolean DEFAULT false NOT NULL,
+  "value_verified_at" timestamp with time zone,
+  "value_verified_by" integer
 );
 
 CREATE TABLE public."donors" (
@@ -576,6 +584,30 @@ CREATE TABLE public."finance_report_email_settings" (
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
+CREATE TABLE public."fts_drop_points" (
+  "id" integer DEFAULT nextval('fts_drop_points_id_seq'::regclass) NOT NULL,
+  "name" character varying(120) NOT NULL,
+  "suburb" character varying(120),
+  "address" text,
+  "public_token" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."fts_dropoffs" (
+  "id" integer DEFAULT nextval('fts_dropoffs_id_seq'::regclass) NOT NULL,
+  "drop_point_id" integer NOT NULL,
+  "kg_compost" numeric(7,2) NOT NULL,
+  "donor_name" character varying(120),
+  "donor_email" character varying(254),
+  "status" character varying(20) DEFAULT 'logged'::character varying NOT NULL,
+  "thanks_status" character varying(20),
+  "submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "reviewed_by" integer,
+  "reviewed_at" timestamp with time zone
+);
+
 CREATE TABLE public."gmail_connections" (
   "id" uuid DEFAULT gen_random_uuid() NOT NULL,
   "gmail_email" character varying(255),
@@ -598,6 +630,19 @@ CREATE TABLE public."idempotency_keys" (
   "status_code" smallint,
   "response" jsonb,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."kitchens" (
+  "id" integer DEFAULT nextval('kitchens_id_seq'::regclass) NOT NULL,
+  "kind" beneficiary_type NOT NULL,
+  "name" character varying(120) NOT NULL,
+  "adult_count" integer,
+  "contact_name" character varying(120),
+  "contact_phone" character varying(40),
+  "address" text,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
 CREATE TABLE public."love_activism_events" (
@@ -718,7 +763,8 @@ CREATE TABLE public."pending_donations" (
   "donor_registration_type" character varying(40),
   "donor_first_name" character varying(200),
   "donor_last_name" character varying(200),
-  "section18a_requested" boolean DEFAULT false NOT NULL
+  "section18a_requested" boolean DEFAULT false NOT NULL,
+  "value_estimated" boolean DEFAULT false NOT NULL
 );
 
 CREATE TABLE public."photos" (
@@ -818,7 +864,8 @@ CREATE TABLE public."products" (
   "archived_at" timestamp with time zone,
   "archived_by" integer,
   "unit_cost" numeric(12,2),
-  "quantity_per_meal" numeric
+  "quantity_per_meal" numeric,
+  "preferred_supplier_id" integer
 );
 
 CREATE TABLE public."programmes" (
@@ -1184,7 +1231,8 @@ CREATE TABLE public."volunteers" (
   "signed_out_at" timestamp with time zone,
   "source" text DEFAULT 'guest_login'::text NOT NULL,
   "consent_given" boolean DEFAULT false NOT NULL,
-  "retention_delete_after" date
+  "retention_delete_after" date,
+  "last_active_at" timestamp with time zone
 );
 
 CREATE TABLE public."warehouse_area_counts" (
@@ -1267,8 +1315,11 @@ ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_warning_di
 ALTER TABLE public."finance_report_access_links" ADD CONSTRAINT "finance_report_access_links_pkey" PRIMARY KEY (id);
 ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_pkey" PRIMARY KEY (id);
 ALTER TABLE public."finance_report_email_settings" ADD CONSTRAINT "finance_report_email_settings_pkey" PRIMARY KEY (id);
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_pkey" PRIMARY KEY (id);
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_pkey" PRIMARY KEY (id);
 ALTER TABLE public."gmail_connections" ADD CONSTRAINT "gmail_connections_pkey" PRIMARY KEY (id);
 ALTER TABLE public."idempotency_keys" ADD CONSTRAINT "idempotency_keys_pkey" PRIMARY KEY (key);
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_pkey" PRIMARY KEY (id);
 ALTER TABLE public."love_activism_events" ADD CONSTRAINT "love_activism_events_pkey" PRIMARY KEY (event_id);
 ALTER TABLE public."notification_reads" ADD CONSTRAINT "notification_reads_pkey" PRIMARY KEY (notification_id, user_id);
 ALTER TABLE public."notifications" ADD CONSTRAINT "notifications_pkey" PRIMARY KEY (id);
@@ -1326,6 +1377,7 @@ ALTER TABLE public."ecd_collection_reminders" ADD CONSTRAINT "ecd_collection_rem
 ALTER TABLE public."event_spaces" ADD CONSTRAINT "uq_event_spaces_space_name" UNIQUE (space_name);
 ALTER TABLE public."event_timeslots" ADD CONSTRAINT "uq_event_timeslots_unique_slot" UNIQUE (event_id, space_id, start_time, end_time);
 ALTER TABLE public."finance_report_access_links" ADD CONSTRAINT "finance_report_access_links_token_hash_key" UNIQUE (token_hash);
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_public_token_key" UNIQUE (public_token);
 ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_closed_on_key" UNIQUE (closed_on);
 ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_ecd_id_dispatch_date_key" UNIQUE (ecd_id, dispatch_date);
 ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_public_token_key" UNIQUE (public_token);
@@ -1393,7 +1445,14 @@ ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_dismissal_
 ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_warning_dismissals_reason_check" CHECK ((length(btrim(reason)) > 0));
 ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_status_check" CHECK ((status = ANY (ARRAY['SENT'::text, 'FAILED'::text])));
 ALTER TABLE public."finance_report_email_settings" ADD CONSTRAINT "finance_report_email_settings_id_check" CHECK ((id = 1));
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_name_check" CHECK ((btrim((name)::text) <> ''::text));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_kg_compost_check" CHECK (((kg_compost > (0)::numeric) AND (kg_compost <= (200)::numeric)));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_status_check" CHECK (((status)::text = ANY ((ARRAY['logged'::character varying, 'rejected'::character varying])::text[])));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_thanks_status_check" CHECK (((thanks_status)::text = ANY ((ARRAY['sent'::character varying, 'stubbed'::character varying, 'failed'::character varying])::text[])));
 ALTER TABLE public."idempotency_keys" ADD CONSTRAINT "idempotency_keys_key_check" CHECK (((char_length(key) >= 8) AND (char_length(key) <= 100)));
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_adult_count_check" CHECK (((adult_count IS NULL) OR (adult_count >= 0)));
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_kind_check" CHECK ((kind = ANY (ARRAY['soup_kitchen'::beneficiary_type, 'dignity_kitchen'::beneficiary_type])));
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_name_check" CHECK ((btrim((name)::text) <> ''::text));
 ALTER TABLE public."love_activism_events" ADD CONSTRAINT "chk_love_activism_events_status" CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SCHEDULED'::character varying, 'PUBLISHED'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying])::text[])));
 ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_kind_check" CHECK ((kind = ANY (ARRAY['public_holiday'::text, 'closure'::text])));
 ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_label_check" CHECK (((char_length(label) >= 1) AND (char_length(label) <= 120)));
@@ -1492,6 +1551,7 @@ ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_d
 ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_picking_slip_item_id_fkey" FOREIGN KEY (picking_slip_item_id) REFERENCES picking_slip_items(id) ON DELETE SET NULL;
 ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
 ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_dispatched_by_fkey" FOREIGN KEY (dispatched_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_followed_up_by_fkey" FOREIGN KEY (followed_up_by) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_override_by_fkey" FOREIGN KEY (override_by) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_picking_slip_id_fkey" FOREIGN KEY (picking_slip_id) REFERENCES picking_slips(id) ON DELETE RESTRICT;
 ALTER TABLE public."donation_allocations" ADD CONSTRAINT "donation_allocations_donation_item_id_fkey" FOREIGN KEY (donation_item_id) REFERENCES donation_items(id) ON DELETE CASCADE;
@@ -1510,6 +1570,7 @@ ALTER TABLE public."donations" ADD CONSTRAINT "donations_created_by_fkey" FOREIG
 ALTER TABLE public."donations" ADD CONSTRAINT "donations_donor_id_fkey" FOREIGN KEY (donor_id) REFERENCES donors(id) ON DELETE SET NULL;
 ALTER TABLE public."donations" ADD CONSTRAINT "donations_programme_id_fkey" FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE RESTRICT;
 ALTER TABLE public."donations" ADD CONSTRAINT "donations_received_by_fkey" FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_value_verified_by_fkey" FOREIGN KEY (value_verified_by) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."ecd_centres" ADD CONSTRAINT "ecd_centres_location_updated_by_fkey" FOREIGN KEY (location_updated_by) REFERENCES users(id);
 ALTER TABLE public."ecd_collection_reminders" ADD CONSTRAINT "ecd_collection_reminders_ecd_id_fkey" FOREIGN KEY (ecd_id) REFERENCES ecd_centres(id);
 ALTER TABLE public."ecd_order_lines" ADD CONSTRAINT "ecd_order_lines_ecd_id_fkey" FOREIGN KEY (ecd_id) REFERENCES ecd_centres(id) ON DELETE CASCADE;
@@ -1524,6 +1585,9 @@ ALTER TABLE public."finance_report_access_links" ADD CONSTRAINT "finance_report_
 ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_finance_link_id_fkey" FOREIGN KEY (finance_link_id) REFERENCES finance_report_access_links(id);
 ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_sent_by_user_id_fkey" FOREIGN KEY (sent_by_user_id) REFERENCES users(id);
 ALTER TABLE public."finance_report_email_settings" ADD CONSTRAINT "finance_report_email_settings_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id);
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_drop_point_id_fkey" FOREIGN KEY (drop_point_id) REFERENCES fts_drop_points(id);
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_reviewed_by_fkey" FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."gmail_connections" ADD CONSTRAINT "gmail_connections_connected_by_user_id_fkey" FOREIGN KEY (connected_by_user_id) REFERENCES users(id);
 ALTER TABLE public."idempotency_keys" ADD CONSTRAINT "idempotency_keys_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id);
 ALTER TABLE public."love_activism_events" ADD CONSTRAINT "love_activism_events_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
@@ -1557,6 +1621,7 @@ ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_product_i
 ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_supplier_id_fkey" FOREIGN KEY (supplier_id) REFERENCES suppliers(id);
 ALTER TABLE public."products" ADD CONSTRAINT "products_archived_by_fkey" FOREIGN KEY (archived_by) REFERENCES users(id);
 ALTER TABLE public."products" ADD CONSTRAINT "products_default_location_id_fkey" FOREIGN KEY (default_location_id) REFERENCES storage_locations(id) ON DELETE SET NULL;
+ALTER TABLE public."products" ADD CONSTRAINT "products_preferred_supplier_id_fkey" FOREIGN KEY (preferred_supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
 ALTER TABLE public."products" ADD CONSTRAINT "products_programme_id_fkey" FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE RESTRICT;
 ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "purchase_order_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
 ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "purchase_order_items_purchase_order_id_fkey" FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE;
@@ -1684,9 +1749,12 @@ CREATE INDEX idx_event_timeslots_start_time ON public.event_timeslots USING btre
 CREATE UNIQUE INDEX expiry_warning_dismissals_one_active ON public.expiry_warning_dismissals USING btree (delivery_note_item_id) WHERE (restored_at IS NULL);
 CREATE INDEX idx_finance_report_access_links_active ON public.finance_report_access_links USING btree (token_hash) WHERE (revoked_at IS NULL);
 CREATE INDEX idx_finance_report_email_logs_created_at ON public.finance_report_email_logs USING btree (created_at DESC);
+CREATE UNIQUE INDEX idx_fts_drop_points_name ON public.fts_drop_points USING btree (lower((name)::text));
+CREATE INDEX idx_fts_dropoffs_point_time ON public.fts_dropoffs USING btree (drop_point_id, submitted_at DESC);
 CREATE UNIQUE INDEX idx_gmail_connections_connected_by_user_id ON public.gmail_connections USING btree (connected_by_user_id);
 CREATE INDEX idx_gmail_connections_updated_at ON public.gmail_connections USING btree (updated_at);
 CREATE INDEX idempotency_keys_created_at_idx ON public.idempotency_keys USING btree (created_at);
+CREATE UNIQUE INDEX idx_kitchens_kind_name ON public.kitchens USING btree (kind, lower((name)::text));
 CREATE INDEX idx_love_activism_events_event_date ON public.love_activism_events USING btree (event_date);
 CREATE INDEX idx_love_activism_events_status ON public.love_activism_events USING btree (status);
 CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (created_at DESC);
@@ -1754,7 +1822,7 @@ CREATE INDEX idx_suppliers_live ON public.suppliers USING btree (name) WHERE (ar
 CREATE INDEX suppliers_active_name_idx ON public.suppliers USING btree (is_active, name);
 CREATE INDEX idx_user_invites_pending ON public.user_invites USING btree (created_at DESC) WHERE ((accepted_at IS NULL) AND (revoked_at IS NULL));
 CREATE INDEX idx_user_invites_token_hash ON public.user_invites USING btree (token_hash);
-CREATE UNIQUE INDEX idx_users_email_unique ON public.users USING btree (lower(email)) WHERE (email IS NOT NULL);
+CREATE UNIQUE INDEX idx_users_email_role_unique ON public.users USING btree (lower(email), role) WHERE (email IS NOT NULL);
 CREATE INDEX idx_users_live ON public.users USING btree (username) WHERE (archived_at IS NULL);
 CREATE INDEX idx_users_role ON public.users USING btree (role);
 CREATE INDEX idx_vms_sync_external_id ON public.vms_sync USING btree (external_id);
@@ -1794,6 +1862,9 @@ ALTER SEQUENCE public."ecd_order_lines_id_seq" OWNED BY public."ecd_order_lines"
 ALTER SEQUENCE public."expiry_warning_dismissals_id_seq" OWNED BY public."expiry_warning_dismissals"."id";
 ALTER SEQUENCE public."finance_report_access_links_id_seq" OWNED BY public."finance_report_access_links"."id";
 ALTER SEQUENCE public."finance_report_email_logs_id_seq" OWNED BY public."finance_report_email_logs"."id";
+ALTER SEQUENCE public."fts_drop_points_id_seq" OWNED BY public."fts_drop_points"."id";
+ALTER SEQUENCE public."fts_dropoffs_id_seq" OWNED BY public."fts_dropoffs"."id";
+ALTER SEQUENCE public."kitchens_id_seq" OWNED BY public."kitchens"."id";
 ALTER SEQUENCE public."notifications_id_seq" OWNED BY public."notifications"."id";
 ALTER SEQUENCE public."operating_closures_id_seq" OWNED BY public."operating_closures"."id";
 ALTER SEQUENCE public."outbound_messages_id_seq" OWNED BY public."outbound_messages"."id";
@@ -2042,6 +2113,13 @@ INSERT INTO public.schema_migrations (id, notes) VALUES
   ('060_drop_unused_schema', 'In new-database.sql'),
   ('061_delivery_delivered_at', 'In new-database.sql'),
   ('062_saved_report_narrative', 'In new-database.sql'),
+  ('063_not_collected_follow_up', 'In new-database.sql'),
+  ('064_donation_value_estimate', 'In new-database.sql'),
+  ('065_one_email_per_role', 'In new-database.sql'),
+  ('066_product_preferred_supplier', 'In new-database.sql'),
+  ('067_guest_last_active', 'In new-database.sql'),
+  ('068_kitchens', 'In new-database.sql'),
+  ('069_fts_drop_points', 'In new-database.sql'),
   ('2026_08_02_schema_gap_migration', 'In new-database.sql'),
   ('2026_08_13_donations', 'In new-database.sql');
 

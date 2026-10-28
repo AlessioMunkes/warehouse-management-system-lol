@@ -132,7 +132,7 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
         GROUP BY o.product_id
      ),
      latest_supplier AS (
-       SELECT DISTINCT ON (poi.product_id) poi.product_id, s.name, s.expected_lead_time_days
+       SELECT DISTINCT ON (poi.product_id) poi.product_id, s.id, s.name, s.expected_lead_time_days
          FROM purchase_order_items poi
          JOIN purchase_orders po ON po.id = poi.purchase_order_id
          JOIN suppliers s        ON s.id = po.supplier_id
@@ -141,7 +141,7 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
      ),
      linked AS (
        SELECT sp.product_id,
-              json_agg(json_build_object('name', s.name, 'agreedDays', s.expected_lead_time_days) ORDER BY s.name) AS suppliers
+              json_agg(json_build_object('id', s.id, 'name', s.name, 'agreedDays', s.expected_lead_time_days) ORDER BY s.name) AS suppliers
          FROM supplier_products sp
          JOIN suppliers s ON s.id = sp.supplier_id AND s.is_active = true AND s.archived_at IS NULL
         GROUP BY sp.product_id
@@ -175,6 +175,13 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
             uc.lines                          AS unconverted,
             COALESCE(di.quantity, 0)          AS dispatched,
             inc.lines                         AS incoming,
+            -- Who it is usually ordered from (migration 066), when a
+            -- manager has said and the supplier is still active.
+            ps.id                             AS preferred_supplier_id,
+            ps.name                           AS preferred_supplier_name,
+            ps.expected_lead_time_days        AS preferred_agreed_days,
+            p.unit_cost,
+            ls.id                             AS supplier_id,
             ls.name                           AS supplier_name,
             ls.expected_lead_time_days        AS supplier_agreed_days,
             li.suppliers                      AS linked_suppliers,
@@ -189,6 +196,7 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
        LEFT JOIN dispatched di         ON di.product_id = p.id
        LEFT JOIN incoming inc          ON inc.product_id = p.id
        LEFT JOIN latest_supplier ls    ON ls.product_id = p.id
+       LEFT JOIN suppliers ps          ON ps.id = p.preferred_supplier_id AND ps.is_active = true AND ps.archived_at IS NULL
        LEFT JOIN linked li             ON li.product_id = p.id
        LEFT JOIN actual_lead al        ON al.product_id = p.id
       WHERE p.is_active = true AND p.archived_at IS NULL

@@ -91,6 +91,9 @@ const toProduct = (row) => ({
   unitCost:     row.unit_cost === null || row.unit_cost === undefined
                   ? null
                   : Number(row.unit_cost),
+  // Who it is usually ordered from: the purchase order raised from Low
+  // stock starts on that supplier.
+  preferredSupplierId: row.preferred_supplier_id ?? null,
 });
 
 // A Postgres DATE arrives as 'YYYY-MM-DD' or, through a JSON

@@ -122,11 +122,15 @@ describe('CommunityRequestsPage (manager)', () => {
       expect(within(list).getByText('Beans · 2 kg')).toBeTruthy();
     });
 
-    it('keeps the actions in a sticky column so they stay visible at laptop widths', async () => {
+    // A sticky column sat on top of Caller and Status at laptop widths.
+    // Short labels keep the column narrow instead; the full words stay
+    // the buttons' names.
+    it('keeps the actions in an ordinary column, with short labels', async () => {
       api.getRequests.mockResolvedValue([row()]);
       renderPage();
       const button = await screen.findByRole('button', { name: 'Approve and choose items' });
-      expect(button.closest('td').className).toContain('sticky');
+      expect(button.closest('td').className).not.toContain('sticky');
+      expect(button).toHaveTextContent('Approve');
     });
 
     it('labels the notes column "Quantity and collection notes"', async () => {
@@ -146,7 +150,7 @@ describe('CommunityRequestsPage (manager)', () => {
       renderPage('/community-requests?status=all');
       await screen.findByText('A');
       const rowOf = (text) => screen.getByText(text).closest('tr');
-      const buttons = (text) => within(rowOf(text).querySelector('td:last-child')).queryAllByRole('button').map((b) => b.textContent);
+      const buttons = (text) => within(rowOf(text).querySelector('td:last-child')).queryAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent);
 
       expect(buttons('A')).toEqual(['Approve and choose items']);
       expect(buttons('B')).toEqual(expect.arrayContaining(['Assign packer', 'Decline']));

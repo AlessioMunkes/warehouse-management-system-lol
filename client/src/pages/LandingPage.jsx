@@ -88,7 +88,7 @@ function LocationsMap({ locations }) {
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, { scrollWheelZoom: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map);

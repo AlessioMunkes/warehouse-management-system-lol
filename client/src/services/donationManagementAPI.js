@@ -127,6 +127,19 @@ const donationManagementAPI = {
     return Array.isArray(body.data) ? body.data : [];
   },
 
+  // A manager verifies a donation's value, or corrects it.
+  async verifyDonationValue(id, estimatedValueZar) {
+    const response = await fetch(`${API_BASE}/api/donations/${encodeURIComponent(id)}/value`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estimatedValueZar }),
+    });
+
+    const body = await parseResponse(response);
+    return body.data;
+  },
+
   async resendEmail(emailId) {
     const response = await fetch(`${API_BASE}/api/donations/section-18a/emails/${encodeURIComponent(emailId)}/resend`, {
       method: 'POST',

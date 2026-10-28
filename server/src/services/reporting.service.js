@@ -90,7 +90,7 @@ const getCatalog = () => ({
 // and query builder, and comes back in the same shape.
 // Reports that measure food leaving in kilograms, off the gate's lines.
 const DISPATCH_KG_REPORTS = new Set([
-  'dispatchVolume', 'mealsEnabled', 'mealsServedByGroup', 'adultsReached', 'dignityKitchenServed', 'communityServed',
+  'dispatchVolume', 'mealsEnabled', 'mealsServedByGroup', 'dignityKitchenServed', 'communityServed',
 ]);
 
 const runCustomReport = async (input) => {
@@ -183,6 +183,14 @@ const runReport = async (input) => {
   } else if (spec.dateRange && metric.repoFn === 'goodsReceived') {
     const skipped = await repo.countNonKgReceivedLines(spec);
     if (skipped > 0) { meta.excludedLines = skipped; meta.excludedKind = 'delivery'; }
+  }
+  // Adults served counts kitchens' adults: say how many pallets were
+  // for a kitchen with no adult count, and so added nothing.
+  if (metric.repoFn === 'adultsReached') {
+    const uncounted = series.reduce((n, row) => n + (row.meta?.uncounted ?? 0), 0);
+    if (uncounted > 0) {
+      meta.caveat = `${uncounted} kitchen pallet${uncounted === 1 ? ' was' : 's were'} for a kitchen with no adult count, and ${uncounted === 1 ? 'is' : 'are'} not counted. Add the kitchen and its adults on Beneficiaries, Kitchens.`;
+    }
   }
   if (metric.repoFn === 'stockValue') {
     const unpriced = await repo.countUnpricedStock(spec);

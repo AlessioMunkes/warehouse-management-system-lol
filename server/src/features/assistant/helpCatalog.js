@@ -463,7 +463,7 @@ export const TOPICS = [
       'Catalogue: products and suppliers.',
       'Donations: the classification queue and Section 18A certificates.',
       'Logs: the activity log (staff and volunteers), the archive and message history.',
-      'Settings: email, reminders, stock rules, reporting and certificates; and the finance report.',
+      'Settings: email, reminders, stock rules, recipes and reporting; and the finance report.',
     ],
     followUp: {
       question: 'Would you like to know how to set up a new user?',
@@ -1671,7 +1671,8 @@ export const TOPICS = [
     ],
     body:
       'Pending approval: raised, not signed off. Approved: ready to send to the ' +
-      'supplier. In transit: on its way. Partially received: some of it has come. ' +
+      'supplier. In transit: on its way. Partially received: some of it has come, and ' +
+      'it is labelled Balance outstanding; the rest is received against the same order. ' +
       'Completed: everything arrived. Returned and Follow-up required are for when ' +
       'the supplier got it wrong.\n\n' +
       'Deliveries move an order along by themselves; the tabs Open, Awaiting approval,' +
@@ -2267,15 +2268,14 @@ export const TOPICS = [
     asks: [
       'what is on the reports page', 'what are the tabs on reports', 'operations reports',
       'what can reporting do', 'what does each tab do', 'where is the process map',
-      'where is the reorder planner', 'where are the alerts',
+      'where are the alerts',
     ],
     body:
-      'Operations reports has six tabs, under the title.',
+      'Operations reports has five tabs, under the title. The reorder planner is on the Stock ledger.',
     steps: [
       'Overview: your own set of report cards, and your saved reports.',
       'Reports: ask a question, browse every report, or build a prepared or custom report.',
       'Process map: how work really moves from purchase order to dispatch, and how long each step takes.',
-      'Reorder planner: when each product runs out, the date to order by and how much.',
       'Exception alerts: the weekly measures that moved outside their normal range.',
       'Chart a spreadsheet: chart a CSV or Excel file, or a Google Sheets link.',
     ],
@@ -2441,14 +2441,14 @@ export const TOPICS = [
     id: 'reorder-planner',
     title: 'The reorder planner',
     roles: MANAGERS_UP,
-    screens: ['reporting'],
+    screens: ['stockLedger'],
     asks: [
-      'reorder planner', 'when will we run out', 'what do I need to order', 'how much should I order',
+      'reorder planner', 'where is the reorder planner', 'when will we run out', 'what do I need to order', 'how much should I order',
       'order by date', 'days of cover', 'suggested order', 'stock forecast', 'run out date',
       'what should I buy', 'are we going to run out of rice',
     ],
     body:
-      'The Reorder planner is a tab on Operations reports. For each product it works out when ' +
+      'The Reorder planner is the last tab on the Stock ledger. For each product it works out when ' +
       'stock runs out at the rate it is going, the date an order has to be raised by to arrive ' +
       'in time, and how much to order. It uses the same figures as the Days of stock left report.',
     steps: [
@@ -2456,7 +2456,7 @@ export const TOPICS = [
       'The list is most urgent first: Out of stock, Order now, Order within 7 days, Order later, Covered, No demand.',
       'Select a product to see its week by week projection, and which demand and lead time it used. Missing data says what held a figure back.',
       'Search by product or supplier, and export the plan to Excel as an order sheet.',
-      'To order, raise a purchase order as usual.',
+      'Create purchase orders raises the suggestions in view as orders to approve: one per supplier (the product’s preferred supplier, or the one it was last ordered from), at the suggested quantity, due the longest lead time. Products with no supplier are named and left out.',
     ],
     followUp: {
       question: 'Would you like to know how to raise a purchase order?',
@@ -3061,13 +3061,17 @@ export const TOPICS = [
     asks: [
       'record a follow up', 'supplier sent the wrong thing', 'chase the supplier',
       'reopen an order', 'follow-up required', 'the rest never came',
+      'balance outstanding', 'delivered short', 'follow-up order',
     ],
     body:
       'Open the order and choose Record follow-up, with a short reason. It moves to ' +
       'the Follow-up required tab, so it isn’t forgotten, and no more can be received ' +
       'against it until you decide.\n\n' +
       'If the supplier sorts it out, choose Reopen for receiving to put it back to ' +
-      'Approved.',
+      'Approved.\n\n' +
+      'A delivery that came in short needs none of this: the order stays open as ' +
+      'Partially received, labelled Balance outstanding, and the rest is received ' +
+      'against the same order number. If the rest is not coming, choose Close order.',
     followUp: {
       question: 'Would you like to know what each status means?',
       topic: 'po-status',
@@ -3087,8 +3091,10 @@ export const TOPICS = [
     body:
       'On Inventory, open the Low stock (or Shortfall) tab, tick the products you ' +
       'want and choose Raise purchase order. A new order opens with those products ' +
-      'already on it, each with enough to bring it back up to its reorder level; pick ' +
-      'the supplier, check the quantities and save.',
+      'already on it, each with enough to bring it back up to its reorder level. When ' +
+      'they share a preferred supplier the order starts on it, and the form shows ' +
+      'that supplier’s lead time under the delivery date. Set the date, check the ' +
+      'quantities and save.',
     followUp: {
       question: 'Would you like to know how approving the order works?',
       topic: 'po-approve',
@@ -3451,7 +3457,7 @@ export const TOPICS = [
     screens: ['settings'],
     asks: [
       'settings', 'change the cut off time', 'reminder time', 'expiry warning',
-      'how long do invites last', 'certificate settings', 'impact rates',
+      'how long do invites last', 'impact rates',
     ],
     body:
       'Settings holds how the system is set up, in sections. Changes apply to ' +
@@ -3463,7 +3469,7 @@ export const TOPICS = [
       'Stock rules: when managers are warned about stock nearing its expiry date.',
       'Recipes: what picking slips are made from.',
       'Reporting: the rates that turn kilograms into people fed.',
-      'Certificates and Accounts: certificate details, and how long invite links last.',
+      'Accounts: how long invite links last.',
     ],
     followUp: {
       question: 'Would you like to know how email settings work?',

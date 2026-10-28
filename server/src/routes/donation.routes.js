@@ -16,6 +16,7 @@ router.post('/section-18a/form/:token', donationController.submitSection18AForm)
 router.get('/unmatched',   auth, requireRole(...MANAGERS_UP), donationController.listUnmatchedItems);
 router.get('/section-18a', auth, requireRole(...MANAGERS_UP), donationController.listSection18AQueue);
 router.get('/section-18a/emails', auth, requireRole(...MANAGERS_UP), donationController.listEmailHistory);
+router.post('/estimate-value', auth, requireRole(...ALL_STAFF), donationController.estimateDonationValue);
 router.post('/section-18a/emails/:emailId/resend',
   auth, requireRole(...MANAGERS_UP),
   validateIntParam('emailId'),
@@ -38,6 +39,7 @@ router.post('/', auth, requireRole(...WORKERS_ONLY), donationController.createDo
 // ── Single donation ───────────────────────────────────────────
 router.get('/:id',        auth, requireRole(...ALL_STAFF), validateIntId, donationController.getDonationById);
 router.get('/:id/events', auth, requireRole(...ALL_STAFF), validateIntId, donationController.getDonationEvents);
+router.patch('/:id/value', auth, requireRole(...MANAGERS_UP), validateIntId, donationController.verifyDonationValue);
 router.get('/:id/section-18a/certificate',
   auth, requireRole(...MANAGERS_UP),
   validateIntId,

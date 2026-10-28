@@ -46,10 +46,6 @@ router.get('/:id',
 router.patch('/:id/status',
   auth, requireRole(...MANAGERS_UP), validateIntId, purchaseOrderController.setStatus);
 
-// A second order for what came short on this one.
-router.post('/:id/follow-up-order',
-  auth, requireRole(...MANAGERS_UP), validateIntId, purchaseOrderController.createFollowUp);
-
 router.patch('/:id/quickbooks-ref',
   auth, requireRole(...MANAGERS_UP), validateIntId, purchaseOrderController.setQuickbooksReference);
 

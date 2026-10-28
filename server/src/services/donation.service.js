@@ -39,6 +39,7 @@ import {
   donationFingerprint,
 } from '../utils/donationValidation.js';
 import donationModel from '../repositories/donation.repository.js';
+import { convertQuantity } from '../features/units/unitConversion.js';
 import { DONATION_CATEGORIES } from '../constants/donationCategories.js';
 import {
   sendThankYouEmail,
@@ -550,6 +551,7 @@ const createDonation = async (data, userId) => {
     category,
     programmeId,
     estimatedValueZar:    value,
+    valueEstimated:       data?.valueEstimated === true,
     donorName:            consented ? (cleanName ? String(cleanName).trim() || null : null) : null,
     donorContact:         consented ? (cleanContact ? String(cleanContact).trim().toLowerCase() || null : null) : null,
     donorTaxReference:    consented ? (cleanTax ? String(cleanTax).trim() || null : null) : null,
@@ -628,6 +630,44 @@ const listUnmatchedItems = async () => await donationModel.listUnmatchedItems();
 
 const listSection18AQueue = async () => await donationModel.listSection18AQueue();
 
+// ── Estimate a donation's value from its items ─────────────────
+// Catalogue unit cost times quantity, for each line matched to a
+// product with a cost and a unit that converts. Lines that cannot be
+// priced are counted, so the screen can say what the figure leaves out.
+// A suggestion for the person recording it; a manager verifies it.
+const estimateDonationValue = async (data) => {
+  const lines = (Array.isArray(data?.items) ? data.items : [])
+    .map((i) => ({ productId: Number(i?.productId), quantity: Number(i?.quantity), unit: String(i?.unit ?? '').trim().toLowerCase() }));
+  if (lines.length === 0) fail(400, 'Add the items before estimating their value.');
+
+  const ids = [...new Set(lines.filter((l) => Number.isInteger(l.productId) && l.productId > 0).map((l) => l.productId))];
+  const { products, sizes } = ids.length ? await donationModel.getProductCosts(ids) : { products: [], sizes: {} };
+  const byId = new Map(products.map((p) => [Number(p.id), p]));
+
+  let total = 0;
+  let priced = 0;
+  for (const line of lines) {
+    const product = byId.get(line.productId);
+    const cost = Number(product?.unit_cost);
+    if (!product || !Number.isFinite(cost) || cost <= 0 || !Number.isFinite(line.quantity) || line.quantity <= 0) continue;
+    const inCostUnit = convertQuantity(line.quantity, line.unit || product.default_unit, product.default_unit, sizes);
+    if (inCostUnit === null) continue;
+    total += inCostUnit * cost;
+    priced += 1;
+  }
+  return { valueZar: Math.round(total * 100) / 100, pricedCount: priced, itemCount: lines.length };
+};
+
+// ── A manager verifies a donation's value (or corrects it) ─────
+const verifyDonationValue = async (donationId, data, userId) => {
+  const moneyCheck = validateMoney(data?.estimatedValueZar, { required: true, field: 'Value' });
+  if (moneyCheck.error) fail(400, moneyCheck.error);
+  const result = await donationModel.verifyDonationValue({ donationId: Number(donationId), valueZar: moneyCheck.value, actorId: userId });
+  if (result.notFound) fail(404, 'Donation not found.');
+  if (result.issued) fail(409, 'Its certificate has been issued, so its value can no longer change.');
+  return result.donation;
+};
+
 // ── Resolve an unmatched line ─────────────────────────────────
 const resolveUnmatchedItem = async (donationItemId, data, userId) => {
   const { productId, unit, locationId } = data || {};
@@ -691,6 +731,8 @@ const reclassifyDonation = async (donationId, data, userId) => {
 
 export default {
   createDonation,
+  estimateDonationValue,
+  verifyDonationValue,
   listDonations,
   getDonationById,
   getDonationEvents,

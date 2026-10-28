@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2 }   from 'lucide-react';
 import { STOCK_UNITS } from '@/services/productAPI';
+import NativeSelect from '@/components/ui/native-select';
 import MissingDetailsNotice from '@/components/ui/missing-details-notice';
 
 // products.storage_type's own CHECK constraint — 'dry' or 'cold', and
@@ -76,6 +77,7 @@ const BLANK = {
   // its unit (weighed or poured is decantable, counted is not).
   category: '', isPerishable: false, isDecantable: null, reorderThreshold: '',
   storageType: 'dry',
+  preferredSupplierId: null,
 };
 
 // `seed` pre-fills a NEW product (a barcode suggestion) without making
@@ -84,6 +86,9 @@ export default function ProductForm({
   initial = null,
   seed = null,
   submitLabel = 'Add product',
+  // The suppliers that can be its preferred one (active, plus whichever
+  // it already has).
+  suppliers = [],
   onSubmit,
   onCancel,
   busy = false,
@@ -115,6 +120,7 @@ export default function ProductForm({
       // expectedLeadTimeDays uses.
       weightKg: form.weightKg === '' || form.weightKg === null ? null : Number(form.weightKg),
       unitCost: form.unitCost === '' || form.unitCost === null ? null : Number(form.unitCost),
+      preferredSupplierId: form.preferredSupplierId ? Number(form.preferredSupplierId) : null,
       // Blank means "leave it alone" on an edit, and the column
       // default (0) on a create — not zero typed deliberately.
       reorderThreshold:
@@ -229,6 +235,22 @@ export default function ProductForm({
           <FieldDescription>
             Price per item before VAT, used on purchase orders. Leave blank if donated or the
             price varies.
+          </FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="product-preferred-supplier">Preferred supplier</FieldLabel>
+          <NativeSelect
+            id="product-preferred-supplier"
+            value={form.preferredSupplierId ? String(form.preferredSupplierId) : ''}
+            onChange={(e) => setForm((f) => ({ ...f, preferredSupplierId: e.target.value || null }))}
+          >
+            <option value="">None</option>
+            {suppliers
+              .filter((s) => s.isActive || String(s.id) === String(form.preferredSupplierId))
+              .map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </NativeSelect>
+          <FieldDescription>
+            Who it is usually ordered from. The reorder planner and Raise purchase order use it.
           </FieldDescription>
         </Field>
       </div>

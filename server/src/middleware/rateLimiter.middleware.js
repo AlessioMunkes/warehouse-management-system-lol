@@ -151,3 +151,19 @@ export const accountChangeRateLimiter = rateLimit({
 });
 
 export default loginRateLimiter;
+// ── Public Feed the Soil drop-off form ──────────────────────────
+// POST /api/fts/drop/:token is the form behind a QR code hung at a
+// pop-up stand (migration 069): no account, so every send counts, not
+// only failures. 20 in 15 minutes is a queue at a busy stand sharing one
+// phone network; a script logging made-up compost runs out long before
+// it skews the total, and staff can reject what got through.
+export const publicFtsDropoffRateLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             20,
+  standardHeaders: 'draft-8',
+  legacyHeaders:   false,
+  message: {
+    success: false,
+    message: 'Too many drop-offs from here just now. Please wait a few minutes, or ask at the stand.',
+  },
+});

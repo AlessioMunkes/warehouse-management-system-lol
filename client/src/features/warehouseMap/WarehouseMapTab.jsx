@@ -38,7 +38,7 @@ import ErrorBanner from '@/components/ui/error-banner';
 import { useToast } from '@/components/ui/toastContext';
 import { fmtQtyUnit } from '@/lib/stockWording';
 import { cn } from '@/lib/utils';
-import { getWarehouseMap, recordAreaCount } from '../../services/warehouseMapAPI';
+import { getWarehouseMap, recordAreaCount, setAreaCapacity } from '../../services/warehouseMapAPI';
 import { matchesSearch } from '../inventory/inventoryViews';
 import WarehouseMap from './WarehouseMap';
 import DayStrip from './DayStrip';
@@ -199,6 +199,13 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
   const openArea = openId && openId !== UNPLACED ? areas.find((a) => a.id === openId) ?? null : null;
   const gateOf = (kind) => areas.find((a) => a.gate?.kind === kind) ?? null;
 
+  // From the area's panel. A refusal stays in the panel's own editor.
+  const saveCapacity = async (capacity) => {
+    const next = await setAreaCapacity(openArea.id, capacity);
+    setMap(next);
+    toast({ variant: 'success', title: `Capacity saved for ${openArea.name}` });
+  };
+
   const saveCount = async (lines) => {
     setSaving(true);
     try {
@@ -329,6 +336,7 @@ export default function WarehouseMapTab({ canAdjust = false, onAdjust }) {
           canCount={holdsStock(openArea)}
           canAdjust={canAdjust}
           onCount={() => setCounting(true)}
+          onSaveCapacity={canAdjust ? saveCapacity : null}
           onAdjust={(productId) => onAdjust?.(productId)}
           onFind={(name) => { setQuery(name); setAttentionOnly(false); }}
           onClose={() => setOpenId(null)}

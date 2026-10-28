@@ -71,6 +71,9 @@ export const ROUTES = [
   // The page behind each pallet's QR code (BR-22): only what is
   // already printed on the label.
   { id: 'slipPreview',    path: '/slip/:token',           roles: null },
+  // The Feed the Soil drop-off form behind a site's QR poster: weight,
+  // and an optional email for a thank-you (migration 069).
+  { id: 'ftsDropOff',     path: '/fts/:token',            roles: null },
   // What the system keeps and the terms of using it. Linked from the
   // landing page, the sign-in page and Google's consent screen.
   { id: 'privacy',        path: LEGAL.privacy,            roles: null },

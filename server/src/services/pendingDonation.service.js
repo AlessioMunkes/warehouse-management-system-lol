@@ -113,6 +113,8 @@ const buildDonationPayloadFromPending = (pendingDonation) => {
     category,
     programmeId: pendingDonation.programme_id ?? pendingDonation.programmeId ?? null,
     estimatedValueZar,
+    // Still the system's figure only while nobody priced the lines.
+    valueEstimated: totalValue > 0 ? false : (pendingDonation.value_estimated ?? pendingDonation.valueEstimated) === true,
     donorName: pendingDonation.donor_name ?? pendingDonation.donorName ?? null,
     donorContact: pendingDonation.donor_contact ?? pendingDonation.donorContact ?? null,
     donorTaxReference: pendingDonation.donor_tax_reference ?? pendingDonation.donorTaxReference ?? null,
@@ -360,6 +362,9 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         donorTaxReference: data.donorTaxReference ?? data.donor_tax_reference ?? null,
         donorConsentGiven: data.donorConsentGiven ?? data.donor_consent_given ?? null,
         estimatedValueZar: data.estimatedValueZar ?? data.estimated_value_zar ?? null,
+        // Only a value that was sent can have been estimated.
+        valueEstimated: (data.valueEstimated === true || data.value_estimated === true)
+          && (data.estimatedValueZar ?? data.estimated_value_zar ?? null) !== null,
         donationCategory: data.donationCategory ?? data.donation_category ?? null,
         notes: data.notes ?? null,
         section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,

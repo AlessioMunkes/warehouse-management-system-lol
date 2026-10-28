@@ -71,6 +71,15 @@ export async function createDonation(draft) {
   return apiPost("/api/donations", payload); // { donation, warnings, duplicate }
 }
 
+// ── POST /api/donations/estimate-value ─────────────────────────
+// What the matched items are worth at catalogue cost, for "Estimate it
+// for me": { valueZar, pricedCount, itemCount }.
+export async function estimateDonationValue(items) {
+  return apiPost("/api/donations/estimate-value", {
+    items: items.map((i) => ({ productId: i.productId ?? null, quantity: Number(i.quantity), unit: i.unit || "" })),
+  });
+}
+
 // ── Pending-donation intake ───────────────────────────────────
 // Maps the local draft shape to POST /api/donations/pending
 // (pendingDonation.service.js createPendingDonationFromIntake).
@@ -112,6 +121,7 @@ export async function createPendingDonation(draft) {
     && draft.estimatedValueZar !== undefined;
   if (wantsSection18A || typedValue) {
     payload.estimatedValueZar = Number(draft.estimatedValueZar);
+    payload.valueEstimated = draft.valueEstimated === true;
   }
 
   // The server recognises a repeat of the same donation by this key, so

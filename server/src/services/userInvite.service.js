@@ -226,9 +226,11 @@ const createInvite = async (body, actorId) => {
   const email = validEmail(body?.email);
   const role  = validRole(body?.role);
 
-  const existingUser = await userRepo.findUserByEmail(email);
+  // One account per role on an address: inviting it to another role is
+  // how someone gets a second account (an admin who also manages).
+  const existingUser = await userRepo.findUserByEmail(email, { role });
   if (existingUser) {
-    throw fail(409, `A user with the email "${email}" already exists.`);
+    throw fail(409, `An account with the email "${email}" already exists in that role.`);
   }
 
   const open = await inviteRepo.findOpenByEmail(email);

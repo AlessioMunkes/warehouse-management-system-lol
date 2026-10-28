@@ -51,9 +51,11 @@ describe('paperSaved', () => {
   });
 });
 
+// Migration 068: adults served is meals, one per adult, counted from
+// each collected kitchen pallet's kitchen.
 describe('adultsReached', () => {
-  it('forces the beneficiary_kind filter to soup_kitchen regardless of caller input', async () => {
-    poolMock.query.mockResolvedValue({ rows: [{ label: 'Total', value: '120' }] });
+  it('counts soup and Dignity Kitchen pallets only, whatever the caller asks for', async () => {
+    poolMock.query.mockResolvedValue({ rows: [{ label: 'Total', value: '120', uncounted: 0 }] });
 
     await repo.adultsReached({
       dimension: 'none',
@@ -62,18 +64,18 @@ describe('adultsReached', () => {
     });
 
     const [sql, params] = poolMock.query.mock.calls[0];
-    expect(sql).toMatch(/ps\.beneficiary_kind = \$\d+::beneficiary_type/);
-    expect(params).toContain('soup_kitchen');
+    expect(sql).toMatch(/ps\.beneficiary_kind = ANY\(\$\d+::beneficiary_type\[\]\)/);
+    expect(params).toContainEqual(['soup_kitchen', 'dignity_kitchen']);
     expect(params).not.toContain('ecd');
   });
 
-  it('does not apply the ECD+soup-kitchen impact clause — it is soup-kitchen only', async () => {
-    poolMock.query.mockResolvedValue({ rows: [] });
-    await repo.adultsReached({ dimension: 'none', dateRange: RANGE, filters: {} });
+  it('adds up each kitchen’s adults, matched by kind and name, and counts the pallets it could not', async () => {
+    poolMock.query.mockResolvedValue({ rows: [{ label: 'Total', value: '120', uncounted: 2 }] });
+    const series = await repo.adultsReached({ dimension: 'none', dateRange: RANGE, filters: {} });
     const [sql] = poolMock.query.mock.calls[0];
-    // impactClause() pushes an ARRAY[...] parameter for ecd+soup_kitchen;
-    // this metric filters by a single beneficiary_kind value instead.
-    expect(sql).not.toMatch(/beneficiary_kind = ANY/);
+    expect(sql).toMatch(/SUM\(k\.adult_count\)/);
+    expect(sql).toMatch(/k\.kind = ps\.beneficiary_kind AND lower\(k\.name\) = lower\(ps\.beneficiary_name\)/);
+    expect(series).toEqual([{ label: 'Total', value: 120, meta: { uncounted: 2 } }]);
   });
 });
 
@@ -181,7 +183,10 @@ describe('compostProcessed', () => {
 
     const [sql, params] = poolMock.query.mock.calls[0];
     expect(sql).toMatch(/FROM collection_kit_records/);
-    expect(sql).not.toMatch(/status/);
+    // A kit's record counts whatever its status; a site drop-off unless rejected.
+    expect(sql).not.toMatch(/r\.status/);
+    expect(sql).toMatch(/FROM fts_dropoffs d/);
+    expect(sql).toMatch(/d\.status = 'logged'/);
     expect(sql).toMatch(/SUM\(kg_compost\)/);
     expect(params).toEqual([RANGE.from, RANGE.to]);
     expect(result).toEqual([{ label: 'Total', value: 16.5 }]);
@@ -192,8 +197,10 @@ describe('compostProcessed', () => {
     await repo.compostProcessed({ dimension: 'region', dateRange: RANGE });
 
     const [sql] = poolMock.query.mock.calls[0];
-    expect(sql).toMatch(/LEFT JOIN collection_kits ck ON ck\.id = t\.kit_id/);
-    expect(sql).toMatch(/COALESCE\(ck\.suburb, 'Unspecified'\)/);
+    // The kit owner's suburb, or the drop-off site's.
+    expect(sql).toMatch(/LEFT JOIN collection_kits ck ON ck\.id = r\.kit_id/);
+    expect(sql).toMatch(/COALESCE\(p\.suburb, p\.name\)/);
+    expect(sql).toMatch(/COALESCE\(t\.suburb, 'Unspecified'\)/);
     expect(sql).toMatch(/ORDER BY 2 DESC, 1/);
   });
 

@@ -153,6 +153,13 @@ export async function releaseSlip(slipId) {
   return request(`/${slipId}/release`, { method: 'POST' });
 }
 
+// POST /api/picking/:id/follow-up — manager only: records that the
+// centre of a pallet that was not collected has been contacted.
+// Returns the slip with who followed it up and when.
+export async function followUpSlip(slipId) {
+  return request(`/${slipId}/follow-up`, { method: 'POST' });
+}
+
 // PATCH /api/picking/:id — manager only, and only while the slip is
 // still pending: dispatch date, cohort, and/or the whole product-line
 // list. `items`, when sent, REPLACES the slip's current lines — send

@@ -39,4 +39,13 @@ const recordCount = async (req, res) => {
   }
 };
 
-export default { getMap, saveLayout, recordCount };
+// PATCH /api/warehouse-map/areas/:id/capacity   Body: { capacityKg } or { palletSpaces }
+const setCapacity = async (req, res) => {
+  try {
+    res.status(200).json({ success: true, data: await mapService.setCapacity(req.params.id, req.body) });
+  } catch (err) {
+    send(res, 'setAreaCapacity', 'Could not save the capacity.')(err);
+  }
+};
+
+export default { getMap, saveLayout, recordCount, setCapacity };

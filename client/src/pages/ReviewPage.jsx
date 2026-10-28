@@ -59,6 +59,9 @@ export function ReviewPage() {
         resolvedCount: items.filter((it) => it.status === "resolved" || it.status === "committed").length,
         awaitingCount: items.filter((it) => it.status === "awaiting_resolution").length,
         awaitingItems: items.filter((it) => it.status === "awaiting_resolution"),
+        // The value, on the confirmation too.
+        valueZar: draft.estimatedValueZar === "" || draft.estimatedValueZar == null ? null : Number(draft.estimatedValueZar),
+        valueEstimated: draft.valueEstimated === true,
       });
       setCompletionOpen(true);
     } catch (err) {

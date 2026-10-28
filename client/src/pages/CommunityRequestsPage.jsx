@@ -274,11 +274,13 @@ export default function CommunityRequestsPage() {
               <TableRow>
                 <TableHead className="pl-4 sm:pl-5">Requested</TableHead>
                 {show('items') ? <TableHead>Items</TableHead> : null}
-                {show('notes') ? <TableHead>Quantity and collection notes</TableHead> : null}
+                {show('notes') ? <TableHead className="min-w-28 whitespace-normal">Quantity and collection notes</TableHead> : null}
                 {show('caller') ? <TableHead>Caller</TableHead> : null}
                 {show('status') ? <TableHead>Status</TableHead> : null}
-                {/* Sticky so the actions stay visible at laptop widths. */}
-                <TableHead className="sticky right-0 bg-card" />
+                {/* Not sticky: a sticky column sat on top of Caller and
+                    Status at laptop widths and folded over them as the
+                    table scrolled. Short labels keep it narrow instead. */}
+                <TableHead className="pr-4 sm:pr-5"><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -289,8 +291,9 @@ export default function CommunityRequestsPage() {
                 const packer = packerLabel(r);
                 return (
                   <TableRow key={r.id}>
+                    {/* The date over the time: one line was the widest cell. */}
                     <TableCell className="whitespace-nowrap pl-4 text-muted-foreground sm:pl-5">
-                      {fmtDateTime(r.requestedAt)}
+                      {fmtDateTime(r.requestedAt).split(', ').map((part) => <span key={part} className="block">{part}</span>)}
                     </TableCell>
                     {show('items') ? (
                       <TableCell className="min-w-40 max-w-xs whitespace-pre-line">
@@ -307,12 +310,12 @@ export default function CommunityRequestsPage() {
                       </TableCell>
                     ) : null}
                     {show('notes') ? (
-                      <TableCell className="min-w-32 max-w-48 whitespace-pre-line text-muted-foreground">
+                      <TableCell className="min-w-16 max-w-48 whitespace-pre-line text-muted-foreground">
                         {r.quantityNote || '-'}
                       </TableCell>
                     ) : null}
                     {show('caller') ? (
-                      <TableCell className="min-w-36 whitespace-normal text-muted-foreground">
+                      <TableCell className="min-w-28 whitespace-normal text-muted-foreground">
                         <button
                           type="button"
                           onClick={() => setPanel({ type: 'detail', request: r })}
@@ -351,24 +354,24 @@ export default function CommunityRequestsPage() {
                         ) : null}
                       </TableCell>
                     ) : null}
-                    <TableCell className="sticky right-0 whitespace-nowrap bg-card pr-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)] sm:pr-5">
+                    <TableCell className="whitespace-nowrap pr-4 text-right sm:pr-5">
                       {resolved ? (
                         <span className="text-xs text-muted-foreground">
                           {fmtDateTime(r.resolvedAt)}
                         </span>
                       ) : r.outcome === 'pending' ? (
-                        <Button type="button" size="sm" onClick={() => openItems('approve', r)}>
-                          Approve and choose items
+                        <Button type="button" size="sm" aria-label="Approve and choose items" onClick={() => openItems('approve', r)}>
+                          Approve
                         </Button>
                       ) : (
                         <div className="flex justify-end gap-2">
                           {flagged ? (
-                            <Button type="button" size="sm" onClick={() => openItems('rechoose', r)}>
-                              Choose other items
+                            <Button type="button" size="sm" aria-label="Choose other items" onClick={() => openItems('rechoose', r)}>
+                              Other items
                             </Button>
                           ) : (
-                            <Button type="button" variant="outline" size="sm" onClick={() => openAssign(r)}>
-                              Assign packer
+                            <Button type="button" variant="outline" size="sm" aria-label="Assign packer" onClick={() => openAssign(r)}>
+                              Assign
                             </Button>
                           )}
                           <Button

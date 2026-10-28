@@ -207,6 +207,15 @@ describe('lead time', () => {
       linked_suppliers: [{ name: 'A', agreedDays: null }, { name: 'B', agreedDays: 5 }, { name: 'C', agreedDays: 9 }],
     })).toMatchObject({ days: 9, supplier: 'C', label: 'Longest agreed of 3 suppliers: 9 days' });
   });
+
+  // Migration 066: who a manager says it is ordered from comes first.
+  it('takes the preferred supplier over the latest order, with its id', () => {
+    expect(lead({
+      supplier_id: 2, supplier_name: 'Cape Mills', supplier_agreed_days: 4,
+      preferred_supplier_id: 7, preferred_supplier_name: 'Fresh Co', preferred_agreed_days: 2,
+    })).toMatchObject({ days: 2, supplier: 'Fresh Co', supplierId: 7, preferredSupplier: true, label: 'Agreed with Fresh Co: 2 days' });
+    expect(lead({ supplier_id: 2 })).toMatchObject({ supplier: 'Cape Mills', supplierId: 2, preferredSupplier: false });
+  });
 });
 
 describe('drawing stock down', () => {

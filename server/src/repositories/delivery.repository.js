@@ -37,6 +37,7 @@ import {
   RECEIVABLE_PO_STATUSES,
   PO_STATUS_FULLY_RECEIVED,
   PO_STATUS_PARTIALLY_RECEIVED,
+  NO_OPEN_FOLLOW_UP_SQL,
 } from "../constants/purchaseOrderStatus.js";
 
 // ── The goods-in archive ──────────────────────────────────────
@@ -320,8 +321,11 @@ const createDelivery = async ({
     // FOR UPDATE because the two checks below are read-then-write:
     // without it, two tablets submitting the same delivery at the
     // same moment both see 'approved' and both receive the stock.
+    // rest_elsewhere: an older order whose rest was moved to a
+    // follow-up order is received against that one, not this.
     const poResult = await client.query(
-      `SELECT id, supplier_id, status FROM purchase_orders WHERE id = $1 FOR UPDATE`,
+      `SELECT po.id, po.supplier_id, po.status, NOT ${NO_OPEN_FOLLOW_UP_SQL} AS rest_elsewhere
+         FROM purchase_orders po WHERE po.id = $1 FOR UPDATE`,
       [purchaseOrderId],
     );
     const purchaseOrder = poResult.rows[0];
@@ -355,9 +359,9 @@ const createDelivery = async ({
     // 'pending' is refused too: it is open, but nobody has approved it
     // yet (RECEIVABLE_PO_STATUSES). The two lists below read the same
     // constant, so what is offered and what is accepted cannot disagree.
-    if (!isReceivablePurchaseOrder(purchaseOrder.status)) {
+    if (!isReceivablePurchaseOrder(purchaseOrder.status) || purchaseOrder.rest_elsewhere) {
       await client.query("ROLLBACK");
-      return { purchaseOrderNotOpen: true, status: purchaseOrder.status };
+      return { purchaseOrderNotOpen: true, status: purchaseOrder.status, restElsewhere: Boolean(purchaseOrder.rest_elsewhere) };
     }
 
     // status and created_at both have defaults — listing them here is
@@ -469,12 +473,12 @@ const createDelivery = async ({
     //   nothing owed   -> completed, and so is every order it was a
     //                     follow-up to (they were waiting on this one)
     //   something owed -> partially_received, with what was short kept as
-    //                     its reason. That pair IS the "follow-up
-    //                     required" flag the floor and the manager see:
-    //                     the status says part of it is in, the flag
-    //                     says the rest needs chasing. The flag clears
-    //                     when a follow-up order is raised, and the
-    //                     status stays until that order is received.
+    //                     its reason: the "Balance outstanding" label
+    //                     the floor and the manager see. The order stays
+    //                     open on the same order number, and the rest is
+    //                     received against it (this query counts every
+    //                     delivery, so the next one closes it when the
+    //                     balance is in).
     const owed = await client.query(
       `SELECT p.name, p.default_unit AS unit,
               (poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0))::numeric AS short
@@ -590,6 +594,7 @@ const getSuppliersWithOpenOrders = async () => {
      FROM suppliers s
      JOIN purchase_orders po ON po.supplier_id = s.id
      WHERE po.status = ANY($1)
+       AND ${NO_OPEN_FOLLOW_UP_SQL}
        AND s.is_active = true
      ORDER BY s.name ASC`,
     [RECEIVABLE_PO_STATUSES],
@@ -644,6 +649,7 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
      LEFT JOIN suppliers s ON s.id = po.supplier_id
      WHERE ($1::int IS NULL OR po.supplier_id = $1::int)
        AND po.status = ANY($2)
+       AND ${NO_OPEN_FOLLOW_UP_SQL}
      ORDER BY po.expected_delivery_date ASC NULLS LAST, po.id ASC`,
     [supplierId ?? null, RECEIVABLE_PO_STATUSES],
   );

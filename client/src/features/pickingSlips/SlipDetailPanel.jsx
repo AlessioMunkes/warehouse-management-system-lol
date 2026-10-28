@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────
 import PhotoStrip from '@/components/ui/photo-strip';
 import { useState } from 'react';
-import { Pencil, Printer, Undo2, UserPlus, UserRoundCheck } from 'lucide-react';
+import { MessageCircle, Pencil, PhoneCall, Printer, Undo2, UserPlus, UserRoundCheck } from 'lucide-react';
 import DetailPanel from '@/components/ui/detail-panel';
 import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,10 @@ import {
 import { COHORT_LABELS } from '@/lib/cohorts';
 
 const ITEM_STATUS = { pending: 'To pack', confirmed: 'Packed', flagged: 'Flagged' };
+
+const fmtWhen = (iso) => new Date(iso).toLocaleString('en-ZA', {
+  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg',
+});
 
 const Section = ({ title, children }) => (
   <section>
@@ -61,7 +65,7 @@ const WorkerSelect = ({ id, label, workers, exclude = [], value, onChange }) => 
 
 export default function SlipDetailPanel({
   slip, workers = [], busy = false,
-  onAssign, onRelease, onAddSecond, onEdit, onPrintLabel, onClose,
+  onAssign, onRelease, onAddSecond, onFollowUp, onEdit, onPrintLabel, onClose,
 }) {
   const [assignTo, setAssignTo] = useState('');
   const [secondTo, setSecondTo] = useState('');
@@ -101,6 +105,41 @@ export default function SlipDetailPanel({
           ? <Fact label="For" value={slip.beneficiary_kind === 'soup_kitchen' ? 'Soup kitchen' : slip.beneficiary_kind === 'dignity_kitchen' ? 'Dignity Kitchen' : 'Community'} />
           : <Fact label="Children" value={slip.child_count ?? '-'} />}
       </dl>
+
+      {/* Nobody came for it: get in touch with the centre, and keep a
+          record that someone did. */}
+      {slip.follow_up ? (
+        <Section title="Follow up">
+          <p className="mb-3 text-sm">
+            {slip.followed_up_at
+              ? `Followed up by ${slip.followed_up_by_name ?? 'a manager'}, ${fmtWhen(slip.followed_up_at)}.`
+              : 'Nobody came to collect this pallet, and nobody has followed it up yet.'}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {slip.follow_up.whatsappLink ? (
+              // Opens the chat with the message typed in, and records the
+              // follow-up: sending it is the person's own tap in WhatsApp.
+              <Button
+                type="button" size="sm" disabled={busy}
+                onClick={() => {
+                  window.open(slip.follow_up.whatsappLink, '_blank', 'noopener,noreferrer');
+                  onFollowUp?.();
+                }}
+              >
+                <MessageCircle /> Follow up on WhatsApp
+              </Button>
+            ) : null}
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => onFollowUp?.()}>
+              <PhoneCall /> {slip.followed_up_at ? 'Followed up again' : 'Mark followed up'}
+            </Button>
+          </div>
+          {!slip.follow_up.whatsappLink ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              No mobile number on record for this centre. Add one in Beneficiaries to follow up on WhatsApp.
+            </p>
+          ) : null}
+        </Section>
+      ) : null}
 
       <Section title="Who is packing it">
         <p className="mb-3 text-sm">

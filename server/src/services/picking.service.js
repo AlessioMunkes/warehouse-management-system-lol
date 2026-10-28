@@ -10,6 +10,7 @@ import pickingRepository from '../repositories/picking.repository.js';
 import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
 import pushService       from './push.service.js';
+import { normaliseSaMobileToE164, whatsappLink } from '../utils/whatsapp.js';
 
 const COHORTS = ['tuesday', 'thursday'];
 const STATUSES = ['pending', 'in_progress', 'complete', 'cancelled'];
@@ -94,10 +95,43 @@ const getSlips = async (query, user) => {
 };
 
 // ── One slip ──────────────────────────────────────────────────
+// A pallet nobody came for carries what a manager needs to follow it
+// up: the message, and the centre's mobile as a WhatsApp link when it
+// has one.
+const followUpMessage = (slip) => {
+  const day = new Date(`${slip.dispatch_date_iso}T12:00:00Z`)
+    .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Africa/Johannesburg' });
+  return [
+    slip.contact_name ? `Hello ${slip.contact_name},` : 'Hello,',
+    `${slip.ecd_name}'s food from Ladles of Love was ready for collection on ${day}, but nobody came to fetch it.`,
+    'Please let us know when you can collect it, or if anything has changed.',
+    'Kind regards,',
+    'Ladles of Love',
+  ].join('\n\n');
+};
+
+const withFollowUp = (slip) => {
+  if (slip.dispatch_status !== 'not_collected') return slip;
+  const message = followUpMessage(slip);
+  const e164 = normaliseSaMobileToE164(slip.mobile_number) ?? normaliseSaMobileToE164(slip.contact_phone);
+  return {
+    ...slip,
+    follow_up: { message, whatsappNumber: e164, whatsappLink: e164 ? whatsappLink(e164, message) : null },
+  };
+};
+
 const getSlipById = async (id) => {
   const slip = await pickingRepository.getSlipById(id);
   if (!slip) fail(404, 'Picking slip not found.');
-  return slip;
+  return withFollowUp(slip);
+};
+
+// ── Follow up a pallet that was not collected (manager only) ────
+const followUpSlip = async (slipId, user) => {
+  const result = await pickingRepository.recordFollowUp({ slipId: Number(slipId), actorId: user.id });
+  if (result.notFound) fail(404, 'Picking slip not found.');
+  if (result.notNotCollected) fail(409, 'Only a pallet that was not collected can be followed up.');
+  return getSlipById(Number(slipId));
 };
 
 // ── Shared date/cohort validation ─────────────────────────────
@@ -476,6 +510,7 @@ export default {
   assignSlip,
   addSecondPacker,
   releaseSlip,
+  followUpSlip,
   editSlip,
   confirmItem,
   flagItem,

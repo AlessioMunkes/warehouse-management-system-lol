@@ -58,8 +58,8 @@ export const OPEN_PO_STATUSES = [
 ];
 
 // Still expecting goods against this order itself. A part-received
-// order is not: the rest comes on its follow-up order.
-export const RECEIVABLE_PO_STATUSES = ["approved", "in_transit"];
+// order is: a short delivery leaves it open on the same order number.
+export const RECEIVABLE_PO_STATUSES = ["approved", "in_transit", "partially_received"];
 
 // Mirrors PO_MANUAL_TRANSITIONS on the server: from each status, the
 // statuses a manager's buttons lead to. The server refuses anything else.
@@ -68,28 +68,30 @@ export const PO_MANUAL_TRANSITIONS = {
   approved:           ["in_transit", "follow_up_required", "returned"],
   in_transit:         ["approved", "follow_up_required", "returned"],
   follow_up_required: ["approved", "completed", "returned"],
-  partially_received: ["approved", "completed", "returned"],
+  partially_received: ["completed", "returned"],
   completed:          [],
   returned:           [],
 };
 export const canMovePurchaseOrder = (from, to) => (PO_MANUAL_TRANSITIONS[from] ?? []).includes(to);
 
-// THE FOLLOW-UP FLAG
-// "Partially received" is the status of an order that came in short.
-// "Follow-up required" is a flag on top of it, shown until a follow-up
-// order is raised for the rest (or the order is reopened or closed). It
-// is not stored: an order is flagged while it is part received and no
-// follow-up order is on its way. An order a manager marked for follow-up
-// before anything arrived is flagged too.
-export const needsFollowUp = (po) => {
-  if (!po) return false;
-  if (po.status === "follow_up_required") return true;
-  if (po.status !== "partially_received") return false;
+// BALANCE OUTSTANDING
+// "Partially received" is the status of an order that came in short. It
+// stays open on the same order number, labelled "Balance outstanding",
+// until the rest is received against it or a manager closes it. Not
+// stored: an order is labelled while it is part received, unless it is
+// an older one whose rest was moved to a follow-up order still on its way.
+export const BALANCE_OUTSTANDING = "Balance outstanding";
+export const hasBalanceOutstanding = (po) => {
+  if (!po || po.status !== "partially_received") return false;
   const coming = po.followUpOrders?.length
     ? po.followUpOrders.filter((o) => o.status !== "completed" && o.status !== "returned").length
     : (po.openFollowUpCount ?? 0);
   return coming === 0;
 };
+
+// THE FOLLOW-UP FLAG: an order someone has to chase with the supplier.
+// One with a balance outstanding, or one a manager marked for follow-up.
+export const needsFollowUp = (po) => Boolean(po) && (po.status === "follow_up_required" || hasBalanceOutstanding(po));
 
 // ── Row mappers ───────────────────────────────────────────────
 const toLine = (row) => ({
@@ -215,13 +217,6 @@ export const setPurchaseOrderStatus = async (id, status, reason = null) => {
 
 export const approvePurchaseOrder = async (id) => setPurchaseOrderStatus(id, "approved");
 
-// ── POST /api/purchase-orders/:id/follow-up-order ───────────────
-// A second order for what came short. Answers with the new order; the
-// first moves to Partially received.
-export const createFollowUpOrder = async (id, expectedDeliveryDate = null) => {
-  const body = await apiPost(`/api/purchase-orders/${id}/follow-up-order`, expectedDeliveryDate ? { expectedDeliveryDate } : {});
-  return toPurchaseOrder(body.data ?? {});
-};
 
 // ── PATCH /api/purchase-orders/:id/quickbooks-ref ───────────────
 // quickbooksPoId "" clears the reference — see purchaseOrder.service.js.
@@ -273,7 +268,7 @@ export const deletePurchaseOrder = async (id) => {
 
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
-  setPurchaseOrderStatus, approvePurchaseOrder, createFollowUpOrder, setQuickbooksReference,
+  setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
   updatePurchaseOrder, deletePurchaseOrder, resendFinanceEmail,
   previewQuickbooksImport, applyQuickbooksImport,
 };

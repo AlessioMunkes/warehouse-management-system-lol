@@ -12,7 +12,7 @@
 // since 'pending' is the only state where every item is guaranteed
 // untouched. A packer mid-count never sees their list rewritten.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
 import { Input }    from '@/components/ui/input';
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { generateSlips, createSlip, editSlip } from '../../services/pickingAPI';
+import { getKitchens } from '../../services/kitchenAPI';
 import { todaySast } from './slipViews';
 import ErrorBanner from '@/components/ui/error-banner';
 import { COHORT_OPTIONS } from '@/lib/cohorts';
@@ -175,7 +176,20 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  // The kitchens on Beneficiaries, offered as names: a pallet counts
+  // towards adults served when its name matches its kitchen's. A
+  // failure leaves the name typed by hand, as before.
+  const [kitchens, setKitchens] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    getKitchens().then((rows) => { if (!cancelled) setKitchens(rows); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const forKitchen = form.kind !== 'ecd';
+  const kitchenNames = kitchens.filter((k) => k.kind === form.kind).map((k) => k.name);
+  const knownKitchen = kitchens.find((k) => k.kind === form.kind
+    && k.name.toLowerCase() === form.beneficiaryName.trim().toLowerCase());
 
   // A kitchen has no standing order, so its lines are always typed.
   // Switching to one opens the product lines straight away.
@@ -260,11 +274,23 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
           <Field>
             <FieldLabel htmlFor="adhoc-name">{form.kind === 'soup_kitchen' ? 'Soup kitchen name' : 'Name'}</FieldLabel>
             <Input
-              id="adhoc-name" value={form.beneficiaryName} maxLength={120}
+              id="adhoc-name" value={form.beneficiaryName} maxLength={120} list="adhoc-kitchens"
               onChange={(e) => setForm((f) => ({ ...f, beneficiaryName: e.target.value }))}
               placeholder={form.kind === 'soup_kitchen' ? 'e.g. Hope Soup Kitchen' : 'Dignity Kitchen'}
             />
-            <FieldDescription>Shown on the pallet, at the gate and on the dispatch note.</FieldDescription>
+            <datalist id="adhoc-kitchens">
+              {kitchenNames.map((n) => <option key={n} value={n} />)}
+            </datalist>
+            <FieldDescription>
+              Shown on the pallet, at the gate and on the dispatch note.
+              {form.beneficiaryName.trim()
+                ? knownKitchen
+                  ? (knownKitchen.adultCount === null
+                    ? ' Its adults per collection are not set on Beneficiaries, so it adds nothing to adults served.'
+                    : ` Counts as ${knownKitchen.adultCount.toLocaleString('en-ZA')} adults served once collected.`)
+                  : ' Not on Beneficiaries, Kitchens: add it there for its adults to count on the impact report.'
+                : ''}
+            </FieldDescription>
           </Field>
         ) : (
         <Field>

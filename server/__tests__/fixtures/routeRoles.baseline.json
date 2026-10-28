@@ -198,7 +198,6 @@
   "purchaseOrder.routes.js POST /quickbooks-import/apply": "admin,manager",
   "purchaseOrder.routes.js GET /:id": "admin,manager,warehouse_worker",
   "purchaseOrder.routes.js PATCH /:id/status": "admin,manager",
-  "purchaseOrder.routes.js POST /:id/follow-up-order": "admin,manager",
   "purchaseOrder.routes.js PATCH /:id/quickbooks-ref": "admin,manager",
   "purchaseOrder.routes.js POST /:id/finance-email/resend": "admin,manager",
   "purchaseOrder.routes.js PUT /:id": "admin,manager",
@@ -299,5 +298,19 @@
   "warehouseMap.routes.js POST /areas/:id/counts": "admin,manager",
   "impactMap.routes.js GET /": "admin,manager",
   "centreLocation.routes.js GET /": "admin,manager",
-  "centreLocation.routes.js PATCH /:id": "admin,manager"
+  "centreLocation.routes.js PATCH /:id": "admin,manager",
+  "donation.routes.js POST /estimate-value": "admin,manager,warehouse_worker",
+  "donation.routes.js PATCH /:id/value": "admin,manager",
+  "ftsDropPoint.routes.js GET /drop/:token": "no role check",
+  "ftsDropPoint.routes.js POST /drop/:token": "no role check",
+  "ftsDropPoint.routes.js GET /drop-points": "admin,manager",
+  "ftsDropPoint.routes.js POST /drop-points": "admin,manager",
+  "ftsDropPoint.routes.js PATCH /drop-points/:id": "admin,manager",
+  "ftsDropPoint.routes.js GET /dropoffs": "admin,manager",
+  "ftsDropPoint.routes.js PATCH /dropoffs/:id": "admin,manager",
+  "kitchen.routes.js GET /": "admin,manager",
+  "kitchen.routes.js POST /": "admin,manager",
+  "kitchen.routes.js PATCH /:id": "admin,manager",
+  "picking.routes.js POST /:id/follow-up": "admin,manager",
+  "warehouseMap.routes.js PATCH /areas/:id/capacity": "admin,manager"
 }

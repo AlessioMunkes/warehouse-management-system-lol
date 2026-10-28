@@ -198,15 +198,39 @@ const dispatchVolume = (spec) => dispatchedKgQuery({ ...spec, impactOnly: false 
 // measurement stays inspectable and a factor change needs no re-query.
 const mealsEnabled   = (spec) => dispatchedKgQuery({ ...spec, impactOnly: true });
 
-// Soup kitchens only, forced rather than left to the caller — this is
-// not a general "pick a beneficiary kind" report, it IS the adults
-// number. NFR-20 keeps dignity kitchens out of impact reporting
-// entirely, so there is no other beneficiary kind this could mean.
-const adultsReached = (spec) => dispatchedKgQuery({
-  ...spec,
-  impactOnly: false,
-  filters: { ...spec.filters, beneficiary_kind: 'soup_kitchen' },
-});
+// Adults served, counted as meals (migration 068): every collected
+// pallet for a soup kitchen or the Dignity Kitchen is as many adults as
+// its kitchen feeds per collection, one meal each. A pallet is matched
+// to its kitchen by kind and name, the way the slip names it. Kitchens
+// with no adult count, and pallets for a kitchen nobody registered, add
+// nothing, and the meta says how many pallets that was.
+const ADULT_KITCHEN_KINDS = ['soup_kitchen', 'dignity_kitchen'];
+
+const adultsReached = async ({ dimension, filters = {}, dateRange }) => {
+  const dim = slipDimension(dimension, LEFT_DAY);
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `${LEFT_DAY} BETWEEN $1::date AND $2::date`,
+    `de.status = ANY($${params.push(COLLECTED_STATUSES)}::text[])`,
+    `ps.beneficiary_kind = ANY($${params.push(ADULT_KITCHEN_KINDS)}::beneficiary_type[])`,
+  ];
+  if (filters.cohort) { params.push(filters.cohort); where.push(`ps.cohort = $${params.length}`); }
+
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label,
+            SUM(k.adult_count)::numeric AS value,
+            COUNT(*) FILTER (WHERE k.adult_count IS NULL)::int AS uncounted
+       FROM picking_slips ps
+       JOIN dispatch_events de ON de.picking_slip_id = ps.id
+  LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+  LEFT JOIN kitchens k ON k.kind = ps.beneficiary_kind AND lower(k.name) = lower(ps.beneficiary_name)
+      WHERE ${where.join(' AND ')}
+      ${dim.group ? `GROUP BY ${dim.group}` : ''}
+      ORDER BY ${orderFor(dimension)}`,
+    params
+  );
+  return rows.map((r) => ({ label: r.label, value: num(r.value ?? 0), meta: { uncounted: r.uncounted } }));
+};
 
 // Same shape as adultsReached, forced to dignity_kitchen instead —
 // see reportCatalog.js's dignity_kitchen_served entry for why this
@@ -340,7 +364,7 @@ const compostDimension = (dimension) => {
   switch (dimension) {
     case 'none':   return { expr: `'Total'`,                        group: null };
     case 'month':  return { expr: bucketMonth('bucket_date'),        group: bucketMonth('bucket_date') };
-    case 'region': return { expr: `COALESCE(ck.suburb, 'Unspecified')`, group: `COALESCE(ck.suburb, 'Unspecified')` };
+    case 'region': return { expr: `COALESCE(t.suburb, 'Unspecified')`, group: `COALESCE(t.suburb, 'Unspecified')` };
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -349,11 +373,20 @@ const compostProcessed = async ({ dimension, dateRange }) => {
   const dim = compostDimension(dimension);
   const params = [dateRange.from, dateRange.to];
   const { rows } = await pool.query(
+    // Kits weighed at the warehouse, and compost logged by QR code at a
+    // drop-off site (migration 069) unless staff rejected it. A site's
+    // region is its own suburb.
     `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost), 0)::numeric AS value
-       FROM (SELECT ${sastDate('logged_at')} AS bucket_date, kg_compost, kit_id
-               FROM collection_kit_records
-              WHERE ${sastDate('logged_at')} BETWEEN $1::date AND $2::date) t
-       LEFT JOIN collection_kits ck ON ck.id = t.kit_id
+       FROM (SELECT ${sastDate('r.logged_at')} AS bucket_date, r.kg_compost, ck.suburb
+               FROM collection_kit_records r
+               LEFT JOIN collection_kits ck ON ck.id = r.kit_id
+              WHERE ${sastDate('r.logged_at')} BETWEEN $1::date AND $2::date
+             UNION ALL
+             SELECT ${sastDate('d.submitted_at')}, d.kg_compost, COALESCE(p.suburb, p.name)
+               FROM fts_dropoffs d
+               JOIN fts_drop_points p ON p.id = d.drop_point_id
+              WHERE d.status = 'logged'
+                AND ${sastDate('d.submitted_at')} BETWEEN $1::date AND $2::date) t
        ${dim.group ? `GROUP BY ${dim.group}` : ''}
        ORDER BY ${dimension === 'region' ? '2 DESC, 1' : '1'}`,
     params
@@ -942,27 +975,47 @@ const communityRequestOutcomes = async ({ dimension, filters = {}, dateRange }) 
 // ══ Volunteers ═════════════════════════════════════════════════
 // Aggregate hours only. full_name is never selected, grouped by, or
 // filtered on — this must not become a per-volunteer timesheet.
-// Sessions with no sign-out are excluded rather than counted as
-// zero: a volunteer who forgot to sign out worked an unknown number
-// of hours, not none.
+//
+// Two kinds of time given, added together:
+//   Warehouse guests   a guest's visit, sign-in to sign-out. A visit
+//                      with no sign-out is excluded rather than counted
+//                      as zero; since migration 067 a visit idle for
+//                      four hours is signed out when the guest last did
+//                      something, so few are left without one.
+//   Volunteer events   each booking checked in at a volunteer event,
+//                      for the length of its timeslot.
+const VOLUNTEER_SOURCES = ['Warehouse guests', 'Volunteer events'];
+
 const volunteerHours = async ({ dimension, dateRange }) => {
-  const d = sastDate('v.signed_in_at');
+  const d = 'h.day';
   const expr = {
-    none:  `'Total'`,
-    month: bucketMonth(d),
-    week:  bucketWeek(d),
-    day:   bucketDay(d),
+    none:   `'Total'`,
+    month:  bucketMonth(d),
+    week:   bucketWeek(d),
+    day:    bucketDay(d),
+    source: 'h.source',
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
   const { rows } = await pool.query(
-    `SELECT ${expr} AS label,
-            ROUND(SUM(EXTRACT(EPOCH FROM (v.signed_out_at - v.signed_in_at)) / 3600.0)::numeric, 1) AS value,
+    `WITH h AS (
+       SELECT ${sastDate('v.signed_in_at')} AS day, '${VOLUNTEER_SOURCES[0]}'::text AS source,
+              EXTRACT(EPOCH FROM (v.signed_out_at - v.signed_in_at)) / 3600.0 AS hours
+         FROM volunteers v
+        WHERE v.signed_out_at IS NOT NULL AND v.signed_out_at > v.signed_in_at
+       UNION ALL
+       SELECT ${sastDate('t.start_time')}, '${VOLUNTEER_SOURCES[1]}'::text,
+              EXTRACT(EPOCH FROM (t.end_time - t.start_time)) / 3600.0
+         FROM attendance a
+         JOIN volunteer_bookings b ON b.booking_id = a.booking_id
+         JOIN event_timeslots t    ON t.timeslot_id = b.timeslot_id
+        WHERE a.checked_in = true AND t.end_time > t.start_time
+     )
+     SELECT ${expr} AS label,
+            ROUND(SUM(h.hours)::numeric, 1) AS value,
             COUNT(*)::int AS sessions
-       FROM volunteers v
+       FROM h
       WHERE ${d} BETWEEN $1::date AND $2::date
-        AND v.signed_out_at IS NOT NULL
-        AND v.signed_out_at > v.signed_in_at
       ${dimension === 'none' ? '' : `GROUP BY ${expr}`} ORDER BY 1`,
     [dateRange.from, dateRange.to]
   );

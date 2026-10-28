@@ -60,7 +60,12 @@ const getCredentials = async (userId) => {
 
 const findOtherUserWithEmail = async (email, userId) => {
   const { rows } = await pool.query(
-    `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id <> $2 LIMIT 1`,
+    // Another account in the same role: an address may be on one
+    // account of each role (migration 065).
+    `SELECT id FROM users
+      WHERE LOWER(email) = LOWER($1) AND id <> $2
+        AND role = (SELECT role FROM users WHERE id = $2)
+      LIMIT 1`,
     [email, userId],
   );
   return rows[0] ?? null;

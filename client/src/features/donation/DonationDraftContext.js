@@ -39,6 +39,9 @@ export const emptyDraft = () => ({
   category: "",              // not asked for on the form yet
   items: [emptyItem()],
   estimatedValueZar: "",
+  // True while the value is the system's estimate from the items, not a
+  // typed one. A manager verifies an estimate (Section 18A).
+  valueEstimated: false,
   isFood: null,
   contactMethod: "",
   contactDetails: "",

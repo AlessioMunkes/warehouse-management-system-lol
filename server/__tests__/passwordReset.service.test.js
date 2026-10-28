@@ -28,7 +28,7 @@ const resetRepoMock = {
 };
 
 const userRepoMock = {
-  findUserByEmail: vi.fn(),
+  findUsersByEmail: vi.fn(),
   getUserById:     vi.fn(),
 };
 
@@ -62,7 +62,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  userRepoMock.findUserByEmail.mockResolvedValue(null);
+  userRepoMock.findUsersByEmail.mockResolvedValue([]);
   userRepoMock.getUserById.mockResolvedValue(ACTIVE_ACCOUNT);
   resetRepoMock.findRecentActiveByUserId.mockResolvedValue(null);
   resetRepoMock.recordEmailAttempt.mockResolvedValue(undefined);
@@ -96,7 +96,7 @@ const inProductionWithNoAddress = async (fn) => {
 describe('requestReset — a server with no web address (production)', () => {
   it('creates no reset and sends no email with a broken link, but still answers the same', async () => {
     await inProductionWithNoAddress(async (log) => {
-      userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+      userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
       const result = passwordResetService.requestReset('jane@example.com', '1.2.3.4');
       await flush();
 
@@ -113,7 +113,7 @@ describe('requestReset — a server with no web address (production)', () => {
     vi.stubEnv('PASSWORD_RESET_BASE_URL', '');
     vi.stubEnv('CLIENT_URL', 'https://wms.example');
     try {
-      userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+      userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
       passwordResetService.requestReset('jane@example.com', '1.2.3.4');
       await flush();
       expect(emailProviderMock.sendEmail.mock.calls[0][0].text).toContain('https://wms.example/reset-password/');
@@ -131,7 +131,7 @@ describe('requestReset — no enumeration, no timing oracle', () => {
   });
 
   it('returns the identical generic message for a known, active email', () => {
-    userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+    userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
     const result = passwordResetService.requestReset('jane@example.com', '1.2.3.4');
     expect(result).toEqual({ message: GENERIC });
   });
@@ -139,13 +139,13 @@ describe('requestReset — no enumeration, no timing oracle', () => {
   it('does not await the lookup/email work before returning', () => {
     // Never-resolving lookup — if requestReset awaited this internally,
     // this test would hang/time out instead of returning immediately.
-    userRepoMock.findUserByEmail.mockReturnValue(new Promise(() => {}));
+    userRepoMock.findUsersByEmail.mockReturnValue(new Promise(() => {}));
     const result = passwordResetService.requestReset('jane@example.com', '1.2.3.4');
     expect(result).toEqual({ message: GENERIC });
   });
 
   it('creates a reset and sends an email for a known, active user (fire-and-forget)', async () => {
-    userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+    userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
     passwordResetService.requestReset('jane@example.com', '1.2.3.4');
     await flush();
     expect(resetRepoMock.createReset).toHaveBeenCalledWith(
@@ -162,7 +162,7 @@ describe('requestReset — no enumeration, no timing oracle', () => {
   });
 
   it('does nothing for an inactive account', async () => {
-    userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+    userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
     userRepoMock.getUserById.mockResolvedValue({ ...ACTIVE_ACCOUNT, is_active: false });
     passwordResetService.requestReset('jane@example.com', '1.2.3.4');
     await flush();
@@ -171,7 +171,7 @@ describe('requestReset — no enumeration, no timing oracle', () => {
   });
 
   it('does nothing for an archived account', async () => {
-    userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+    userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
     userRepoMock.getUserById.mockResolvedValue({ ...ACTIVE_ACCOUNT, archived_at: new Date().toISOString() });
     passwordResetService.requestReset('jane@example.com', '1.2.3.4');
     await flush();
@@ -180,14 +180,14 @@ describe('requestReset — no enumeration, no timing oracle', () => {
   });
 
   it('normalises email: trims and lowercases before lookup', async () => {
-    userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+    userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
     passwordResetService.requestReset('  Jane@Example.com  ', '1.2.3.4');
     await flush();
-    expect(userRepoMock.findUserByEmail).toHaveBeenCalledWith('jane@example.com');
+    expect(userRepoMock.findUsersByEmail).toHaveBeenCalledWith('jane@example.com');
   });
 
   it('an error anywhere in the found-user path still leaves the response identical to the unknown-email case', async () => {
-    userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+    userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
     resetRepoMock.createReset.mockRejectedValue(new Error('DB is on fire'));
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -205,7 +205,7 @@ describe('requestReset — no enumeration, no timing oracle', () => {
 // ── Per-email throttle ────────────────────────────────────────
 describe('requestReset — per-email throttle', () => {
   it('does not create a new reset or send another email when a live one was created in the last 5 minutes', async () => {
-    userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+    userRepoMock.findUsersByEmail.mockResolvedValue([ACTIVE_USER]);
     resetRepoMock.findRecentActiveByUserId.mockResolvedValue(existingReset());
 
     const result = passwordResetService.requestReset('jane@example.com', '1.2.3.4');
@@ -294,5 +294,29 @@ describe('confirmReset', () => {
 
   it('returns success on a valid confirm', async () => {
     await expect(passwordResetService.confirmReset('abc', 'longenough1')).resolves.toEqual({ success: true });
+  });
+});
+
+// ── One address, several accounts (migration 065) ─────────────────
+describe('requestReset — an address with an admin and a manager account', () => {
+  it('sends a link for each account, each email naming the account it resets', async () => {
+    vi.stubEnv('APP_BASE_URL', 'https://wms.example');
+    try {
+      userRepoMock.findUsersByEmail.mockResolvedValue([
+        { id: 5, username: 'grizel', email: 'grizel@example.com', role: 'admin' },
+        { id: 6, username: 'grizel.m', email: 'grizel@example.com', role: 'manager' },
+      ]);
+      userRepoMock.getUserById.mockImplementation(async (id) => ({ ...ACTIVE_ACCOUNT, id }));
+      passwordResetService.requestReset('grizel@example.com', '1.2.3.4');
+      await flush(); await flush();
+
+      expect(resetRepoMock.createReset.mock.calls.map(([p]) => p.userId)).toEqual([5, 6]);
+      const sent = emailProviderMock.sendEmail.mock.calls.map(([m]) => m);
+      expect(sent.map((m) => m.subject)).toEqual(['Reset the password for grizel', 'Reset the password for grizel.m']);
+      expect(sent[0].text).toContain('the admin account grizel');
+      expect(sent[1].text).toContain('the manager account grizel.m');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
