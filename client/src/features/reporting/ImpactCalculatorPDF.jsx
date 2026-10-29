@@ -1,101 +1,138 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/ImpactCalculatorPDF.jsx
 //
-// The Impact report as a printable document, laid out by NoteSheet
-// like the delivery note, the dispatch note and the operations report:
-// the same title over a red rule, the warehouse on the left, the
-// details box on the right, a line of additional information and light
-// tables. Only the contents differ.
+// A shareable, poster-style export of the Impact Calculator — a
+// cover page carrying all four headline numbers as one 2x2 grid of
+// illustrated cards (same composition as the on-screen poster cards,
+// ImpactStatCard.jsx), plus a closing "beneficiaries by type"
+// comparison page. Replaces an earlier single-page table version that
+// carried numbers but none of the imagery, and a version after that
+// which gave each number its own full page — four numbers do not
+// need six pages between them, and each one mostly empty read as
+// broken rather than spacious.
 //
-// Two tables: the four headline figures, then beneficiaries by type.
-// Every figure is printed with its unit and, where the screen has
-// one, the same caption or caveat, so the paper says what the screen
-// says. The illustrated poster cards stay on the screen; on paper the
-// numbers are the point, and a fixed-height poster page had to be
-// sized by hand to stop html2canvas bleeding it into the next page.
+// This one PDF keeps the poster on purpose: the other notes moved to
+// NoteSheet's table layout, and for a while this did too, but the
+// impact report is shared outside the warehouse and the illustrations
+// are the point of it.
+//
+// Each .pdf-poster-page is a fixed 794x1123px (A4 at 96dpi, matching
+// .pdf-document's own fixed 794px width) — see index.css's POSTER
+// PAGES note for why that has to be exact: PdfShell's "View PDF"
+// button rasterises the whole document as one canvas and slices it
+// into PDF pages by pixel height alone, with no idea where a section
+// starts or ends, so a page that isn't exactly one A4 page tall
+// bleeds into the next one.
+//
+// Page content is positioned with fixed margins, not flexbox
+// vertical centering — an earlier version tried to centre each
+// page's content in the available height and it did not survive
+// html2canvas, rendering with everything pinned to the top and the
+// whole rest of the page empty. See index.css's own note on
+// .pdf-poster-page.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import NoteSheet from '../receipts/NoteSheet';
-import { formatDate } from '../receipts/noteFormat';
-import { useAuth } from '../../context/AuthContext';
+import PdfShell from '../receipts/PdfShell';
+import { formatDate, formatDateTime } from '../receipts/noteFormat';
 
 const fmtNum = (n) => Math.round(Number(n) || 0).toLocaleString('en-ZA');
 
-const ESTIMATE_NOTE =
-  'Children are headcounted. Adults, Dignity Kitchen guests and households are estimates, '
-  + 'worked out from the kilograms dispatched to each kitchen or community request.';
-
 const ImpactCalculatorPDF = ({ pdfStats, beneficiaryTypeStats, dateRange, onClose }) => {
-  const { user } = useAuth() ?? {};
-  const [generated] = useState(() => new Date());
   if (!pdfStats) return null;
 
-  const preparedBy = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
-  const period = `${formatDate(dateRange.from)} – ${formatDate(dateRange.to)}`;
-  const types = beneficiaryTypeStats ?? [];
+  const maxBeneficiaryValue = Math.max(
+    ...(beneficiaryTypeStats ?? [])
+      .map((i) => i.stat)
+      .filter((s) => s && !s.notReady && !s.error)
+      .map((s) => s.value),
+    1
+  );
 
   return (
-    <NoteSheet
-      title="Impact Report"
-      toolbarTitle={`IMPACT REPORT - ${period}`}
-      filename={`impact-report-${dateRange.from}_${dateRange.to}`}
+    <PdfShell
+      title="IMPACT CALCULATOR"
+      filename={`impact-calculator-${dateRange.from}_${dateRange.to}`}
       onClose={onClose}
-      meta={[
-        { label: 'Period', value: period },
-        { label: 'Generated', value: generated.toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' }) },
-        preparedBy ? { label: 'Prepared by', value: preparedBy } : null,
-      ]}
-      info={types.length ? ESTIMATE_NOTE : null}
     >
-      <table className="pdfnote-table">
-        <thead>
-          <tr>
-            <th>Impact</th>
-            <th className="pdfnote-table-center">Figure</th>
-            <th>Note</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pdfStats.map((s) => (
-            <tr key={s.label}>
-              <td className="pdfnote-table-product">{s.label}</td>
-              <td className="pdfnote-table-center">
-                {s.available ? `${fmtNum(s.value)} ${s.unit}` : '-'}
-              </td>
-              <td>
-                {s.available
-                  ? [s.caption, s.caveat].filter(Boolean).join(' ') || '-'
-                  : s.caveat || 'Not available for this period.'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="pdf-poster">
+        {/* ── Page 1: cover ─────────────────────────────────── */}
+        <div className="pdf-poster-page">
+          <div className="pdf-doc-header">
+            <div>
+              <h1 className="pdf-doc-title">IMPACT CALCULATOR</h1>
+              <p className="pdf-doc-subtitle">Ladles of Love · Nourish Our Children</p>
+              <p className="pdf-doc-subtitle">Warehouse Management System</p>
+            </div>
+            <div>
+              <p className="pdf-doc-id-label">Period</p>
+              <p className="pdf-doc-id">
+                {formatDate(dateRange.from)} – {formatDate(dateRange.to)}
+              </p>
+              <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
+                Generated: {formatDateTime(new Date().toISOString())}
+              </p>
+            </div>
+          </div>
 
-      {types.length ? (
-        <>
-          <p className="pdfnote-doc-section-heading">Beneficiaries by type</p>
-          <table className="pdfnote-table">
-            <thead>
-              <tr>
-                <th>Beneficiary type</th>
-                <th className="pdfnote-table-center">Reached</th>
-              </tr>
-            </thead>
-            <tbody>
-              {types.map(({ metric, label, unit, stat }) => (
-                <tr key={metric}>
-                  <td className="pdfnote-table-product">{label}</td>
-                  <td className="pdfnote-table-center">
-                    {!stat || stat.notReady || stat.error ? '-' : `${fmtNum(stat.value)} ${unit}`}
-                  </td>
-                </tr>
+          <div className="pdf-poster-grid">
+            {pdfStats.map((s) => (
+              <div key={s.label} className="pdf-poster-card">
+                <div className="pdf-poster-illustration">
+                  {s.image ? <img src={s.image} alt="" /> : null}
+                </div>
+                <p className="pdf-poster-label">{s.label}</p>
+
+                {s.available ? (
+                  <>
+                    <p className="pdf-poster-value" style={{ color: s.color }}>{fmtNum(s.value)}</p>
+                    <p className="pdf-poster-unit">{s.unit}</p>
+                    {s.caption ? <p className="pdf-poster-caption">{s.caption}</p> : null}
+                  </>
+                ) : (
+                  <p className="pdf-poster-caption">{s.caveat || 'Not available for this period.'}</p>
+                )}
+
+                {s.available && s.caveat ? <p className="pdf-poster-caveat">{s.caveat}</p> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Closing page: beneficiaries by type ──────────── */}
+        {beneficiaryTypeStats?.length ? (
+          <div className="pdf-poster-page">
+            <p className="pdf-poster-label">Beneficiaries by type</p>
+            <div className="pdf-poster-compare">
+              {beneficiaryTypeStats.map(({ metric, label, unit, color, stat }) => (
+                <div key={metric} className="pdf-poster-compare-item">
+                  <div className="pdf-poster-compare-head">
+                    <span>{label}</span>
+                    <span style={{ color: '#676767' }}>
+                      {!stat || stat.notReady || stat.error ? '-' : `${fmtNum(stat.value)} ${unit}`}
+                    </span>
+                  </div>
+                  <div className="pdf-poster-compare-track">
+                    {stat && !stat.notReady && !stat.error ? (
+                      <div
+                        className="pdf-poster-compare-fill"
+                        style={{
+                          width: `${Math.max((stat.value / maxBeneficiaryValue) * 100, 3)}%`,
+                          backgroundColor: color,
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </>
-      ) : null}
-    </NoteSheet>
+            </div>
+            <p className="pdf-poster-footnote">
+              Children are headcounted. Adults are counted as one meal each, from the
+              adults each soup kitchen and the Dignity Kitchen feeds per collection.
+              Households are estimated from the kilograms sent per community request.
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </PdfShell>
   );
 };
 

@@ -74,6 +74,9 @@ export const ROUTES = [
   // The Feed the Soil drop-off form behind a site's QR poster: weight,
   // and an optional email for a thank-you (migration 069).
   { id: 'ftsDropOff',     path: '/fts/:token',            roles: null },
+  // The same form behind the general poster: one code for every place,
+  // with a dropdown of the open sites (migration 070).
+  { id: 'ftsDropOffAny',  path: '/fts',                   roles: null },
   // What the system keeps and the terms of using it. Linked from the
   // landing page, the sign-in page and Google's consent screen.
   { id: 'privacy',        path: LEGAL.privacy,            roles: null },

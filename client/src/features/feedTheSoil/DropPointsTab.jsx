@@ -8,6 +8,10 @@
 // for a thank-you. Below the sites, the latest drop-offs: they count in
 // compost processed, and one that is not real (a test, a typo) can be
 // rejected, or counted again.
+//
+// The general poster is one code for every place (migration 070): its
+// form has a dropdown of the open sites and "Somewhere else", for a
+// stall that has no site set up.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { MapPin, Plus, Printer } from 'lucide-react';
@@ -98,8 +102,11 @@ export default function DropPointsTab() {
       <ListCard
         header={(
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">Pop-up stands and other places people return their compost. Hang each one’s QR poster there.</p>
-            <Button type="button" size="sm" onClick={() => setAdding(true)}><Plus /> Add a site</Button>
+            <p className="text-sm text-muted-foreground">Pop-up stands and other places people return their compost. Hang each one’s QR poster there, or the general poster anywhere: it asks where they are.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => print(null)}><Printer /> General QR poster</Button>
+              <Button type="button" size="sm" onClick={() => setAdding(true)}><Plus /> Add a site</Button>
+            </div>
           </div>
         )}
       >
@@ -181,7 +188,10 @@ export default function DropPointsTab() {
                 {dropoffs.map((d) => (
                   <TableRow key={d.id} className={d.status === 'rejected' ? 'text-muted-foreground line-through' : undefined}>
                     <TableCell className="pl-4 sm:pl-5">{when(d.submittedAt)}</TableCell>
-                    <TableCell>{d.site}</TableCell>
+                    <TableCell>
+                      {d.site}
+                      {d.typedPlace ? <span className="block text-xs text-muted-foreground">Typed in, not a site</span> : null}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtKg(d.kg)}</TableCell>
                     <TableCell>
                       {d.donorName || 'Not given'}

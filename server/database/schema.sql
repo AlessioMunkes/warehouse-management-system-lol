@@ -1034,7 +1034,7 @@ CREATE TABLE public.fts_drop_points (
 );
 CREATE TABLE public.fts_dropoffs (
   id integer NOT NULL DEFAULT nextval('fts_dropoffs_id_seq'::regclass),
-  drop_point_id integer NOT NULL,
+  drop_point_id integer,
   kg_compost numeric NOT NULL CHECK (kg_compost > 0::numeric AND kg_compost <= 200::numeric),
   donor_name character varying,
   donor_email character varying,
@@ -1043,6 +1043,8 @@ CREATE TABLE public.fts_dropoffs (
   submitted_at timestamp with time zone NOT NULL DEFAULT now(),
   reviewed_by integer,
   reviewed_at timestamp with time zone,
+  place_name character varying,
+  CONSTRAINT fts_dropoffs_site_or_place CHECK (drop_point_id IS NOT NULL OR place_name IS NOT NULL AND btrim(place_name::text) <> ''::text),
   CONSTRAINT fts_dropoffs_pkey PRIMARY KEY (id),
   CONSTRAINT fts_dropoffs_drop_point_id_fkey FOREIGN KEY (drop_point_id) REFERENCES public.fts_drop_points(id),
   CONSTRAINT fts_dropoffs_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)

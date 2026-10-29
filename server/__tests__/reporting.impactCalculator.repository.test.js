@@ -197,9 +197,11 @@ describe('compostProcessed', () => {
     await repo.compostProcessed({ dimension: 'region', dateRange: RANGE });
 
     const [sql] = poolMock.query.mock.calls[0];
-    // The kit owner's suburb, or the drop-off site's.
+    // The kit owner's suburb, or the drop-off site's, or the place
+    // typed on the general poster's form.
     expect(sql).toMatch(/LEFT JOIN collection_kits ck ON ck\.id = r\.kit_id/);
-    expect(sql).toMatch(/COALESCE\(p\.suburb, p\.name\)/);
+    expect(sql).toMatch(/COALESCE\(p\.suburb, p\.name, d\.place_name\)/);
+    expect(sql).toMatch(/LEFT JOIN fts_drop_points p ON p\.id = d\.drop_point_id/);
     expect(sql).toMatch(/COALESCE\(t\.suburb, 'Unspecified'\)/);
     expect(sql).toMatch(/ORDER BY 2 DESC, 1/);
   });

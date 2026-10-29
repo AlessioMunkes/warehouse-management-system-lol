@@ -1,14 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // server/__tests__/ftsDropPoint.service.test.js
 //
-// Feed the Soil drop-off sites (migration 069): the public form behind
-// a site's QR code, and the thank-you it sends.
+// Feed the Soil drop-off sites (migrations 069, 070): the public form
+// behind a site's QR code or the general poster, and the thank-you.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const TOKEN = '6f1c2b0e-8a4d-4c1e-9b7a-2d3e4f5a6b7c';
 const repoMock = {
   listDropPoints: vi.fn(), createDropPoint: vi.fn(), updateDropPoint: vi.fn(), findActiveByToken: vi.fn(),
+  listOpenSites: vi.fn(), findActiveById: vi.fn(),
   createDropoff: vi.fn(), recordThanks: vi.fn(), listDropoffs: vi.fn(), setDropoffStatus: vi.fn(),
 };
 const sendMock = vi.fn();
@@ -41,7 +42,7 @@ describe('the public drop-off form', () => {
     const result = await service.submitDropoff(TOKEN, { kg: '4.5', name: ' Ayesha ', email: 'Ayesha@Example.com' });
     expect(result).toEqual({ site: 'Muizenberg pop-up', kg: 4.5, thanksEmailed: true });
     expect(repoMock.createDropoff).toHaveBeenCalledWith({
-      dropPointId: 3, kgCompost: 4.5, donorName: 'Ayesha', donorEmail: 'ayesha@example.com',
+      dropPointId: 3, placeName: null, kgCompost: 4.5, donorName: 'Ayesha', donorEmail: 'ayesha@example.com',
     });
     await flush();
     expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -70,6 +71,37 @@ describe('the public drop-off form', () => {
     await expect(service.submitDropoff(TOKEN, { kg: 3, email: 'a@b.co' })).resolves.toMatchObject({ thanksEmailed: true });
     await flush();
     expect(repoMock.recordThanks).toHaveBeenCalledWith(11, 'failed');
+  });
+});
+
+describe('the general poster', () => {
+  it('lists the open sites by name only', async () => {
+    repoMock.listOpenSites.mockResolvedValue([{ id: 3, name: 'Muizenberg pop-up', suburb: null, public_token: TOKEN }]);
+    await expect(service.getPublicSites()).resolves.toEqual([{ id: 3, name: 'Muizenberg pop-up', suburb: null }]);
+  });
+
+  it('logs a drop-off at a site picked from the dropdown', async () => {
+    repoMock.findActiveById.mockResolvedValue({ id: 3, name: 'Muizenberg pop-up' });
+    await expect(service.submitAnyDropoff({ dropPointId: '3', kg: 2 })).resolves.toMatchObject({ site: 'Muizenberg pop-up', kg: 2 });
+    expect(repoMock.findActiveById).toHaveBeenCalledWith(3);
+    expect(repoMock.createDropoff).toHaveBeenCalledWith(expect.objectContaining({ dropPointId: 3, placeName: null }));
+  });
+
+  it('logs a drop-off at a place typed under Somewhere else, and thanks them for it', async () => {
+    const result = await service.submitAnyDropoff({ place: '  Kalk Bay   market ', kg: 1.5, email: 'a@b.co' });
+    expect(result).toEqual({ site: 'Kalk Bay market', kg: 1.5, thanksEmailed: true });
+    expect(repoMock.createDropoff).toHaveBeenCalledWith(expect.objectContaining({ dropPointId: null, placeName: 'Kalk Bay market' }));
+    await flush();
+    expect(sendMock.mock.calls[0][0].text).toContain('compost to Kalk Bay market');
+  });
+
+  it('refuses a closed site, and a drop-off that names nowhere', async () => {
+    repoMock.findActiveById.mockResolvedValue(null);
+    await expect(service.submitAnyDropoff({ dropPointId: 9, kg: 2 })).rejects.toMatchObject({ status: 400 });
+    await expect(service.submitAnyDropoff({ dropPointId: 'x', kg: 2 })).rejects.toMatchObject({ status: 400 });
+    await expect(service.submitAnyDropoff({ place: '   ', kg: 2 })).rejects.toMatchObject({ status: 400 });
+    await expect(service.submitAnyDropoff({ place: 'x'.repeat(121), kg: 2 })).rejects.toMatchObject({ status: 400 });
+    expect(repoMock.createDropoff).not.toHaveBeenCalled();
   });
 });
 

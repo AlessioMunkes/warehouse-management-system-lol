@@ -113,6 +113,7 @@ export const PAGES = {
   resetPassword:    <L.resetPassword />,
   slipPreview:      <L.slipPreview />,
   ftsDropOff:       <L.ftsDropOff />,
+  ftsDropOffAny:    <L.ftsDropOff />,
   privacy:          <L.privacy />,
   terms:            <L.terms />,
 
