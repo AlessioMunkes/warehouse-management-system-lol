@@ -34,12 +34,12 @@ server/                 Express API
     middleware/         Sign-in (JWT cookie) and role checks
     constants/          Roles and other fixed lists
   database/
-    schema.sql          Every table in the database, for reference. Not a script to run.
+    schema.sql          Builds the whole database (see The database)
+    migrations/         Seed data, run after schema.sql
   scripts/              Command-line tools (see below)
   __tests__/            Vitest + Supertest
 
 docs/
-  new-database.sql      Builds a new, empty database (see The database)
   *.pdf                 The handover notes and the how-to-use guide
 
 render.yaml             Deployment to Render
@@ -90,41 +90,50 @@ The database lives in Supabase (PostgreSQL 17).
 
 ### Starting a new database
 
-`docs/new-database.sql` builds a new, empty database the app can run on: every table, type,
-key, index and sequence, row-level security, the starter settings every warehouse shares
-(programmes, reporting factors, storage locations, picking and donation settings), and a
-record of the migrations it already contains. It holds no warehouse's data: no people, stock,
-donations, centres, connections or contact details.
+Two places, two jobs:
 
-1. Create a new Supabase project.
-2. Open SQL Editor, then New query, and paste the whole file.
-3. Optional: near the end of the file, set `admin_username`, `admin_first_name`,
-   `admin_last_name` and `admin_password` (8 to 72 characters) to create the first admin.
-   Left as `CHANGE-ME`, no admin is made; create one later with
-   `npm run warehouse-admin -- create-admin`.
-4. Press Run. Put the project's connection string (Connect, then Session pooler) in
-   `server/.env` as `DATABASE_URL`.
+- `server/database/schema.sql` builds the whole database: every table, type, key, index and
+  sequence, row-level security, and a record of the schema changes it already contains. It
+  holds no data.
+- `server/database/migrations/` holds the seed data, run after the schema. Right now that is
+  `001_seed_starter_settings.sql`: the settings every warehouse shares (programmes, reporting
+  factors, storage locations, picking and donation settings). No people, stock, donations,
+  centres or contact details.
 
-It stops without changing anything if the database already has tables. Two other ways to run
-it, both as one transaction:
+The quickest way, from the `server` folder, with the database's connection string in
+`server/.env` as `DATABASE_URL` (add `DB_SSL=false` for a local Postgres):
 
 ```
-psql "<connection string>" --single-transaction -f docs/new-database.sql
-cd server && npm run migrate -- init <code>     # a database listed in WAREHOUSE_DB_URLS
+npm run migrate -- init default
+npm run warehouse-admin -- create-admin default --username <u> --first <name> --last <name>
 ```
+
+`init` builds from `schema.sql` and then runs every seed migration, all or nothing. It refuses
+to touch a database that already has tables.
+
+Other ways to do the same:
+
+```
+psql "<connection string>" --single-transaction -f server/database/schema.sql
+cd server && npm run migrate -- up
+```
+
+or, in Supabase: SQL Editor, New query, paste the whole of `schema.sql` (optionally set
+`admin_username`, `admin_first_name`, `admin_last_name` and `admin_password` near the end to
+create the first admin), press Run, then paste and run each file in
+`server/database/migrations/` in name order.
 
 ### Changing the database
 
-- Put the change in a new file `server/database/migrations/NNN_what_it_does.sql` (the next
-  number up), run `cd server` and `npm run migrate -- up`, and make the same change in
-  `server/database/schema.sql`.
-- Then run `npm run export-database` in `server/` to write `docs/new-database.sql` again from
-  the updated database, so a new database starts with the change too. It only reads.
-- `server/database/schema.sql` is a reference copy of every table, for reading. It is not
-  meant to be run (its first line says so); `docs/new-database.sql` is the one to run.
-- The numbered migration files that built the database up (019 to 039) were removed at
-  handover: the database already has them, recorded in its `schema_migrations` table. The ones
-  in `server/database/migrations/` now are changes made since, and are applied too.
+- A schema change: make it on the database, then run `npm run export-database` in `server/`
+  to write `schema.sql` again. If other databases already exist, also put the change in the
+  next numbered file in `server/database/migrations/` and run `npm run migrate -- up`.
+- New starter data: add `server/database/migrations/NNN_seed_what_it_adds.sql`. Every insert
+  in it ends `ON CONFLICT DO NOTHING`, so it is safe on a database that already has the rows
+  (a test checks this). Run `npm run migrate -- up`.
+- The numbered schema migrations that built the live database up (001 to 070) were folded into
+  `schema.sql` and removed. `schema.sql` records them in `schema_migrations`, so `up` never
+  tries to run them again.
 
 ## Tests
 
@@ -141,7 +150,7 @@ When you add or change a route, that test fails until the file is updated: that 
 | Script | What it does |
 |---|---|
 | `npm run migrate` | Applies new database changes from `database/migrations/` (see The database) |
-| `npm run export-database` | Writes `docs/new-database.sql` from the database in `.env`. Only reads |
+| `npm run export-database` | Writes `server/database/schema.sql` from the database in `.env`. Only reads |
 | `npm run warehouse-admin` | Looks up and manages people across warehouses, when running more than one |
 | `seedWesternCapeSupply.mjs` | Loads the sponsor's supply sheet: centres, products, standing orders |
 | `loadRealData.mjs` | Loads the summer menu into the Summer recipe and the July 2026 stock count |

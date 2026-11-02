@@ -8,7 +8,8 @@
 //   npm run migrate -- status            what is applied and pending, per database
 //   npm run migrate -- up                apply pending migrations to EVERY database
 //   npm run migrate -- init <code>       build a NEW, empty warehouse database
-//                                        from docs/new-database.sql
+//                                        from database/schema.sql, then run
+//                                        every seed migration
 //   npm run migrate -- mark-baseline     one-off, for a database that predates
 //                                        this runner: record the migrations
 //                                        baseline.sql already contains
@@ -21,6 +22,9 @@
 // same file the app uses.
 //
 // Rules the runner enforces:
+//   - database/schema.sql builds the whole schema. database/migrations/
+//     holds seed data (NNN_seed_*.sql) and any schema change made after
+//     schema.sql was last exported.
 //   - Files in database/migrations/ named NNN_lowercase_words.sql run in
 //     name order. Each runs inside its own transaction together with
 //     the row recording it, so a failure leaves nothing half-applied.
@@ -46,9 +50,9 @@ import { dbSslConfig } from '../src/config/dbSsl.js';
 const here      = path.dirname(fileURLToPath(import.meta.url));
 const DB_DIR    = path.resolve(here, '..', 'database');
 const MIG_DIR   = path.join(DB_DIR, 'migrations');
-// The whole schema plus starter rows, written by `npm run export-database`.
-// It records the migrations it contains itself.
-const NEW_DB    = path.resolve(here, '..', '..', 'docs', 'new-database.sql');
+// The whole schema, written by `npm run export-database`. It records the
+// schema changes it already contains itself; seed migrations then run.
+const SCHEMA    = path.join(DB_DIR, 'schema.sql');
 const MANIFEST  = path.join(DB_DIR, 'baseline-migrations.txt');
 
 const ssl = dbSslConfig();
@@ -201,21 +205,21 @@ const init = async () => {
   const target = allTargets().find((t) => t.code === code);
   if (!target) fail(`No database "${code}" in WAREHOUSE_DB_URLS. Add it there first.`);
 
-  if (!fs.existsSync(NEW_DB)) fail(`Missing ${path.relative(process.cwd(), NEW_DB)}. Run npm run export-database.`);
+  if (!fs.existsSync(SCHEMA)) fail(`Missing ${path.relative(process.cwd(), SCHEMA)}. Run npm run export-database.`);
   const migrations = loadMigrations();
 
   await withClients([target], async ([{ client }]) => {
-    console.log(`\n[${code}] building from docs/new-database.sql ...`);
+    console.log(`\n[${code}] building from database/schema.sql ...`);
     try {
       await initialiseDatabase(client, {
-        baselineSql: fs.readFileSync(NEW_DB, 'utf8'),
+        baselineSql: fs.readFileSync(SCHEMA, 'utf8'),
         seedSql:     '',
         manifest:    [],
       });
     } catch (err) {
       fail(`[${code}] ${err.message}\n  Nothing was created (the whole init is one transaction).`);
     }
-    console.log(`[${code}] schema and starter rows created`);
+    console.log(`[${code}] schema created; running seed migrations`);
 
     const pending = pendingMigrations(migrations, await appliedMigrations(client));
     for (const m of pending) {

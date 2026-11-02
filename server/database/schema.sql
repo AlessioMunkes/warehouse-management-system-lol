@@ -1,2060 +1,2001 @@
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
-
-CREATE TABLE public.users (
-  id integer NOT NULL DEFAULT nextval('users_id_seq'::regclass),
-  username character varying NOT NULL UNIQUE,
-  first_name character varying NOT NULL,
-  last_name character varying NOT NULL,
-  password_hash character varying NOT NULL,
-  role character varying NOT NULL CHECK (role::text = ANY (ARRAY['warehouse_worker'::character varying, 'manager'::character varying, 'admin'::character varying]::text[])),
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  archived_at timestamp with time zone,
-  archived_by integer,
-  email text,
-  session_version integer NOT NULL DEFAULT 0,
-  CONSTRAINT users_pkey PRIMARY KEY (id),
-  CONSTRAINT users_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.suppliers (
-  id integer NOT NULL DEFAULT nextval('suppliers_id_seq'::regclass),
-  name character varying NOT NULL UNIQUE,
-  contact_email character varying,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  contact_phone character varying,
-  address text,
-  agreement_ref character varying,
-  contact_name character varying,
-  payment_terms character varying,
-  expected_lead_time_days integer CHECK (expected_lead_time_days IS NULL OR expected_lead_time_days >= 0 AND expected_lead_time_days <= 365),
-  category character varying,
-  notes text,
-  created_by integer,
-  deactivated_at timestamp with time zone,
-  deactivated_by integer,
-  archived_at timestamp with time zone,
-  archived_by integer,
-  CONSTRAINT suppliers_pkey PRIMARY KEY (id),
-  CONSTRAINT suppliers_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT suppliers_deactivated_by_fkey FOREIGN KEY (deactivated_by) REFERENCES public.users(id),
-  CONSTRAINT suppliers_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.products (
-  id integer NOT NULL DEFAULT nextval('products_id_seq'::regclass),
-  name character varying NOT NULL UNIQUE,
-  stock_keeping_unit character varying NOT NULL UNIQUE,
-  weight_kg numeric,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  is_decantable boolean NOT NULL DEFAULT false,
-  programme_id integer,
-  default_location_id integer,
-  code_type USER-DEFINED NOT NULL DEFAULT 'fixed'::product_code_type,
-  category character varying,
-  is_perishable boolean NOT NULL DEFAULT false,
-  default_unit character varying NOT NULL DEFAULT 'kg'::character varying,
-  storage_type character varying DEFAULT 'dry'::character varying CHECK (storage_type::text = ANY (ARRAY['dry'::character varying, 'cold'::character varying]::text[])),
-  archived_at timestamp with time zone,
-  archived_by integer,
-  unit_cost numeric CHECK (unit_cost IS NULL OR unit_cost >= 0::numeric),
-  quantity_per_meal numeric,
-  preferred_supplier_id integer,
-  CONSTRAINT products_pkey PRIMARY KEY (id),
-  CONSTRAINT products_programme_id_fkey FOREIGN KEY (programme_id) REFERENCES public.programmes(id),
-  CONSTRAINT products_default_location_id_fkey FOREIGN KEY (default_location_id) REFERENCES public.storage_locations(id),
-  CONSTRAINT products_archived_by_fkey FOREIGN KEY (archived_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.purchase_orders (
-  id integer NOT NULL DEFAULT nextval('purchase_orders_id_seq'::regclass),
-  supplier_id integer NOT NULL,
-  created_by integer,
-  status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'in_transit'::character varying, 'partially_received'::character varying, 'completed'::character varying, 'returned'::character varying, 'follow_up_required'::character varying]::text[])),
-  expected_delivery_date date,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  status_reason text,
-  status_changed_at timestamp with time zone,
-  status_changed_by integer,
-  po_number character varying NOT NULL DEFAULT ((('PO-'::text || to_char((now() AT TIME ZONE 'Africa/Johannesburg'::text), 'YYYY'::text)) || '-'::text) || lpad((nextval('purchase_order_number_seq'::regclass))::text, 4, '0'::text)),
-  notes text,
-  finance_email_status text CHECK (finance_email_status = ANY (ARRAY['sent'::text, 'failed'::text])),
-  finance_email_error text,
-  finance_email_attempted_at timestamp with time zone,
-  CONSTRAINT purchase_orders_pkey PRIMARY KEY (id),
-  CONSTRAINT purchase_orders_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id),
-  CONSTRAINT purchase_orders_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT purchase_orders_status_changed_by_fkey FOREIGN KEY (status_changed_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.purchase_order_items (
-  id integer NOT NULL DEFAULT nextval('purchase_order_items_id_seq'::regclass),
-  purchase_order_id integer NOT NULL,
-  product_id integer NOT NULL,
-  expected_quantity numeric NOT NULL CHECK (expected_quantity > 0::numeric AND expected_quantity = round(expected_quantity, 3)),
-  expected_weight_kg numeric CHECK (expected_weight_kg IS NULL OR expected_weight_kg >= 0::numeric),
-  unit_price numeric CHECK (unit_price IS NULL OR unit_price >= 0::numeric),
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT purchase_order_items_pkey PRIMARY KEY (id),
-  CONSTRAINT purchase_order_items_purchase_order_id_fkey FOREIGN KEY (purchase_order_id) REFERENCES public.purchase_orders(id),
-  CONSTRAINT purchase_order_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-CREATE TABLE public.delivery_notes (
-  id integer NOT NULL DEFAULT nextval('delivery_notes_id_seq'::regclass),
-  supplier_id integer NOT NULL,
-  received_by integer,
-  purchase_order_id integer NOT NULL,
-  delivery_date date NOT NULL,
-  status character varying NOT NULL DEFAULT 'recorded'::character varying CHECK (status::text = ANY (ARRAY['recorded'::character varying, 'flagged'::character varying, 'closed'::character varying]::text[])),
-  signature text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  driver_name character varying,
-  idempotency_key text,
-  delivered_at timestamp with time zone,
-  CONSTRAINT delivery_notes_pkey PRIMARY KEY (id),
-  CONSTRAINT delivery_notes_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id),
-  CONSTRAINT delivery_notes_received_by_fkey FOREIGN KEY (received_by) REFERENCES public.users(id),
-  CONSTRAINT delivery_notes_purchase_order_id_fkey FOREIGN KEY (purchase_order_id) REFERENCES public.purchase_orders(id)
-);
-CREATE TABLE public.volunteers (
-  id bigint NOT NULL DEFAULT nextval('volunteers_id_seq'::regclass),
-  full_name text NOT NULL,
-  signed_in_at timestamp with time zone NOT NULL DEFAULT now(),
-  signed_out_at timestamp with time zone,
-  source text NOT NULL DEFAULT 'guest_login'::text,
-  consent_given boolean NOT NULL DEFAULT false,
-  retention_delete_after date,
-  last_active_at timestamp with time zone,
-  CONSTRAINT volunteers_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.decanting_records (
-  id integer NOT NULL DEFAULT nextval('decanting_records_id_seq'::regclass),
-  week_of date NOT NULL,
-  notes text,
-  recorded_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT decanting_records_pkey PRIMARY KEY (id),
-  CONSTRAINT decanting_records_recorded_by_fkey FOREIGN KEY (recorded_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.decanting_lines (
-  id integer NOT NULL DEFAULT nextval('decanting_lines_id_seq'::regclass),
-  decanting_id integer NOT NULL,
-  product_id integer,
-  required_kg numeric NOT NULL,
-  actual_bulk_kg numeric,
-  packed_kg numeric NOT NULL,
-  total_bags integer NOT NULL,
-  sizes_kg jsonb NOT NULL,
-  bags jsonb NOT NULL,
-  margin_error numeric NOT NULL,
-  within_margin boolean NOT NULL,
-  wastage_kg numeric NOT NULL DEFAULT 0,
-  surplus_kg numeric NOT NULL DEFAULT 0,
-  shortfall_kg numeric NOT NULL DEFAULT 0,
-  notes text,
-  partial_bag_actual_kg numeric CHECK (partial_bag_actual_kg IS NULL OR partial_bag_actual_kg > 0::numeric AND partial_bag_actual_kg < 0.5),
-  CONSTRAINT decanting_lines_pkey PRIMARY KEY (id),
-  CONSTRAINT decanting_lines_decanting_id_fkey FOREIGN KEY (decanting_id) REFERENCES public.decanting_records(id),
-  CONSTRAINT decanting_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-CREATE TABLE public.stock_levels (
-  product_id integer NOT NULL,
-  quantity_on_hand numeric NOT NULL DEFAULT 0,
-  unit character varying NOT NULL CHECK (unit::text = ANY (ARRAY['kg'::character varying, 'g'::character varying, 'l'::character varying, 'ml'::character varying, 'each'::character varying, 'bag'::character varying, 'box'::character varying, 'crate'::character varying, 'punnet'::character varying]::text[])) NOT VALI),
-  reorder_threshold numeric NOT NULL DEFAULT 0,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT stock_levels_pkey PRIMARY KEY (product_id),
-  CONSTRAINT stock_levels_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-CREATE TABLE public.stock_movements (
-  id integer NOT NULL DEFAULT nextval('stock_movements_id_seq'::regclass),
-  product_id integer NOT NULL,
-  quantity numeric NOT NULL,
-  unit character varying CHECK (unit IS NULL OR (unit::text = ANY (ARRAY['kg'::character varying, 'g'::character varying, 'l'::character varying, 'ml'::character varying, 'each'::character varying, 'bag'::character varying, 'box'::character varying, 'crate'::character varying, 'punnet'::character varying]::text[]))) NOT VALI),
-  movement_type character varying NOT NULL CHECK (movement_type::text = ANY (ARRAY['adjustment'::character varying, 'decanted'::character varying, 'dispatched'::character varying, 'donated'::character varying, 'picked'::character varying, 'received'::character varying, 'wastage'::character varying]::text[])),
-  reference_type character varying,
-  reference_id integer,
-  reason text,
-  performed_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  programme_id integer,
-  location_id integer,
-  approved_by integer,
-  CONSTRAINT stock_movements_pkey PRIMARY KEY (id),
-  CONSTRAINT stock_movements_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT stock_movements_performed_by_fkey FOREIGN KEY (performed_by) REFERENCES public.users(id),
-  CONSTRAINT stock_movements_programme_id_fkey FOREIGN KEY (programme_id) REFERENCES public.programmes(id),
-  CONSTRAINT stock_movements_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.storage_locations(id),
-  CONSTRAINT stock_movements_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.ecd_centres (
-  id integer NOT NULL DEFAULT nextval('ecd_centres_id_seq'::regclass),
-  name character varying NOT NULL,
-  contact_name character varying,
-  child_count integer CHECK (child_count >= 0),
-  cohort USER-DEFINED NOT NULL,
-  last_collected_date date,
-  is_active boolean NOT NULL DEFAULT true,
-  approved_at timestamp with time zone,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  contact_phone character varying,
-  collection_day USER-DEFINED,
-  location character varying,
-  mobile_number character varying,
-  contact_email text,
-  CONSTRAINT ecd_centres_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.ecd_order_lines (
-  id integer NOT NULL DEFAULT nextval('ecd_order_lines_id_seq'::regclass),
-  ecd_id integer NOT NULL,
-  product_id integer NOT NULL,
-  quantity numeric NOT NULL CHECK (quantity > 0::numeric),
-  unit character varying NOT NULL CHECK (unit::text = ANY (ARRAY['kg'::character varying, 'g'::character varying, 'l'::character varying, 'ml'::character varying, 'each'::character varying, 'bag'::character varying, 'box'::character varying, 'crate'::character varying, 'punnet'::character varying]::text[])) NOT VALI),
-  effective_from date NOT NULL,
-  effective_to date,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT ecd_order_lines_pkey PRIMARY KEY (id),
-  CONSTRAINT ecd_order_lines_ecd_id_fkey FOREIGN KEY (ecd_id) REFERENCES public.ecd_centres(id),
-  CONSTRAINT ecd_order_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-CREATE TABLE public.picking_settings (
-  key text NOT NULL,
-  value text NOT NULL,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT picking_settings_pkey PRIMARY KEY (key)
-);
-CREATE TABLE public.picking_slips (
-  id integer NOT NULL DEFAULT nextval('picking_slips_id_seq'::regclass),
-  ecd_id integer,
-  dispatch_date date NOT NULL,
-  cohort USER-DEFINED NOT NULL,
-  pallet_ref character varying,
-  status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'in_progress'::character varying, 'complete'::character varying, 'dispatched'::character varying, 'cancelled'::character varying]::text[])),
-  assigned_to integer,
-  generated_by integer,
-  started_at timestamp with time zone,
-  completed_at timestamp with time zone,
-  completed_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  public_token uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
-  collection_status USER-DEFINED,
-  assigned_volunteer_id bigint,
-  beneficiary_kind USER-DEFINED NOT NULL DEFAULT 'ecd'::beneficiary_type,
-  beneficiary_name character varying,
-  dispatched_at timestamp with time zone,
-  assigned_to_2 integer,
-  CONSTRAINT picking_slips_pkey PRIMARY KEY (id),
-  CONSTRAINT picking_slips_ecd_id_fkey FOREIGN KEY (ecd_id) REFERENCES public.ecd_centres(id),
-  CONSTRAINT picking_slips_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES public.users(id),
-  CONSTRAINT picking_slips_generated_by_fkey FOREIGN KEY (generated_by) REFERENCES public.users(id),
-  CONSTRAINT picking_slips_completed_by_fkey FOREIGN KEY (completed_by) REFERENCES public.users(id),
-  CONSTRAINT picking_slips_assigned_volunteer_id_fkey FOREIGN KEY (assigned_volunteer_id) REFERENCES public.volunteers(id),
-  CONSTRAINT picking_slips_assigned_to_2_fkey FOREIGN KEY (assigned_to_2) REFERENCES public.users(id)
-);
-CREATE TABLE public.picking_slip_items (
-  id integer NOT NULL DEFAULT nextval('picking_slip_items_id_seq'::regclass),
-  picking_slip_id integer NOT NULL,
-  product_id integer NOT NULL,
-  required_quantity numeric NOT NULL,
-  unit character varying NOT NULL,
-  packed_quantity numeric,
-  status USER-DEFINED NOT NULL DEFAULT 'pending'::picking_item_status,
-  flag_reason text,
-  confirmed_by integer,
-  confirmed_at timestamp with time zone,
-  dispatched_quantity numeric,
-  dispatched_at timestamp with time zone,
-  packer_note text,
-  CONSTRAINT picking_slip_items_pkey PRIMARY KEY (id),
-  CONSTRAINT picking_slip_items_picking_slip_id_fkey FOREIGN KEY (picking_slip_id) REFERENCES public.picking_slips(id),
-  CONSTRAINT picking_slip_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT picking_slip_items_confirmed_by_fkey FOREIGN KEY (confirmed_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.picking_events (
-  id integer NOT NULL DEFAULT nextval('picking_events_id_seq'::regclass),
-  picking_slip_id integer NOT NULL,
-  event_type character varying NOT NULL,
-  actor_id integer,
-  detail jsonb,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT picking_events_pkey PRIMARY KEY (id),
-  CONSTRAINT picking_events_picking_slip_id_fkey FOREIGN KEY (picking_slip_id) REFERENCES public.picking_slips(id),
-  CONSTRAINT picking_events_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.schema_migrations (
-  id character varying NOT NULL,
-  applied_at timestamp with time zone NOT NULL DEFAULT now(),
-  notes text,
-  CONSTRAINT schema_migrations_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.programmes (
-  id integer NOT NULL DEFAULT nextval('programmes_id_seq'::regclass),
-  code character varying NOT NULL UNIQUE,
-  name character varying NOT NULL,
-  description text,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT programmes_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.delivery_note_items (
-  id integer NOT NULL DEFAULT nextval('delivery_note_items_id_seq'::regclass),
-  delivery_note_id integer NOT NULL,
-  product_id integer NOT NULL,
-  purchase_order_item_id integer,
-  expected_quantity numeric NOT NULL DEFAULT 0,
-  expected_weight_kg numeric,
-  received_quantity numeric NOT NULL CHECK (received_quantity >= 0::numeric),
-  received_weight_kg numeric,
-  unit character varying NOT NULL DEFAULT 'kg'::character varying,
-  discrepancy_quantity numeric DEFAULT (received_quantity - expected_quantity),
-  discrepancy_weight_kg numeric DEFAULT (received_weight_kg - expected_weight_kg),
-  discrepancy_reason text,
-  discrepancy_resolved boolean NOT NULL DEFAULT false,
-  location_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  storage_area character varying CHECK (storage_area IS NULL OR (storage_area::text = ANY (ARRAY['cold_room'::character varying, 'dry_store'::character varying, 'fts_section'::character varying, 'mezzanine'::character varying, 'boardroom'::character varying]::text[]))),
-  expiry_date date,
-  CONSTRAINT delivery_note_items_pkey PRIMARY KEY (id),
-  CONSTRAINT delivery_note_items_delivery_note_id_fkey FOREIGN KEY (delivery_note_id) REFERENCES public.delivery_notes(id),
-  CONSTRAINT delivery_note_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT delivery_note_items_purchase_order_item_id_fkey FOREIGN KEY (purchase_order_item_id) REFERENCES public.purchase_order_items(id),
-  CONSTRAINT dni_location_fk FOREIGN KEY (location_id) REFERENCES public.storage_locations(id)
-);
-CREATE TABLE public.storage_locations (
-  id integer NOT NULL DEFAULT nextval('storage_locations_id_seq'::regclass),
-  name character varying NOT NULL UNIQUE,
-  area USER-DEFINED NOT NULL,
-  capacity_note text,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT storage_locations_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.donations (
-  id integer NOT NULL DEFAULT nextval('donations_id_seq'::regclass),
-  received_at timestamp with time zone NOT NULL DEFAULT now(),
-  programme_id integer,
-  estimated_value_zar numeric NOT NULL CHECK (estimated_value_zar >= 0::numeric),
-  donor_name character varying,
-  donor_contact character varying,
-  donor_consent_given boolean NOT NULL DEFAULT false,
-  section_18a_qualifying boolean NOT NULL DEFAULT false,
-  section_18a_certificate_ref character varying,
-  section_18a_issued_at timestamp with time zone,
-  received_by integer,
-  notes text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  donor_tax_reference character varying,
-  idempotency_key character varying,
-  section_18a_status character varying NOT NULL DEFAULT 'not_evaluated'::character varying CHECK (section_18a_status::text = ANY (ARRAY['not_evaluated'::character varying, 'not_qualifying'::character varying, 'qualifying_pending_donor'::character varying, 'queued'::character varying, 'issued'::character varying, 'failed'::character varying]::text[])),
-  quickbooks_sync_status character varying NOT NULL DEFAULT 'unsynced'::character varying,
-  quickbooks_sync_reference_id character varying,
-  quickbooks_sync_error text,
-  quickbooks_synced_at timestamp with time zone,
-  quickbooks_sync_attempted_at timestamp with time zone,
-  donor_id integer,
-  donation_category character varying NOT NULL CHECK (donation_category::text = ANY (ARRAY['recipe_food'::character varying, 'add_on_food'::character varying, 'non_recipe_food'::character varying, 'non_food'::character varying]::text[])),
-  status character varying NOT NULL DEFAULT 'draft'::character varying CHECK (status::text = ANY (ARRAY['draft'::character varying, 'under_review'::character varying, 'ready_for_commit'::character varying, 'committed'::character varying, 'cancelled'::character varying]::text[])),
-  created_by integer,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  donor_registration_type character varying CHECK (donor_registration_type::text = ANY (ARRAY['individual'::character varying, 'company'::character varying, 'company_public'::character varying, 'cc'::character varying, 'npc'::character varying, 'trust'::character varying, 'estate'::character varying, 'association'::character varying]::text[])),
-  section18a_requested boolean NOT NULL DEFAULT false,
-  donor_first_name character varying,
-  donor_last_name character varying,
-  donor_cellphone character varying,
-  donor_address_line1 character varying,
-  donor_address_line2 character varying,
-  donor_city_suburb character varying,
-  donor_province character varying,
-  donor_postal_code character varying,
-  donor_country character varying,
-  donor_identification_type character varying CHECK (donor_identification_type::text = ANY (ARRAY['south_african_id'::character varying, 'foreign_passport'::character varying]::text[])),
-  donor_identification_number character varying,
-  donor_identification_country_of_issue character varying,
-  section_18a_deemed_value_zar numeric CHECK (section_18a_deemed_value_zar IS NULL OR section_18a_deemed_value_zar >= 0::numeric),
-  section_18a_form_token_hash text,
-  section_18a_form_token_expires_at timestamp with time zone,
-  section_18a_form_submitted_at timestamp with time zone,
-  section_18a_donor_form jsonb,
-  value_estimated boolean NOT NULL DEFAULT false,
-  value_verified_at timestamp with time zone,
-  value_verified_by integer,
-  CONSTRAINT donations_pkey PRIMARY KEY (id),
-  CONSTRAINT donations_programme_id_fkey FOREIGN KEY (programme_id) REFERENCES public.programmes(id),
-  CONSTRAINT donations_received_by_fkey FOREIGN KEY (received_by) REFERENCES public.users(id),
-  CONSTRAINT donations_donor_id_fkey FOREIGN KEY (donor_id) REFERENCES public.donors(id),
-  CONSTRAINT donations_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.donation_items (
-  id integer NOT NULL DEFAULT nextval('donation_items_id_seq'::regclass),
-  donation_id integer NOT NULL,
-  product_id integer,
-  description character varying,
-  quantity numeric NOT NULL CHECK (quantity > 0::numeric),
-  unit character varying NOT NULL DEFAULT 'kg'::character varying,
-  estimated_value_zar numeric,
-  storage_location_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  routing_status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (routing_status::text = ANY (ARRAY['pending'::character varying, 'allocated'::character varying, 'unmatched'::character varying, 'not_stock_bearing'::character varying, 'awaiting_programme_stock'::character varying]::text[])),
-  resolved_by integer,
-  resolved_at timestamp with time zone,
-  routed_category character varying,
-  routing_outcome character varying,
-  routing_source character varying NOT NULL DEFAULT 'unclassified'::character varying CHECK (routing_source::text = ANY (ARRAY['manual_override'::character varying, 'product_default'::character varying, 'manual_category'::character varying, 'unclassified'::character varying]::text[])),
-  line_no integer NOT NULL CHECK (line_no > 0),
-  source_reference character varying,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT donation_items_pkey PRIMARY KEY (id),
-  CONSTRAINT donation_items_donation_id_fkey FOREIGN KEY (donation_id) REFERENCES public.donations(id),
-  CONSTRAINT donation_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT donation_items_storage_location_id_fkey FOREIGN KEY (storage_location_id) REFERENCES public.storage_locations(id),
-  CONSTRAINT donation_items_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.delivery_receipts (
-  id integer NOT NULL DEFAULT nextval('delivery_receipts_id_seq'::regclass),
-  picking_slip_id integer NOT NULL UNIQUE,
-  ecd_id integer,
-  dispatch_date date NOT NULL,
-  cohort USER-DEFINED NOT NULL,
-  outcome USER-DEFINED NOT NULL DEFAULT 'not_collected'::collection_outcome,
-  collected_by_name character varying,
-  collector_contact character varying,
-  signature text,
-  confirmed_by integer,
-  confirmed_at timestamp with time zone,
-  is_cohort_override boolean NOT NULL DEFAULT false,
-  override_reason text,
-  override_approved_by integer,
-  auto_flagged_at timestamp with time zone,
-  notes text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT delivery_receipts_pkey PRIMARY KEY (id),
-  CONSTRAINT delivery_receipts_picking_slip_id_fkey FOREIGN KEY (picking_slip_id) REFERENCES public.picking_slips(id),
-  CONSTRAINT delivery_receipts_ecd_id_fkey FOREIGN KEY (ecd_id) REFERENCES public.ecd_centres(id),
-  CONSTRAINT delivery_receipts_confirmed_by_fkey FOREIGN KEY (confirmed_by) REFERENCES public.users(id),
-  CONSTRAINT delivery_receipts_override_approved_by_fkey FOREIGN KEY (override_approved_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.stock_counts (
-  id integer NOT NULL DEFAULT nextval('stock_counts_id_seq'::regclass),
-  count_date date NOT NULL,
-  status USER-DEFINED NOT NULL DEFAULT 'in_progress'::stock_count_status,
-  started_by integer,
-  started_at timestamp with time zone NOT NULL DEFAULT now(),
-  submitted_at timestamp with time zone,
-  approved_by integer,
-  approved_at timestamp with time zone,
-  notes text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT stock_counts_pkey PRIMARY KEY (id),
-  CONSTRAINT stock_counts_started_by_fkey FOREIGN KEY (started_by) REFERENCES public.users(id),
-  CONSTRAINT stock_counts_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.stock_count_lines (
-  id integer NOT NULL DEFAULT nextval('stock_count_lines_id_seq'::regclass),
-  stock_count_id integer NOT NULL,
-  product_id integer NOT NULL,
-  location_id integer,
-  system_quantity numeric NOT NULL,
-  counted_quantity numeric NOT NULL CHECK (counted_quantity >= 0::numeric),
-  variance numeric DEFAULT (counted_quantity - system_quantity),
-  unit character varying NOT NULL DEFAULT 'kg'::character varying,
-  reason_code character varying,
-  notes text,
-  counted_by integer,
-  counted_at timestamp with time zone NOT NULL DEFAULT now(),
-  client_uuid uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
-  adjustment_movement_id integer,
-  CONSTRAINT stock_count_lines_pkey PRIMARY KEY (id),
-  CONSTRAINT stock_count_lines_stock_count_id_fkey FOREIGN KEY (stock_count_id) REFERENCES public.stock_counts(id),
-  CONSTRAINT stock_count_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT stock_count_lines_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.storage_locations(id),
-  CONSTRAINT stock_count_lines_counted_by_fkey FOREIGN KEY (counted_by) REFERENCES public.users(id),
-  CONSTRAINT stock_count_lines_adjustment_movement_id_fkey FOREIGN KEY (adjustment_movement_id) REFERENCES public.stock_movements(id)
-);
-CREATE TABLE public.community_requests (
-  id integer NOT NULL DEFAULT nextval('community_requests_id_seq'::regclass),
-  requested_at timestamp with time zone NOT NULL DEFAULT now(),
-  caller_name character varying,
-  caller_contact character varying,
-  items_requested text NOT NULL,
-  quantity_note character varying,
-  outcome USER-DEFINED NOT NULL DEFAULT 'pending'::request_outcome,
-  outcome_note text,
-  handled_by integer,
-  resolved_at timestamp with time zone,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  logged_by integer,
-  CONSTRAINT community_requests_pkey PRIMARY KEY (id),
-  CONSTRAINT community_requests_logged_by_fkey FOREIGN KEY (logged_by) REFERENCES public.users(id),
-  CONSTRAINT community_requests_handled_by_fkey FOREIGN KEY (handled_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.quickbooks_object_map (
-  entity_type character varying NOT NULL,
-  entity_id integer NOT NULL,
-  qbo_object_type character varying NOT NULL,
-  qbo_id character varying NOT NULL,
-  sync_token character varying,
-  last_synced_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT quickbooks_object_map_pkey PRIMARY KEY (entity_type, entity_id)
-);
-CREATE TABLE public.quickbooks_sync_queue (
-  id bigint NOT NULL DEFAULT nextval('quickbooks_sync_queue_id_seq'::regclass),
-  entity_type character varying NOT NULL,
-  entity_id integer NOT NULL,
-  operation character varying NOT NULL,
-  payload jsonb,
-  status USER-DEFINED NOT NULL DEFAULT 'pending'::sync_status,
-  attempts integer NOT NULL DEFAULT 0,
-  last_error text,
-  next_attempt_at timestamp with time zone NOT NULL DEFAULT now(),
-  idempotency_key character varying NOT NULL UNIQUE,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT quickbooks_sync_queue_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.dispatch_events (
-  id integer NOT NULL DEFAULT nextval('dispatch_events_id_seq'::regclass),
-  picking_slip_id integer NOT NULL UNIQUE,
-  status character varying NOT NULL DEFAULT 'awaiting'::character varying CHECK (status::text = ANY (ARRAY['awaiting'::character varying, 'collected'::character varying, 'late_collected'::character varying, 'not_collected'::character varying, 'cancelled'::character varying]::text[])),
-  collected_at timestamp with time zone,
-  flagged_at timestamp with time zone,
-  dispatched_by integer,
-  driver_name character varying,
-  vehicle_reg character varying,
-  signature text,
-  override_by integer,
-  override_reason text,
-  idempotency_key uuid UNIQUE,
-  notes text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  followed_up_at timestamp with time zone,
-  followed_up_by integer,
-  CONSTRAINT dispatch_events_pkey PRIMARY KEY (id),
-  CONSTRAINT dispatch_events_picking_slip_id_fkey FOREIGN KEY (picking_slip_id) REFERENCES public.picking_slips(id),
-  CONSTRAINT dispatch_events_dispatched_by_fkey FOREIGN KEY (dispatched_by) REFERENCES public.users(id),
-  CONSTRAINT dispatch_events_override_by_fkey FOREIGN KEY (override_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.dispatch_event_lines (
-  id integer NOT NULL DEFAULT nextval('dispatch_event_lines_id_seq'::regclass),
-  dispatch_event_id integer NOT NULL,
-  picking_slip_item_id integer,
-  product_id integer NOT NULL,
-  packed_quantity numeric NOT NULL,
-  loaded_quantity numeric NOT NULL CHECK (loaded_quantity >= 0::numeric),
-  unit character varying NOT NULL,
-  variance_reason text,
-  CONSTRAINT dispatch_event_lines_pkey PRIMARY KEY (id),
-  CONSTRAINT dispatch_event_lines_dispatch_event_id_fkey FOREIGN KEY (dispatch_event_id) REFERENCES public.dispatch_events(id),
-  CONSTRAINT dispatch_event_lines_picking_slip_item_id_fkey FOREIGN KEY (picking_slip_item_id) REFERENCES public.picking_slip_items(id),
-  CONSTRAINT dispatch_event_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-CREATE TABLE public.donation_allocations (
-  id integer GENERATED ALWAYS AS IDENTITY NOT NULL,
-  donation_item_id integer NOT NULL,
-  beneficiary_type character varying NOT NULL DEFAULT 'ecd'::character varying CHECK (beneficiary_type::text = ANY (ARRAY['ecd'::character varying, 'soup_kitchen'::character varying, 'dignity_kitchen'::character varying, 'other'::character varying]::text[])),
-  ecd_centre_id integer,
-  child_count integer NOT NULL,
-  allocated_quantity numeric NOT NULL CHECK (allocated_quantity >= 0::numeric),
-  unit character varying NOT NULL,
-  allocation_status character varying NOT NULL DEFAULT 'planned'::character varying CHECK (allocation_status::text = ANY (ARRAY['planned'::character varying, 'recorded'::character varying, 'cancelled'::character varying]::text[])),
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  stock_movement_id integer,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT donation_allocations_pkey PRIMARY KEY (id),
-  CONSTRAINT donation_allocations_donation_item_id_fkey FOREIGN KEY (donation_item_id) REFERENCES public.donation_items(id),
-  CONSTRAINT donation_allocations_ecd_centre_id_fkey FOREIGN KEY (ecd_centre_id) REFERENCES public.ecd_centres(id),
-  CONSTRAINT donation_allocations_stock_movement_id_fkey FOREIGN KEY (stock_movement_id) REFERENCES public.stock_movements(id)
-);
-CREATE TABLE public.donation_settings (
-  id integer NOT NULL DEFAULT 1 CHECK (id = 1),
-  section18a_threshold_value numeric NOT NULL DEFAULT 1000.00,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT donation_settings_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.reporting_factors (
-  id integer NOT NULL DEFAULT nextval('reporting_factors_id_seq'::regclass),
-  factor_key character varying NOT NULL,
-  value numeric NOT NULL CHECK (value > 0::numeric),
-  unit character varying NOT NULL,
-  source_note text,
-  effective_from date NOT NULL DEFAULT CURRENT_DATE,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT reporting_factors_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.reporting_queries (
-  id bigint NOT NULL DEFAULT nextval('reporting_queries_id_seq'::regclass),
-  user_id integer,
-  question text NOT NULL,
-  outcome character varying NOT NULL CHECK (outcome::text = ANY (ARRAY['ok'::character varying, 'clarify'::character varying, 'unresolved'::character varying, 'error'::character varying]::text[])),
-  metric character varying,
-  spec jsonb,
-  error_message text,
-  latency_ms integer,
-  provider character varying,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT reporting_queries_pkey PRIMARY KEY (id),
-  CONSTRAINT reporting_queries_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.supplier_prospects (
-  id integer NOT NULL DEFAULT nextval('supplier_prospects_id_seq'::regclass),
-  name character varying NOT NULL,
-  what_they_supply text,
-  lead_source character varying,
-  contact_name character varying,
-  contact_email character varying,
-  contact_phone character varying,
-  notes text,
-  status character varying NOT NULL DEFAULT 'open'::character varying CHECK (status::text = ANY (ARRAY['open'::character varying, 'contacted'::character varying, 'rejected'::character varying, 'converted'::character varying]::text[])),
-  converted_supplier_id integer,
-  created_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT supplier_prospects_pkey PRIMARY KEY (id),
-  CONSTRAINT supplier_prospects_supplier_fkey FOREIGN KEY (converted_supplier_id) REFERENCES public.suppliers(id),
-  CONSTRAINT supplier_prospects_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.donation_category_routing (
-  category character varying NOT NULL CHECK (category::text = ANY (ARRAY['recipe_food'::character varying, 'add_on_food'::character varying, 'non_recipe_food'::character varying, 'non_food'::character varying]::text[])),
-  routing_outcome character varying NOT NULL,
-  storage_area USER-DEFINED,
-  description text,
-  is_active boolean NOT NULL DEFAULT true,
-  updated_by integer,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT donation_category_routing_pkey PRIMARY KEY (category),
-  CONSTRAINT donation_category_routing_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.donation_routing_defaults (
-  product_id integer NOT NULL,
-  donation_category character varying CHECK (donation_category::text = ANY (ARRAY['recipe_food'::character varying, 'add_on_food'::character varying, 'non_recipe_food'::character varying, 'non_food'::character varying]::text[])),
-  set_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT donation_routing_defaults_pkey PRIMARY KEY (product_id),
-  CONSTRAINT donation_routing_defaults_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT donation_routing_defaults_set_by_fkey FOREIGN KEY (set_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.warehouse_manager_flags (
-  id integer NOT NULL DEFAULT nextval('warehouse_manager_flags_id_seq'::regclass),
-  product_id integer NOT NULL,
-  quantity_kg numeric NOT NULL,
-  reason text NOT NULL,
-  target_location character varying,
-  created_by integer,
-  status character varying DEFAULT 'pending'::character varying,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),
-  pending_donation_id integer,
-  pending_donation_item_id integer,
-  CONSTRAINT warehouse_manager_flags_pkey PRIMARY KEY (id),
-  CONSTRAINT warehouse_manager_flags_pending_donation_id_fkey FOREIGN KEY (pending_donation_id) REFERENCES public.pending_donations(id),
-  CONSTRAINT warehouse_manager_flags_pending_donation_item_id_fkey FOREIGN KEY (pending_donation_item_id) REFERENCES public.pending_donation_items(id),
-  CONSTRAINT warehouse_manager_flags_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-CREATE TABLE public.pending_donations (
-  id integer NOT NULL DEFAULT nextval('pending_donations_id_seq'::regclass),
-  status character varying NOT NULL DEFAULT 'draft'::character varying CHECK (status::text = ANY (ARRAY['draft'::character varying, 'awaiting_resolution'::character varying, 'committing'::character varying, 'committed'::character varying, 'cancelled'::character varying, 'commit_failed'::character varying, 'commit_incomplete'::character varying]::text[])),
-  created_by integer,
-  donor_name character varying,
-  donor_contact character varying,
-  donor_tax_reference character varying,
-  donor_consent_given boolean,
-  estimated_value_zar numeric,
-  donation_category character varying,
-  programme_id integer,
-  notes text,
-  section_18a_status character varying,
-  section_18a_qualifying boolean,
-  draft_snapshot jsonb NOT NULL,
-  idempotency_key character varying,
-  committed_donation_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  resolved_at timestamp with time zone,
-  committed_at timestamp with time zone,
-  cancelled_at timestamp with time zone,
-  commit_failed_at timestamp with time zone,
-  commit_incomplete_at timestamp with time zone,
-  donor_registration_type character varying CHECK (donor_registration_type::text = ANY (ARRAY['individual'::character varying, 'company'::character varying, 'company_public'::character varying, 'cc'::character varying, 'npc'::character varying, 'trust'::character varying, 'estate'::character varying, 'association'::character varying]::text[])),
-  donor_first_name character varying,
-  donor_last_name character varying,
-  donor_cellphone character varying,
-  donor_address_line1 character varying,
-  donor_address_line2 character varying,
-  donor_city_suburb character varying,
-  donor_province character varying,
-  donor_postal_code character varying,
-  donor_country character varying,
-  section18a_requested boolean NOT NULL DEFAULT false,
-  donor_identification_type character varying CHECK (donor_identification_type::text = ANY (ARRAY['south_african_id'::character varying, 'foreign_passport'::character varying]::text[])),
-  donor_identification_country_of_issue character varying,
-  donor_identification_number character varying,
-  value_estimated boolean NOT NULL DEFAULT false,
-  CONSTRAINT pending_donations_pkey PRIMARY KEY (id),
-  CONSTRAINT pending_donations_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT pending_donations_programme_id_fkey FOREIGN KEY (programme_id) REFERENCES public.programmes(id),
-  CONSTRAINT pending_donations_committed_donation_id_fkey FOREIGN KEY (committed_donation_id) REFERENCES public.donations(id)
-);
-CREATE TABLE public.pending_donation_items (
-  id integer NOT NULL DEFAULT nextval('pending_donation_items_id_seq'::regclass),
-  pending_donation_id integer NOT NULL,
-  line_no integer NOT NULL,
-  description text NOT NULL,
-  product_id integer,
-  quantity numeric NOT NULL,
-  unit character varying NOT NULL,
-  estimated_value_zar numeric,
-  requested_category character varying,
-  resolved_category character varying,
-  routing_status character varying,
-  storage_area_hint character varying,
-  source character varying CHECK (source::text = ANY (ARRAY['product_default'::character varying, 'manual_category'::character varying, 'unclassified'::character varying, 'pending_manual_review'::character varying]::text[])),
-  status character varying NOT NULL DEFAULT 'awaiting_resolution'::character varying CHECK (status::text = ANY (ARRAY['awaiting_resolution'::character varying, 'resolved'::character varying, 'committed'::character varying, 'rejected'::character varying, 'cancelled'::character varying]::text[])),
-  flag_id integer,
-  rejection_reason text,
-  resolved_by integer,
-  rejected_at timestamp with time zone,
-  committed_donation_item_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT pending_donation_items_pkey PRIMARY KEY (id),
-  CONSTRAINT pending_donation_items_pending_donation_id_fkey FOREIGN KEY (pending_donation_id) REFERENCES public.pending_donations(id),
-  CONSTRAINT pending_donation_items_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id),
-  CONSTRAINT pending_donation_items_flag_id_fkey FOREIGN KEY (flag_id) REFERENCES public.warehouse_manager_flags(id),
-  CONSTRAINT pending_donation_items_resolved_by_fkey FOREIGN KEY (resolved_by) REFERENCES public.users(id),
-  CONSTRAINT pending_donation_items_committed_donation_item_id_fkey FOREIGN KEY (committed_donation_item_id) REFERENCES public.donation_items(id)
-);
-CREATE TABLE public.gmail_connections (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  gmail_email character varying,
-  token_type character varying NOT NULL,
-  scope text NOT NULL,
-  access_token_encrypted text NOT NULL,
-  refresh_token_encrypted text NOT NULL,
-  access_token_expires_at timestamp with time zone,
-  refresh_token_expires_at timestamp with time zone,
-  connected_by_user_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  display_name character varying,
-  CONSTRAINT gmail_connections_pkey PRIMARY KEY (id),
-  CONSTRAINT gmail_connections_connected_by_user_id_fkey FOREIGN KEY (connected_by_user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.quickbooks_connections (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  realm_id character varying NOT NULL UNIQUE,
-  token_type character varying NOT NULL,
-  scope text NOT NULL,
-  access_token_encrypted text NOT NULL,
-  refresh_token_encrypted text NOT NULL,
-  access_token_expires_at timestamp with time zone,
-  refresh_token_expires_at timestamp with time zone,
-  connected_by_user_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT quickbooks_connections_pkey PRIMARY KEY (id),
-  CONSTRAINT quickbooks_connections_connected_by_user_id_fkey FOREIGN KEY (connected_by_user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.donors (
-  id integer NOT NULL DEFAULT nextval('donors_id_seq'::regclass),
-  name character varying NOT NULL,
-  contact character varying,
-  tax_reference character varying,
-  consent_given boolean NOT NULL DEFAULT false,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT donors_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.schema_migration_provenance (
-  migration_id text NOT NULL,
-  applied_at timestamp with time zone NOT NULL DEFAULT now(),
-  notes text,
-  CONSTRAINT schema_migration_provenance_pkey PRIMARY KEY (migration_id)
-);
-CREATE TABLE public.notifications (
-  id integer NOT NULL DEFAULT nextval('notifications_id_seq'::regclass),
-  type character varying NOT NULL,
-  title character varying NOT NULL,
-  body text,
-  entity_type character varying,
-  entity_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  target_roles ARRAY,
-  CONSTRAINT notifications_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.notification_reads (
-  notification_id integer NOT NULL,
-  user_id integer NOT NULL,
-  read_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT notification_reads_pkey PRIMARY KEY (notification_id, user_id),
-  CONSTRAINT notification_reads_notification_id_fkey FOREIGN KEY (notification_id) REFERENCES public.notifications(id),
-  CONSTRAINT notification_reads_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.love_activism_events (
-  event_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  event_name character varying NOT NULL,
-  description text,
-  event_date date NOT NULL,
-  status character varying NOT NULL CHECK (status::text = ANY (ARRAY['DRAFT'::character varying, 'SCHEDULED'::character varying, 'PUBLISHED'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying]::text[])),
-  created_by integer NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  venue_name character varying,
-  address character varying,
-  CONSTRAINT love_activism_events_pkey PRIMARY KEY (event_id),
-  CONSTRAINT love_activism_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.event_spaces (
-  space_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  space_name character varying NOT NULL UNIQUE,
-  description text,
-  location character varying,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT event_spaces_pkey PRIMARY KEY (space_id)
-);
-CREATE TABLE public.event_timeslots (
-  timeslot_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  event_id uuid NOT NULL,
-  space_id uuid NOT NULL,
-  start_time timestamp with time zone NOT NULL,
-  end_time timestamp with time zone NOT NULL,
-  capacity integer NOT NULL CHECK (capacity > 0),
-  status character varying NOT NULL CHECK (status::text = ANY (ARRAY['OPEN'::character varying, 'CLOSED'::character varying, 'CANCELLED'::character varying]::text[])),
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT event_timeslots_pkey PRIMARY KEY (timeslot_id),
-  CONSTRAINT event_timeslots_event_id_fkey FOREIGN KEY (event_id) REFERENCES public.love_activism_events(event_id),
-  CONSTRAINT event_timeslots_space_id_fkey FOREIGN KEY (space_id) REFERENCES public.event_spaces(space_id)
-);
-CREATE TABLE public.volunteer_bookings (
-  booking_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  timeslot_id uuid NOT NULL,
-  external_booking_id character varying UNIQUE,
-  external_volunteer_id character varying,
-  volunteer_first_name character varying NOT NULL,
-  volunteer_last_name character varying,
-  booking_source character varying NOT NULL CHECK (booking_source::text = ANY (ARRAY['VMS'::character varying, 'WMS_GUEST'::character varying]::text[])),
-  booking_status character varying NOT NULL CHECK (booking_status::text = ANY (ARRAY['CONFIRMED'::character varying, 'CANCELLED'::character varying]::text[])),
-  booked_at timestamp with time zone NOT NULL DEFAULT now(),
-  last_synced_at timestamp with time zone,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  volunteer_email character varying,
-  volunteer_phone character varying,
-  CONSTRAINT volunteer_bookings_pkey PRIMARY KEY (booking_id),
-  CONSTRAINT volunteer_bookings_timeslot_id_fkey FOREIGN KEY (timeslot_id) REFERENCES public.event_timeslots(timeslot_id)
-);
-CREATE TABLE public.attendance (
-  attendance_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  booking_id uuid NOT NULL UNIQUE,
-  checked_in boolean NOT NULL DEFAULT false,
-  check_in_time timestamp with time zone,
-  source character varying,
-  last_synced_at timestamp with time zone,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT attendance_pkey PRIMARY KEY (attendance_id),
-  CONSTRAINT attendance_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.volunteer_bookings(booking_id)
-);
-CREATE TABLE public.vms_sync (
-  sync_id uuid NOT NULL DEFAULT gen_random_uuid(),
-  entity_type character varying NOT NULL CHECK (entity_type::text = ANY (ARRAY['EVENT'::character varying, 'TIMESLOT'::character varying, 'event_booking'::character varying]::text[])),
-  entity_id uuid NOT NULL,
-  external_id character varying,
-  sync_status character varying NOT NULL CHECK (sync_status::text = ANY (ARRAY['PENDING'::character varying, 'SYNCED'::character varying, 'FAILED'::character varying]::text[])),
-  last_attempt_at timestamp with time zone,
-  last_success_at timestamp with time zone,
-  error_message text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT vms_sync_pkey PRIMARY KEY (sync_id)
-);
-CREATE TABLE public.audit_log (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  entity_type text NOT NULL,
-  entity_id text NOT NULL,
-  action text NOT NULL,
-  actor_id integer,
-  reason text,
-  approved_by integer,
-  before_data jsonb,
-  after_data jsonb,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT audit_log_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.section18a_settings (
-  id integer NOT NULL DEFAULT 1 CHECK (id = 1),
-  organisation_name text NOT NULL DEFAULT ''::text,
-  organisation_address text NOT NULL DEFAULT ''::text,
-  contact_name text NOT NULL DEFAULT ''::text,
-  contact_email text NOT NULL DEFAULT ''::text,
-  contact_phone text NOT NULL DEFAULT ''::text,
-  pba_declaration text NOT NULL DEFAULT ''::text,
-  certificate_prefix text NOT NULL DEFAULT 'S18A'::text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT section18a_settings_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.section18a_certificates (
-  id bigint NOT NULL DEFAULT nextval('section18a_certificates_id_seq'::regclass),
-  donation_id integer NOT NULL,
-  certificate_number text NOT NULL UNIQUE,
-  issue_date date NOT NULL,
-  issued_by integer,
-  settings_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
-  donor_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
-  donation_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
-  pdf_content bytea NOT NULL,
-  pdf_filename text NOT NULL,
-  pdf_content_type text NOT NULL DEFAULT 'application/pdf'::text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT section18a_certificates_pkey PRIMARY KEY (id),
-  CONSTRAINT section18a_certificates_donation_id_fkey FOREIGN KEY (donation_id) REFERENCES public.donations(id),
-  CONSTRAINT section18a_certificates_issued_by_fkey FOREIGN KEY (issued_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.donation_email_logs (
-  id bigint NOT NULL DEFAULT nextval('donation_email_logs_id_seq'::regclass),
-  donation_id integer NOT NULL,
-  certificate_id bigint,
-  email_type text NOT NULL CHECK (email_type = ANY (ARRAY['THANK_YOU'::text, 'SECTION_18A'::text])),
-  recipient text NOT NULL,
-  subject text NOT NULL,
-  status text NOT NULL CHECK (status = ANY (ARRAY['SENT'::text, 'FAILED'::text])),
-  provider_message_id text,
-  error_message text,
-  sent_at timestamp with time zone,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  donor_id bigint,
-  recipient_email text,
-  recipient_name text,
-  gmail_message_id text,
-  gmail_thread_id text,
-  sent_by_user_id integer,
-  CONSTRAINT donation_email_logs_pkey PRIMARY KEY (id),
-  CONSTRAINT donation_email_logs_donation_id_fkey FOREIGN KEY (donation_id) REFERENCES public.donations(id),
-  CONSTRAINT donation_email_logs_certificate_id_fkey FOREIGN KEY (certificate_id) REFERENCES public.section18a_certificates(id),
-  CONSTRAINT donation_email_logs_sent_by_user_id_fkey FOREIGN KEY (sent_by_user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.certificate_settings (
-  id integer NOT NULL DEFAULT 1 CHECK (id = 1),
-  organisation_name text NOT NULL DEFAULT ''::text,
-  pbo_number text NOT NULL DEFAULT ''::text,
-  section18a_reference text NOT NULL DEFAULT ''::text,
-  physical_address text NOT NULL DEFAULT ''::text,
-  postal_address text NOT NULL DEFAULT ''::text,
-  contact_email text NOT NULL DEFAULT ''::text,
-  contact_phone text NOT NULL DEFAULT ''::text,
-  sender_display_name text NOT NULL DEFAULT ''::text,
-  reply_to_email text NOT NULL DEFAULT ''::text,
-  subject_template text NOT NULL DEFAULT ''::text,
-  footer_text text NOT NULL DEFAULT ''::text,
-  signature_name text NOT NULL DEFAULT ''::text,
-  signature_title text NOT NULL DEFAULT ''::text,
-  default_acknowledgement_message text NOT NULL DEFAULT ''::text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  logo_url text NOT NULL DEFAULT ''::text,
-  npo_number text NOT NULL DEFAULT ''::text,
-  website text NOT NULL DEFAULT ''::text,
-  certificate_prefix text NOT NULL DEFAULT '18A'::text,
-  CONSTRAINT certificate_settings_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.assistant_queries (
-  id integer NOT NULL DEFAULT nextval('assistant_queries_id_seq'::regclass),
-  user_id integer,
-  user_role text,
-  screen text,
-  question text NOT NULL,
-  outcome text NOT NULL,
-  topic_id text,
-  target_screen text,
-  error_message text,
-  latency_ms integer,
-  provider text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT assistant_queries_pkey PRIMARY KEY (id),
-  CONSTRAINT assistant_queries_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.user_invites (
-  id integer NOT NULL DEFAULT nextval('user_invites_id_seq'::regclass),
-  email text NOT NULL,
-  role text NOT NULL CHECK (role = ANY (ARRAY['warehouse_worker'::text, 'manager'::text, 'admin'::text])),
-  token_hash text NOT NULL,
-  expires_at timestamp with time zone NOT NULL,
-  accepted_at timestamp with time zone,
-  revoked_at timestamp with time zone,
-  invited_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  last_sent_at timestamp with time zone NOT NULL DEFAULT now(),
-  resend_count integer NOT NULL DEFAULT 0,
-  email_status text CHECK (email_status = ANY (ARRAY['sent'::text, 'stubbed'::text, 'failed'::text])),
-  email_error text,
-  email_attempted_at timestamp with time zone,
-  CONSTRAINT user_invites_pkey PRIMARY KEY (id),
-  CONSTRAINT user_invites_invited_by_fkey FOREIGN KEY (invited_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.collection_kits (
-  id integer NOT NULL DEFAULT nextval('collection_kits_id_seq'::regclass),
-  owner_name character varying NOT NULL,
-  suburb character varying,
-  assigned_at date NOT NULL DEFAULT CURRENT_DATE,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT collection_kits_pkey PRIMARY KEY (id)
-);
-
--- Soup kitchens and the Dignity Kitchen, with the adults each feeds per
--- collection (migration 068). Their pallets match them by kind and name.
-CREATE TABLE public.kitchens (
-  id integer NOT NULL DEFAULT nextval('kitchens_id_seq'::regclass),
-  kind USER-DEFINED NOT NULL CHECK (kind = ANY (ARRAY['soup_kitchen'::beneficiary_type, 'dignity_kitchen'::beneficiary_type])),
-  name character varying NOT NULL CHECK (btrim(name::text) <> ''::text),
-  adult_count integer CHECK (adult_count IS NULL OR adult_count >= 0),
-  contact_name character varying,
-  contact_phone character varying,
-  address text,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT kitchens_pkey PRIMARY KEY (id)
-);
-
--- Feed the Soil drop-off sites and the compost logged at them by QR code
--- (migration 069).
-CREATE TABLE public.fts_drop_points (
-  id integer NOT NULL DEFAULT nextval('fts_drop_points_id_seq'::regclass),
-  name character varying NOT NULL CHECK (btrim(name::text) <> ''::text),
-  suburb character varying,
-  address text,
-  public_token uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
-  is_active boolean NOT NULL DEFAULT true,
-  created_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT fts_drop_points_pkey PRIMARY KEY (id),
-  CONSTRAINT fts_drop_points_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.fts_dropoffs (
-  id integer NOT NULL DEFAULT nextval('fts_dropoffs_id_seq'::regclass),
-  drop_point_id integer,
-  kg_compost numeric NOT NULL CHECK (kg_compost > 0::numeric AND kg_compost <= 200::numeric),
-  donor_name character varying,
-  donor_email character varying,
-  status character varying NOT NULL DEFAULT 'logged'::character varying CHECK (status::text = ANY (ARRAY['logged'::character varying, 'rejected'::character varying]::text[])),
-  thanks_status character varying CHECK (thanks_status::text = ANY (ARRAY['sent'::character varying, 'stubbed'::character varying, 'failed'::character varying]::text[])),
-  submitted_at timestamp with time zone NOT NULL DEFAULT now(),
-  reviewed_by integer,
-  reviewed_at timestamp with time zone,
-  place_name character varying,
-  CONSTRAINT fts_dropoffs_site_or_place CHECK (drop_point_id IS NOT NULL OR place_name IS NOT NULL AND btrim(place_name::text) <> ''::text),
-  CONSTRAINT fts_dropoffs_pkey PRIMARY KEY (id),
-  CONSTRAINT fts_dropoffs_drop_point_id_fkey FOREIGN KEY (drop_point_id) REFERENCES public.fts_drop_points(id),
-  CONSTRAINT fts_dropoffs_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.collection_kit_records (
-  id integer NOT NULL DEFAULT nextval('collection_kit_records_id_seq'::regclass),
-  kit_id integer NOT NULL,
-  kg_compost numeric NOT NULL CHECK (kg_compost >= 0::numeric),
-  logged_at date NOT NULL DEFAULT CURRENT_DATE,
-  status character varying NOT NULL DEFAULT 'logged'::character varying CHECK (status::text = ANY (ARRAY['logged'::character varying, 'dispatched'::character varying]::text[])),
-  dispatched_at timestamp with time zone,
-  notes text,
-  logged_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  dispatched_to character varying,
-  CONSTRAINT collection_kit_records_pkey PRIMARY KEY (id),
-  CONSTRAINT collection_kit_records_kit_id_fkey FOREIGN KEY (kit_id) REFERENCES public.collection_kits(id),
-  CONSTRAINT collection_kit_records_logged_by_fkey FOREIGN KEY (logged_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.finance_report_access_links (
-  id integer NOT NULL DEFAULT nextval('finance_report_access_links_id_seq'::regclass),
-  token_hash text NOT NULL UNIQUE,
-  created_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  revoked_at timestamp with time zone,
-  revoked_by integer,
-  expires_at timestamp with time zone NOT NULL,
-  last_opened_at timestamp with time zone,
-  open_count integer NOT NULL DEFAULT 0,
-  CONSTRAINT finance_report_access_links_pkey PRIMARY KEY (id),
-  CONSTRAINT finance_report_access_links_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT finance_report_access_links_revoked_by_fkey FOREIGN KEY (revoked_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.finance_report_email_settings (
-  id integer NOT NULL DEFAULT 1 CHECK (id = 1),
-  recipient_email text,
-  updated_by integer,
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT finance_report_email_settings_pkey PRIMARY KEY (id),
-  CONSTRAINT finance_report_email_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.finance_report_email_logs (
-  id integer NOT NULL DEFAULT nextval('finance_report_email_logs_id_seq'::regclass),
-  recipient_email text NOT NULL,
-  status text NOT NULL CHECK (status = ANY (ARRAY['SENT'::text, 'FAILED'::text])),
-  finance_link_id integer,
-  provider_message_id text,
-  error_message text,
-  sent_by_user_id integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  sent_at timestamp with time zone,
-  CONSTRAINT finance_report_email_logs_pkey PRIMARY KEY (id),
-  CONSTRAINT finance_report_email_logs_finance_link_id_fkey FOREIGN KEY (finance_link_id) REFERENCES public.finance_report_access_links(id),
-  CONSTRAINT finance_report_email_logs_sent_by_user_id_fkey FOREIGN KEY (sent_by_user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.ecd_collection_reminders (
-  id integer NOT NULL DEFAULT nextval('ecd_collection_reminders_id_seq'::regclass),
-  ecd_id integer NOT NULL,
-  collection_date date NOT NULL,
-  channel character varying NOT NULL,
-  status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying, 'sending'::character varying, 'sent'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])),
-  sent_at timestamp with time zone,
-  provider_message_id text,
-  error_message text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT ecd_collection_reminders_pkey PRIMARY KEY (id),
-  CONSTRAINT ecd_collection_reminders_ecd_id_fkey FOREIGN KEY (ecd_id) REFERENCES public.ecd_centres(id)
-);
-CREATE TABLE public.reporting_targets (
-  user_id integer NOT NULL,
-  metric_id character varying NOT NULL,
-  value numeric NOT NULL CHECK (value >= 0::numeric),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT reporting_targets_pkey PRIMARY KEY (user_id, metric_id),
-  CONSTRAINT reporting_targets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
-);
-CREATE TABLE public.push_subscriptions (
-  id integer NOT NULL DEFAULT nextval('push_subscriptions_id_seq'::regclass),
-  user_id integer NOT NULL,
-  endpoint text NOT NULL UNIQUE,
-  p256dh text NOT NULL,
-  auth text NOT NULL,
-  user_agent text,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  last_success_at timestamp with time zone,
-  CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id),
-  CONSTRAINT push_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
-);
-
--- Operational Goals V1
--- Separate feature table only. Goal progress is calculated live from existing WMS source tables.
--- No snapshots, history tables, AI persistence, progress tables, or Reporting references.
-
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
-CREATE TABLE IF NOT EXISTS operational_goals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT NOT NULL CHECK (btrim(title) <> ''),
-  goal_text TEXT NOT NULL CHECK (btrim(goal_text) <> ''),
-
-  metric_id TEXT NOT NULL CHECK (btrim(metric_id) <> ''),
-  metric_filters JSONB,
-
-  goal_type TEXT NOT NULL CHECK (goal_type IN ('DIRECTIONAL', 'TARGET')),
-  direction TEXT NOT NULL CHECK (direction IN ('INCREASE', 'DECREASE', 'MAINTAIN')),
-
-  target_value NUMERIC,
-
-  period_start DATE NOT NULL,
-  period_end DATE NOT NULL,
-
-  comparison_type TEXT NOT NULL CHECK (comparison_type IN ('TARGET', 'PREVIOUS_PERIOD')),
-
-  goal_state TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (goal_state IN ('ACTIVE', 'ARCHIVED')),
-
-  created_by INTEGER REFERENCES users(id),
-
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  archived_at TIMESTAMPTZ,
-
-  CONSTRAINT operational_goals_period_check
-    CHECK (period_start <= period_end),
-  CONSTRAINT operational_goals_metric_filters_object_check
-    CHECK (metric_filters IS NULL OR jsonb_typeof(metric_filters) = 'object'),
-  CONSTRAINT operational_goals_target_value_check
-    CHECK (goal_type <> 'TARGET' OR target_value IS NOT NULL),
-  CONSTRAINT operational_goals_archive_state_check
-    CHECK (
-      (goal_state = 'ACTIVE' AND archived_at IS NULL)
-      OR
-      (goal_state = 'ARCHIVED' AND archived_at IS NOT NULL)
-    )
-);
-
-CREATE INDEX IF NOT EXISTS idx_operational_goals_goal_state
-  ON operational_goals(goal_state);
-
-CREATE INDEX IF NOT EXISTS idx_operational_goals_metric_id
-  ON operational_goals(metric_id);
-
-CREATE INDEX IF NOT EXISTS idx_operational_goals_created_by
-  ON operational_goals(created_by);
-
-CREATE INDEX IF NOT EXISTS idx_operational_goals_period
-  ON operational_goals(period_start, period_end);
-
-CREATE INDEX IF NOT EXISTS idx_operational_goals_active
-  ON operational_goals(period_end, created_at)
-  WHERE goal_state = 'ACTIVE';
-CREATE TABLE public.recipes (
-  id integer NOT NULL DEFAULT nextval('recipes_id_seq'::regclass),
-  name text NOT NULL CHECK (char_length(name) >= 1 AND char_length(name) <= 80),
-  kind text NOT NULL CHECK (kind = ANY (ARRAY['summer'::text, 'winter'::text, 'override'::text])),
-  season_start_month smallint CHECK (season_start_month >= 1 AND season_start_month <= 12),
-  season_start_day smallint CHECK (season_start_day >= 1 AND season_start_day <= 31),
-  starts_on date,
-  ends_on date,
-  created_by integer,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT recipes_pkey PRIMARY KEY (id),
-  CONSTRAINT recipes_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
-  CONSTRAINT recipes_shape_check CHECK ((kind = 'override'::text AND starts_on IS NOT NULL AND ends_on IS NOT NULL AND ends_on >= starts_on AND season_start_month IS NULL AND season_start_day IS NULL) OR (kind <> 'override'::text AND starts_on IS NULL AND ends_on IS NULL AND season_start_month IS NOT NULL AND season_start_day IS NOT NULL))
-);
-CREATE TABLE public.recipe_lines (
-  id integer NOT NULL DEFAULT nextval('recipe_lines_id_seq'::regclass),
-  recipe_id integer NOT NULL,
-  product_id integer NOT NULL,
-  quantity_per_child numeric NOT NULL CHECK (quantity_per_child > 0::numeric),
-  unit character varying NOT NULL,
-  CONSTRAINT recipe_lines_pkey PRIMARY KEY (id),
-  CONSTRAINT recipe_lines_one_per_product UNIQUE (recipe_id, product_id),
-  CONSTRAINT recipe_lines_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id) ON DELETE CASCADE,
-  CONSTRAINT recipe_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-CREATE TABLE public.recipe_own_order_centres (
-  ecd_id integer NOT NULL,
-  added_by integer,
-  added_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT recipe_own_order_centres_pkey PRIMARY KEY (ecd_id),
-  CONSTRAINT recipe_own_order_centres_ecd_id_fkey FOREIGN KEY (ecd_id) REFERENCES public.ecd_centres(id) ON DELETE CASCADE,
-  CONSTRAINT recipe_own_order_centres_added_by_fkey FOREIGN KEY (added_by) REFERENCES public.users(id)
-);
-CREATE TABLE public.supplier_products (
-  supplier_id integer NOT NULL,
-  product_id integer NOT NULL,
-  added_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT supplier_products_pkey PRIMARY KEY (supplier_id, product_id),
-  CONSTRAINT supplier_products_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE CASCADE,
-  CONSTRAINT supplier_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
-);
-
--- ─────────────────────────────────────────────────────────────
--- ADDED AFTER THE EXPORT ABOVE
--- The live database also has what follows. These are the statements
--- that created them, kept here because the numbered migration files
--- they came from are no longer in the repository. Like the export,
--- this is for reference: the database already has all of it.
--- Two views in the live database, vw_low_stock and
--- vw_ecd_collection_history, are defined nowhere in this repository.
--- ─────────────────────────────────────────────────────────────
-
--- ── from 029_create_saved_reports ──
--- Saved Operations reports: a manager's own shortlist of reports, some
--- pinned to the top of the page, some emailed to them on a schedule.
--- `spec` is what to run (a prepared report, a custom report or a
--- comparison); `preset` is the period when opened on the page. A
--- scheduled email always covers the last full week or month.
-CREATE TABLE IF NOT EXISTS saved_reports (
-  id            SERIAL PRIMARY KEY,
-  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  title         VARCHAR(120) NOT NULL,
-  kind          VARCHAR(20) NOT NULL CHECK (kind IN ('report', 'custom', 'comparison')),
-  spec          JSONB NOT NULL,
-  preset        VARCHAR(20) NOT NULL DEFAULT 'last_3m',
-  pinned        BOOLEAN NOT NULL DEFAULT FALSE,
-  schedule      VARCHAR(20) NOT NULL DEFAULT 'none' CHECK (schedule IN ('none', 'weekly', 'monthly')),
-  last_sent_at  TIMESTAMPTZ,
-  last_error    TEXT,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_saved_reports_user ON saved_reports(user_id);
-CREATE INDEX IF NOT EXISTS idx_saved_reports_schedule ON saved_reports(schedule) WHERE schedule <> 'none';
-
--- ── from 031_create_password_resets ──
--- =============================================================
--- server/database/migrations/031_create_password_resets.sql
+-- -------------------------------------------------------------
+-- schema.sql — the whole Batches warehouse database, in one script
 --
--- Self-service password reset by email, replacing LoginPage.jsx's
--- "contact your admin" modal. Modelled directly on migration 023's
--- user_invites: token hashed at rest, resolved publicly by hash
--- before any session exists.
+-- Run it against a NEW, EMPTY PostgreSQL database (Supabase or plain
+-- Postgres 16+) and it builds every table, type, key, index and
+-- sequence the app uses, turns on row-level security and closes
+-- Supabase's Data API (the app connects to Postgres directly).
 --
--- ONE ROW PER REQUEST, not one row per user. Unlike user_invites'
--- overwrite-in-place resend, a reset has no admin-facing "resend"
--- action — a new request from the same user does not mutate an
--- existing row, it supersedes it (see superseded_at) and inserts a
--- new one, so the full request history survives for audit.
+-- Written by server/scripts/export-new-database.mjs from the live
+-- database (PostgreSQL 17.6) after migration 070. Do not edit by hand:
+-- change the live database, then run `npm run export-database` again.
 --
--- token_hash is not UNIQUE, same reasoning as
--- idx_user_invites_token_hash: a SHA-256 collision guards against
--- nothing realistic, so this is a plain lookup index.
+-- HOW TO RUN IT
+--   The app:  cd server && npm run migrate -- init <code>
+--             (builds from this file, then runs every seed migration)
+--   psql:     psql "<connection string>" --single-transaction -f server/database/schema.sql
+--             then: cd server && npm run migrate -- up
+--   Supabase: SQL Editor, New query, paste this whole file, set the
+--             first admin at the bottom (optional), press Run. Then run
+--             the files in server/database/migrations/ the same way, in
+--             name order (or `npm run migrate -- up`).
 --
--- NOT ENFORCED HERE: single-live-token-per-user. The database allows
--- more than one live (used_at IS NULL AND superseded_at IS NULL) row
--- per user_id — the service is responsible for superseding a user's
--- prior live rows before inserting a new one, and for throttling
--- repeat requests, so a raced pair of requests can't leave two live
--- tokens outstanding for the same account.
+-- It holds NO data. The starter rows every warehouse needs come from
+-- the seed migrations in server/database/migrations/.
 --
--- Idempotent: safe to run more than once.
--- =============================================================
-
-CREATE TABLE IF NOT EXISTS password_resets (
-  id                  SERIAL PRIMARY KEY,
-  user_id             INTEGER NOT NULL REFERENCES users(id),
-  token_hash          TEXT NOT NULL,
-  expires_at          TIMESTAMPTZ NOT NULL,
-  used_at             TIMESTAMPTZ,
-  -- Set when a newer request for the same user makes this one no
-  -- longer current. Distinct from used_at (this token was never
-  -- consumed) and distinct from simply expiring by time — see
-  -- passwordReset.service.js's loadValidReset, which reports it as
-  -- its own reason ('superseded') rather than folding it into
-  -- 'expired'.
-  superseded_at       TIMESTAMPTZ,
-  requested_ip        TEXT,
-  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  -- 'sent' | 'stubbed' | 'failed' | NULL (no attempt recorded —
-  -- e.g. the request was throttled before an email was ever composed).
-  email_status        TEXT,
-  email_error         TEXT,
-  email_attempted_at  TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash
-  ON password_resets(token_hash);
-
--- Matches exactly what the service needs to ask: "does this user have
--- a live request right now" — the per-email throttle window check and
--- the supersede-before-insert step both filter on this same shape.
-CREATE INDEX IF NOT EXISTS idx_password_resets_active
-  ON password_resets(user_id, created_at DESC)
-  WHERE used_at IS NULL AND superseded_at IS NULL;
-
--- ── from 032_create_outbound_messages ──
--- =============================================================
--- server/database/migrations/032_create_outbound_messages.sql
---
--- One record of every message the system sends, whatever sent it.
---
--- Before this, each sender recorded its own outcome in its own place:
--- donation_email_logs, finance_report_email_logs,
--- ecd_collection_reminders, columns on user_invites / password_resets /
--- purchase_orders — and scheduled reports nowhere. "Did that email go
--- out?" meant knowing which of five tables to look in. Every send now
--- goes through services/communications.service.js,
--- which writes one row here.
---
--- THE OLD LOGS STAY. Each sender still writes its own record as it
--- always has; this table is written alongside them, not instead of
--- them, until each move is verified. Nothing reads the old tables any
--- less than before.
---
---   channel        'email' today; the column is here so SMS or push can
---                  share the history without another table
---   type           what kind of message — the keys in
---                  features/communications/messageTypes.js
---   recipient      the address it went to
---   subject        what the recipient saw as the subject, for finding it
---   status         'sent' | 'stubbed' (EMAIL_ENABLED off) | 'failed'
---   error          the provider's reason, when it failed
---   related_type / related_id
---                  the record it was about (a purchase order, an
---                  invite, a donation), for linking back
---   sent_by        the user whose action sent it, when there was one
---   attempted_at   when the send was tried
---
--- Idempotent: safe to run more than once.
--- =============================================================
-
-CREATE TABLE IF NOT EXISTS outbound_messages (
-  id            BIGSERIAL PRIMARY KEY,
-  channel       TEXT NOT NULL DEFAULT 'email',
-  type          TEXT NOT NULL,
-  recipient     TEXT,
-  subject       TEXT,
-  status        TEXT NOT NULL,
-  error         TEXT,
-  related_type  TEXT,
-  related_id    TEXT,
-  sent_by       INTEGER REFERENCES users(id),
-  attempted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- It stops without changing anything if the database already has tables:
+-- it is for a new, empty database only.
+-- -------------------------------------------------------------
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'outbound_messages_status_check'
-  ) THEN
-    ALTER TABLE outbound_messages
-      ADD CONSTRAINT outbound_messages_status_check
-      CHECK (status IN ('sent', 'stubbed', 'failed'));
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public') THEN
+    RAISE EXCEPTION 'This database already has tables in public. schema.sql is for a new, empty database only. Nothing was changed.';
   END IF;
-END $$;
+END
+$$;
 
--- The history screen reads newest first, optionally by type.
-CREATE INDEX IF NOT EXISTS idx_outbound_messages_attempted
-  ON outbound_messages (attempted_at DESC, id DESC);
-CREATE INDEX IF NOT EXISTS idx_outbound_messages_type_attempted
-  ON outbound_messages (type, attempted_at DESC, id DESC);
--- "Every message about this purchase order / invite / donation".
-CREATE INDEX IF NOT EXISTS idx_outbound_messages_related
-  ON outbound_messages (related_type, related_id);
+-- -- Extensions ---------------------------------------------
+-- In the "extensions" schema, where Supabase keeps them.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
--- ── from 033_create_app_settings ──
--- =============================================================
--- server/database/migrations/033_create_app_settings.sql
---
--- Values an admin can change that used to be constants in the code:
--- the non-collection cut-off hour, the collection-reminder send hour,
--- the two expiry-warning windows, and how long an invite link lasts.
---
--- ONE ROW PER CHANGED VALUE. A key with no row uses the default in
--- server/src/features/settings/settingsDefinitions.js, which is the
--- value the code had before this table existed — so applying this
--- migration changes nothing until someone saves a setting, and a
--- database without it behaves exactly as before.
---
--- value is JSONB so a setting can be a number, a string or a list
--- without a column per type; settingsDefinitions.js validates it.
---
--- Idempotent: safe to run more than once.
--- =============================================================
+-- -- Types --------------------------------------------------
+CREATE TYPE public."beneficiary_type" AS ENUM ('ecd', 'dignity_kitchen', 'soup_kitchen', 'community');
+CREATE TYPE public."cohort_group" AS ENUM ('week1', 'week2', 'tuesday', 'thursday');
+CREATE TYPE public."collection_outcome" AS ENUM ('collected', 'partial', 'not_collected');
+CREATE TYPE public."picking_item_status" AS ENUM ('pending', 'confirmed', 'flagged');
+CREATE TYPE public."product_code_type" AS ENUM ('fixed', 'seasonal');
+CREATE TYPE public."request_outcome" AS ENUM ('pending', 'approved', 'fulfilled', 'partially_fulfilled', 'declined', 'referred');
+CREATE TYPE public."stock_count_status" AS ENUM ('in_progress', 'submitted', 'approved', 'cancelled');
+CREATE TYPE public."storage_area" AS ENUM ('cold_room', 'dry_store', 'fts_section', 'mezzanine', 'boardroom', 'Soup Kitchen Prep', 'Mezzanine or Boardroom storage');
+CREATE TYPE public."sync_status" AS ENUM ('pending', 'in_flight', 'succeeded', 'failed', 'abandoned');
+CREATE TYPE public."weekday" AS ENUM ('monday', 'tuesday', 'wednesday', 'thursday', 'friday');
 
-CREATE TABLE IF NOT EXISTS app_settings (
-  key         TEXT PRIMARY KEY,
-  value       JSONB NOT NULL,
-  updated_by  INTEGER REFERENCES users(id),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- -- Sequences ----------------------------------------------
+CREATE SEQUENCE public."assistant_queries_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."barcode_scan_events_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."collection_kit_records_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."collection_kits_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."community_request_items_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."community_requests_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."decanting_lines_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."decanting_records_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."delivery_note_items_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."delivery_notes_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."delivery_receipts_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."dispatch_event_lines_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."dispatch_events_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."donation_email_logs_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."donation_items_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."donations_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."donors_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."ecd_centres_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."ecd_collection_reminders_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."ecd_order_lines_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."expiry_warning_dismissals_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."finance_report_access_links_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."finance_report_email_logs_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."fts_drop_points_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."fts_dropoffs_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."kitchens_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."notifications_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."operating_closures_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."outbound_messages_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."password_resets_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."pending_donation_items_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."pending_donations_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."photos_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."picking_events_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."picking_slip_items_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."picking_slips_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."product_barcodes_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."products_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."programmes_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."purchase_order_items_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."purchase_order_number_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."purchase_orders_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."push_subscriptions_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."quickbooks_sync_queue_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."recipe_lines_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."recipes_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."reporting_factors_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."reporting_queries_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."saved_reports_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."section18a_certificates_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."stock_count_lines_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."stock_counts_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."stock_movements_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."storage_locations_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."supplier_prospects_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."suppliers_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."user_invites_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."users_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."volunteers_id_seq" AS bigint INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."warehouse_area_counts_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."warehouse_areas_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+CREATE SEQUENCE public."warehouse_manager_flags_id_seq" AS integer INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1 NO CYCLE;
+
+-- -- Tables -------------------------------------------------
+CREATE TABLE public."app_settings" (
+  "key" text NOT NULL,
+  "value" jsonb NOT NULL,
+  "updated_by" integer,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- ── from 034_create_operating_closures ──
--- ─────────────────────────────────────────────────────────────
--- 034_create_operating_closures.sql
---
--- The operating calendar's closed days: public holidays and other
--- closures (stocktake, a shutdown week). One row per date. Collection
--- reminders are not sent for a closed collection day, and the
--- non-collection sweep does not write off pallets due on one.
---
--- Which weekday each cohort collects on is not here: it is two
--- app_settings keys (calendar.tuesdayCohortWeekday,
--- calendar.thursdayCohortWeekday), defaulting to Tuesday and Thursday.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS operating_closures (
-  id          SERIAL PRIMARY KEY,
-  closed_on   DATE NOT NULL UNIQUE,
-  kind        TEXT NOT NULL CHECK (kind IN ('public_holiday', 'closure')),
-  label       TEXT NOT NULL CHECK (char_length(label) BETWEEN 1 AND 120),
-  created_by  INTEGER REFERENCES users(id),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public."assistant_queries" (
+  "id" integer DEFAULT nextval('assistant_queries_id_seq'::regclass) NOT NULL,
+  "user_id" integer,
+  "user_role" text,
+  "screen" text,
+  "question" text NOT NULL,
+  "outcome" text NOT NULL,
+  "topic_id" text,
+  "target_screen" text,
+  "error_message" text,
+  "latency_ms" integer,
+  "provider" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- ── from 035_add_approved_to_request_outcome ──
--- Benevolent requests: a request is approved by a manager before anyone
--- packs it. "pending" stays and is shown as "Awaiting approval";
--- "referred" stays in the enum, unused.
---
--- Its own file on purpose. The runner wraps every file in one
--- transaction, and a value added to an enum cannot be used until the
--- transaction that added it has committed. Everything that refers to
--- 'approved' is in 036.
---
--- Idempotent: safe to run more than once.
-ALTER TYPE request_outcome ADD VALUE IF NOT EXISTS 'approved' AFTER 'pending';
-
--- ── from 036_create_community_request_items ──
--- Benevolent requests: the products a manager approves, and the
--- bookkeeping around approval and the "needs new items" flag.
---
--- community_request_items
---   One row per product on an approved request. quantity_approved is
---   what the manager set aside; quantity_released is what the worker
---   confirmed went out (0 until then; never more than approved).
---   short_at is set on a line when stock for that product dropped below
---   what pallets and other requests need: the line stops reserving
---   stock and the request is flagged. Choosing other items clears it.
---
--- community_requests
---   approved_by / approved_at   who approved it and when. The most
---                               recently approved request is flagged
---                               first when stock runs short.
---   assigned_to                 the packer a manager picked, if any.
---   items_short_at              set while any line is short. This is
---                               also what stops a second notification
---                               for the same request.
---
--- Existing rows are untouched: no backfill, no data changes.
---
--- No BEGIN/COMMIT (the runner wraps the file). Idempotent: safe to run
--- more than once.
-
-CREATE TABLE IF NOT EXISTS community_request_items (
-  id                 SERIAL PRIMARY KEY,
-  request_id         INTEGER NOT NULL REFERENCES community_requests(id) ON DELETE CASCADE,
-  product_id         INTEGER NOT NULL REFERENCES products(id),
-  unit               VARCHAR(20) NOT NULL,
-  quantity_approved  NUMERIC NOT NULL CHECK (quantity_approved > 0),
-  quantity_released  NUMERIC NOT NULL DEFAULT 0 CHECK (quantity_released >= 0),
-  short_at           TIMESTAMPTZ,
-  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT community_request_items_request_product_key UNIQUE (request_id, product_id),
-  CONSTRAINT community_request_items_released_le_approved CHECK (quantity_released <= quantity_approved)
+CREATE TABLE public."attendance" (
+  "attendance_id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "booking_id" uuid NOT NULL,
+  "checked_in" boolean DEFAULT false NOT NULL,
+  "check_in_time" timestamp with time zone,
+  "source" character varying(50),
+  "last_synced_at" timestamp with time zone,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- The committed-stock sum groups by product.
-CREATE INDEX IF NOT EXISTS idx_community_request_items_product
-  ON community_request_items (product_id);
-
-ALTER TABLE community_requests
-  ADD COLUMN IF NOT EXISTS approved_by    INTEGER REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE community_requests
-  ADD COLUMN IF NOT EXISTS approved_at    TIMESTAMPTZ;
-ALTER TABLE community_requests
-  ADD COLUMN IF NOT EXISTS assigned_to    INTEGER REFERENCES users(id) ON DELETE SET NULL;
-ALTER TABLE community_requests
-  ADD COLUMN IF NOT EXISTS items_short_at TIMESTAMPTZ;
-
--- ── from 040_create_idempotency_keys ──
--- ─────────────────────────────────────────────────────────────
--- 040_create_idempotency_keys.sql
---
--- Lets the server recognise a submission it has already handled.
---
--- A phone with no signal keeps what a worker submitted and sends it
--- when the signal returns (client/src/services/outbox.js). A send can
--- be interrupted after the server acted but before the phone heard
--- back, so the same submission can arrive twice. Each one carries a
--- key the phone made up; the first time the key is seen the work is
--- done and the answer stored here, and a repeat gets that stored answer
--- instead of being done again.
---
--- Receiving, dispatch and donation intake already do this with a
--- column of their own. This table is for everything else the floor
--- submits: packing, decanting, benevolent requests, Feed the Soil.
--- See server/src/middleware/idempotency.middleware.js.
---
--- status_code and response are empty while the first attempt is still
--- running.
---
--- Additive only: one new table.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS idempotency_keys (
-  key         TEXT PRIMARY KEY CHECK (char_length(key) BETWEEN 8 AND 100),
-  scope       TEXT NOT NULL,
-  user_id     INTEGER REFERENCES users(id),
-  status_code SMALLINT,
-  response    JSONB,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public."audit_log" (
+  "id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "entity_type" text NOT NULL,
+  "entity_id" text NOT NULL,
+  "action" text NOT NULL,
+  "actor_id" integer,
+  "reason" text,
+  "approved_by" integer,
+  "before_data" jsonb,
+  "after_data" jsonb,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- Old keys are cleared by age.
-CREATE INDEX IF NOT EXISTS idempotency_keys_created_at_idx ON idempotency_keys (created_at);
-
-
--- from 041_create_photos
--- ─────────────────────────────────────────────────────────────
--- 041_create_photos.sql
---
--- A photo a worker takes on the floor: of an item they flagged while
--- packing (short, damaged, substituted), or of a delivery as it arrived.
---
--- entity_type + entity_id say what the photo is of:
---   picking_slip_item  -> picking_slip_items.id
---   purchase_order     -> purchase_orders.id
--- Not a foreign key, on purpose: one table serves both, and a photo is
--- evidence that should outlive an edited slip line.
---
--- THE PICTURE IS IN THE ROW (data). The phone shrinks it first to about
--- 1280 pixels and compresses it, so each is roughly 150 KB; the server
--- refuses anything over 400 KB. That keeps this workable inside the
--- database, but the database allowance is small: a few thousand photos.
--- When that is no longer enough, move `data` to Supabase file storage
--- and keep the rest of the row (see photo.repository.js).
---
--- Additive only: one new table.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS photos (
-  id           BIGSERIAL PRIMARY KEY,
-  entity_type  TEXT NOT NULL CHECK (entity_type IN ('picking_slip_item', 'purchase_order')),
-  entity_id    INTEGER NOT NULL,
-  content_type TEXT NOT NULL CHECK (content_type IN ('image/jpeg', 'image/webp', 'image/png')),
-  byte_size    INTEGER NOT NULL CHECK (byte_size BETWEEN 1 AND 409600),
-  data         BYTEA NOT NULL,
-  created_by   INTEGER REFERENCES users(id),
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public."barcode_scan_events" (
+  "id" integer DEFAULT nextval('barcode_scan_events_id_seq'::regclass) NOT NULL,
+  "scanned_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "screen" character varying(20) NOT NULL,
+  "outcome" character varying(20) NOT NULL,
+  "product_id" integer,
+  "reference_id" integer,
+  "user_id" integer
 );
 
-CREATE INDEX IF NOT EXISTS photos_entity_idx ON photos (entity_type, entity_id);
-
-
--- from 042_add_user_language
--- ─────────────────────────────────────────────────────────────
--- 042_add_user_language.sql
---
--- The language a person reads the floor screens in: English, Afrikaans
--- or isiXhosa. Kept on the account, not the device, because tablets are
--- shared: it follows whoever signs in.
---
--- Additive only: one new column, English for everyone until they choose.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en'
-  CHECK (language IN ('en', 'af', 'xh'));
-
-
--- from 043_add_purchase_order_follow_up
--- ─────────────────────────────────────────────────────────────
--- 043_add_purchase_order_follow_up.sql
---
--- A follow-up order: a second purchase order for what was short on the
--- first. follow_up_of points at the order it follows.
---
--- How an order now moves when a delivery comes in short:
---
---   approved ── short delivery ──> follow_up_required
---   follow_up_required ── a manager creates the follow-up order ──> partially_received
---   the follow-up order is fully received ──> both become completed
---
--- A follow-up can itself come in short and get a follow-up of its own;
--- completing the last one completes every order behind it.
---
--- Additive only: one new column and its index.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE purchase_orders
-  ADD COLUMN IF NOT EXISTS follow_up_of INTEGER REFERENCES purchase_orders(id);
-
-CREATE INDEX IF NOT EXISTS purchase_orders_follow_up_of_idx
-  ON purchase_orders (follow_up_of) WHERE follow_up_of IS NOT NULL;
-
-
--- from 044_add_product_decantable
--- ─────────────────────────────────────────────────────────────
--- 044_add_product_decantable.sql
---
--- Decantable: a product kept loose, by weight or volume, that the team
--- portions out of bulk (maize meal, rice, sugar, oil).
---
--- The flag decides two things:
---   - only a decantable product is offered on the Decanting screen
---   - only a decantable product can have a part quantity anywhere:
---     on a slip, when packing, receiving, dispatching or adjusting
---     stock. Everything else (a can, a crate, a jar) is a whole number.
---
--- Starting point: whatever is measured in kilograms, grams, litres or
--- millilitres is decantable, whatever is counted is not. An admin
--- changes any of them on the Products screen.
---
--- Additive only: one new column.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE products
-  ADD COLUMN IF NOT EXISTS is_decantable BOOLEAN NOT NULL DEFAULT false;
-
-UPDATE products
-   SET is_decantable = true
- WHERE default_unit IN ('kg', 'g', 'l', 'ml')
-   AND is_decantable = false;
-
-
--- from 047_create_expiry_warning_dismissals
--- ─────────────────────────────────────────────────────────────
--- 047_create_expiry_warning_dismissals.sql
---
--- A manager dismissing an expiry warning that the stock estimate got wrong
--- (the estimate assumes oldest-received stock goes out first). One row per
--- dismissal of a delivery line; a restore is recorded on the same row so
--- the history stays. Additive only: one new table and one index.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS expiry_warning_dismissals (
-  id                    SERIAL PRIMARY KEY,
-  delivery_note_item_id INTEGER     NOT NULL REFERENCES delivery_note_items(id),
-  reason                TEXT        NOT NULL CHECK (length(btrim(reason)) > 0),
-  dismissed_by          INTEGER     NOT NULL REFERENCES users(id),
-  dismissed_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-  restored_by           INTEGER     REFERENCES users(id),
-  restored_at           TIMESTAMPTZ,
-  CONSTRAINT expiry_dismissal_restore_pair
-    CHECK ((restored_by IS NULL) = (restored_at IS NULL))
+CREATE TABLE public."certificate_settings" (
+  "id" integer DEFAULT 1 NOT NULL,
+  "organisation_name" text DEFAULT ''::text NOT NULL,
+  "pbo_number" text DEFAULT ''::text NOT NULL,
+  "section18a_reference" text DEFAULT ''::text NOT NULL,
+  "physical_address" text DEFAULT ''::text NOT NULL,
+  "postal_address" text DEFAULT ''::text NOT NULL,
+  "contact_email" text DEFAULT ''::text NOT NULL,
+  "contact_phone" text DEFAULT ''::text NOT NULL,
+  "sender_display_name" text DEFAULT ''::text NOT NULL,
+  "reply_to_email" text DEFAULT ''::text NOT NULL,
+  "subject_template" text DEFAULT ''::text NOT NULL,
+  "footer_text" text DEFAULT ''::text NOT NULL,
+  "signature_name" text DEFAULT ''::text NOT NULL,
+  "signature_title" text DEFAULT ''::text NOT NULL,
+  "default_acknowledgement_message" text DEFAULT ''::text NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "logo_url" text DEFAULT ''::text NOT NULL,
+  "npo_number" text DEFAULT ''::text NOT NULL,
+  "website" text DEFAULT ''::text NOT NULL,
+  "certificate_prefix" text DEFAULT '18A'::text NOT NULL
 );
 
--- At most one active dismissal per delivery line.
-CREATE UNIQUE INDEX IF NOT EXISTS expiry_warning_dismissals_one_active
-  ON expiry_warning_dismissals (delivery_note_item_id)
-  WHERE restored_at IS NULL;
-
--- from 048_create_warehouse_map
--- ─────────────────────────────────────────────────────────────
--- 048_create_warehouse_map.sql
---
--- The warehouse map: where stock is kept, drawn on a grid.
---
--- warehouse_areas
---   One rectangle on the floor plan an admin draws: a dry store, a cold
---   room, a floor area for pallets, or a door. Positions and sizes are
---   in grid cells (constants/warehouseMap.js holds the grid's size).
---   `levels` is how tall it is drawn in the 3D view (shelves high).
---   An area taken off the plan is made inactive, not deleted, so the
---   counts recorded against it keep their history; its stock shows as
---   not placed again.
---
--- warehouse_area_counts
---   What a manager saw in an area: one row per product per count. The
---   newest row for an area and product is what the map shows. A count
---   is a record, never a stock movement: it does not change
---   stock_levels, and nothing on the floor waits for it. A difference
---   from what is on hand is shown so the manager can adjust stock.
---   on_hand_at_count is the balance when the count was saved, so the
---   difference at that moment stays on record.
---
--- Each warehouse database holds its own plan: there is no warehouse
--- column, the database is the warehouse (config/dbRouter.js).
---
--- Additive only: two new tables and their indexes.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS warehouse_areas (
-  id          SERIAL PRIMARY KEY,
-  name        TEXT        NOT NULL CHECK (char_length(btrim(name)) BETWEEN 1 AND 40),
-  kind        TEXT        NOT NULL CHECK (kind IN ('dry', 'cold', 'floor', 'door')),
-  grid_x      SMALLINT    NOT NULL CHECK (grid_x >= 0),
-  grid_y      SMALLINT    NOT NULL CHECK (grid_y >= 0),
-  grid_w      SMALLINT    NOT NULL CHECK (grid_w >= 1),
-  grid_h      SMALLINT    NOT NULL CHECK (grid_h >= 1),
-  levels      SMALLINT    NOT NULL DEFAULT 1 CHECK (levels BETWEEN 1 AND 4),
-  is_active   BOOLEAN     NOT NULL DEFAULT true,
-  created_by  INTEGER     REFERENCES users(id),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_by  INTEGER     REFERENCES users(id),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public."collection_kit_records" (
+  "id" integer DEFAULT nextval('collection_kit_records_id_seq'::regclass) NOT NULL,
+  "kit_id" integer NOT NULL,
+  "kg_compost" numeric(10,3) NOT NULL,
+  "logged_at" date DEFAULT CURRENT_DATE NOT NULL,
+  "status" character varying(20) DEFAULT 'logged'::character varying NOT NULL,
+  "dispatched_at" timestamp with time zone,
+  "notes" text,
+  "logged_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "dispatched_to" character varying(150)
 );
 
--- Two areas on the plan never share a name.
-CREATE UNIQUE INDEX IF NOT EXISTS warehouse_areas_active_name
-  ON warehouse_areas (lower(btrim(name))) WHERE is_active;
-
-CREATE TABLE IF NOT EXISTS warehouse_area_counts (
-  id                SERIAL PRIMARY KEY,
-  area_id           INTEGER     NOT NULL REFERENCES warehouse_areas(id),
-  product_id        INTEGER     NOT NULL REFERENCES products(id),
-  quantity          NUMERIC     NOT NULL CHECK (quantity >= 0),
-  unit              VARCHAR(20) NOT NULL,
-  on_hand_at_count  NUMERIC     NOT NULL,
-  counted_by        INTEGER     REFERENCES users(id),
-  counted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public."collection_kits" (
+  "id" integer DEFAULT nextval('collection_kits_id_seq'::regclass) NOT NULL,
+  "owner_name" character varying(150) NOT NULL,
+  "suburb" character varying(150),
+  "assigned_at" date DEFAULT CURRENT_DATE NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- The newest count per area and product.
-CREATE INDEX IF NOT EXISTS warehouse_area_counts_latest
-  ON warehouse_area_counts (area_id, product_id, counted_at DESC, id DESC);
-
-
--- from 049_warehouse_area_capacity
--- ─────────────────────────────────────────────────────────────
--- 049_warehouse_area_capacity.sql
---
--- The warehouse map's areas learn three things (migration 048 made them):
---
---   kind 'staging'         a pallet staging area: where packed pallets
---                          wait for collection. The map puts every
---                          packed, not yet dispatched pallet in one.
---   capacity_kg            how much a dry store, cold room or floor area
---                          holds, by weight. Empty: not set.
---   pallet_spaces          how many pallets a staging area holds.
---   preferred_product_ids  the stock an area is meant for, by product
---   preferred_categories   or by product category. Stock nobody has
---                          counted into an area is shown in the area it
---                          is meant for, as expected rather than counted.
---
--- The product ids are not a foreign key: a preference for a product
--- that is later archived is simply ignored by the map.
---
--- Additive only: one widened check, four new columns.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE warehouse_areas DROP CONSTRAINT IF EXISTS warehouse_areas_kind_check;
-ALTER TABLE warehouse_areas
-  ADD CONSTRAINT warehouse_areas_kind_check CHECK (kind IN ('dry', 'cold', 'floor', 'staging', 'door'));
-
-ALTER TABLE warehouse_areas
-  ADD COLUMN IF NOT EXISTS capacity_kg NUMERIC CHECK (capacity_kg IS NULL OR capacity_kg > 0);
-ALTER TABLE warehouse_areas
-  ADD COLUMN IF NOT EXISTS pallet_spaces INTEGER CHECK (pallet_spaces IS NULL OR pallet_spaces > 0);
-ALTER TABLE warehouse_areas
-  ADD COLUMN IF NOT EXISTS preferred_product_ids INTEGER[] NOT NULL DEFAULT '{}';
-ALTER TABLE warehouse_areas
-  ADD COLUMN IF NOT EXISTS preferred_categories TEXT[] NOT NULL DEFAULT '{}';
-
-
--- from 050_add_ecd_centre_location
--- ─────────────────────────────────────────────────────────────
--- 050_add_ecd_centre_location.sql
---
--- Where each beneficiary centre is, for the manager's Impact map. An
--- admin sets it on the Centre locations screen; a one-off script
--- (scripts/locateEcdCentres.mjs) fills in what could be found.
---
---   address, suburb        as a person writes them
---   latitude, longitude    the pin. Both or neither. South Africa only:
---                          a pin outside the country is a typing error
---   location_source        how the pin was set:
---                            manual    an admin placed or moved it
---                            geocoded  looked up from the address
---                            imported  loaded from researched data
---   location_note          where the address came from, for checking
---   location_updated_at/by who last changed any of it
---
--- The old free-text `location` column stays as it is, unused.
--- Nothing that reads ecd_centres today selects these columns (every
--- query names its columns), so no existing screen, report or pallet
--- changes.
---
--- Additive only: eight new columns and two checks.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS address TEXT;
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS suburb TEXT;
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS latitude NUMERIC(9, 6);
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS longitude NUMERIC(9, 6);
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_source TEXT;
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_note TEXT;
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMPTZ;
-ALTER TABLE ecd_centres ADD COLUMN IF NOT EXISTS location_updated_by INTEGER REFERENCES users(id);
-
-ALTER TABLE ecd_centres DROP CONSTRAINT IF EXISTS ecd_centres_pin_check;
-ALTER TABLE ecd_centres ADD CONSTRAINT ecd_centres_pin_check CHECK (
-  (latitude IS NULL AND longitude IS NULL)
-  OR (latitude BETWEEN -35 AND -22 AND longitude BETWEEN 16 AND 33)
+CREATE TABLE public."community_request_items" (
+  "id" integer DEFAULT nextval('community_request_items_id_seq'::regclass) NOT NULL,
+  "request_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "unit" character varying(20) NOT NULL,
+  "quantity_approved" numeric NOT NULL,
+  "quantity_released" numeric DEFAULT 0 NOT NULL,
+  "short_at" timestamp with time zone,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
-ALTER TABLE ecd_centres DROP CONSTRAINT IF EXISTS ecd_centres_location_source_check;
-ALTER TABLE ecd_centres ADD CONSTRAINT ecd_centres_location_source_check CHECK (
-  location_source IS NULL OR location_source IN ('manual', 'geocoded', 'imported')
+CREATE TABLE public."community_requests" (
+  "id" integer DEFAULT nextval('community_requests_id_seq'::regclass) NOT NULL,
+  "requested_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "caller_name" character varying(200),
+  "caller_contact" character varying(100),
+  "items_requested" text NOT NULL,
+  "quantity_note" character varying(255),
+  "outcome" request_outcome DEFAULT 'pending'::request_outcome NOT NULL,
+  "outcome_note" text,
+  "handled_by" integer,
+  "resolved_at" timestamp with time zone,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "approved_by" integer,
+  "approved_at" timestamp with time zone,
+  "assigned_to" integer,
+  "items_short_at" timestamp with time zone,
+  "logged_by" integer
 );
 
-
--- from 051_warehouse_gates
--- ─────────────────────────────────────────────────────────────
--- 051_warehouse_gates.sql
---
--- Two more kinds of area for the warehouse map (migrations 048, 049):
---
---   dispatch_gate    where pallets leave. A truck stands at it on the map
---                    while packed pallets wait to be collected today.
---   receiving_gate   where deliveries come in. A truck stands at it while
---                    a purchase order is expected today, or is late.
---
--- They hold no stock and take no capacity, like a door. What happens at
--- them is read from what the system already records (packed slips,
--- purchase orders, delivery notes); nothing new is stored.
---
--- Additive only: one widened check.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE warehouse_areas DROP CONSTRAINT IF EXISTS warehouse_areas_kind_check;
-ALTER TABLE warehouse_areas
-  ADD CONSTRAINT warehouse_areas_kind_check
-  CHECK (kind IN ('dry', 'cold', 'floor', 'staging', 'door', 'dispatch_gate', 'receiving_gate'));
-
-
--- from 052_create_product_barcodes
--- ─────────────────────────────────────────────────────────────
--- 052_create_product_barcodes.sql
---
--- The barcodes printed on stock, each pointing at one product, so a
--- scan can stand in for picking the product by name.
---
--- A table and not a column on products, because:
---   - the same product (1 kg rice) arrives from different suppliers
---     under different barcodes, so one product can have many
---   - most donated stock has none, so a product can have zero
---   - a case and the single item inside it carry different barcodes:
---     units_per_scan says how many of the product's own unit one scan
---     of this code means (1 for the bag, 12 for the box of 12)
---
---   code            digits as printed (EAN-13, EAN-8, UPC-A, UPC-E,
---                   GTIN-14) or a supplier's own Code 128 text. Stored
---                   normalised by the server (productCode.js), so a
---                   12-digit UPC and the same code read as EAN-13 are
---                   one row. Unique: one code, one product.
---   supplier_id     whose packaging it came on, when known
---   created_by      who linked it (a worker linking a code at the bay,
---                   or an admin on the product)
---
--- Nothing else reads it: every existing query names its tables, so no
--- screen, report or pallet changes until it is used.
---
--- Additive only: one new table and an index.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS product_barcodes (
-  id              SERIAL PRIMARY KEY,
-  product_id      INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  code            VARCHAR(64) NOT NULL UNIQUE,
-  units_per_scan  NUMERIC(12, 3) NOT NULL DEFAULT 1 CHECK (units_per_scan > 0),
-  supplier_id     INTEGER REFERENCES suppliers(id),
-  created_by      INTEGER REFERENCES users(id),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+CREATE TABLE public."decanting_lines" (
+  "id" integer DEFAULT nextval('decanting_lines_id_seq'::regclass) NOT NULL,
+  "decanting_id" integer NOT NULL,
+  "product_id" integer,
+  "required_kg" numeric(10,3) NOT NULL,
+  "actual_bulk_kg" numeric(10,3),
+  "packed_kg" numeric(10,3) NOT NULL,
+  "total_bags" integer NOT NULL,
+  "sizes_kg" jsonb NOT NULL,
+  "bags" jsonb NOT NULL,
+  "margin_error" numeric(6,4) NOT NULL,
+  "within_margin" boolean NOT NULL,
+  "wastage_kg" numeric(10,3) DEFAULT 0 NOT NULL,
+  "surplus_kg" numeric(10,3) DEFAULT 0 NOT NULL,
+  "shortfall_kg" numeric(10,3) DEFAULT 0 NOT NULL,
+  "notes" text,
+  "partial_bag_actual_kg" numeric(10,3)
 );
 
-CREATE INDEX IF NOT EXISTS product_barcodes_product_id_idx ON product_barcodes (product_id);
-
-
--- from 053_create_barcode_scan_events
--- ─────────────────────────────────────────────────────────────
--- 053_create_barcode_scan_events.sql
---
--- What each barcode scan on the floor turned out to be, so reporting
--- can say what scanning catches ("wrong items caught by scanning").
---
---   screen        where it was scanned:
---                   receiving, donation, packing, stock_count
---   outcome       what the scan was:
---                   counted        matched a line and counted
---                   not_on_list    a real product, but not one this
---                                  order, pallet or list wants: the
---                                  wrong item, caught
---                   already_done   that line was already packed
---                   unknown        a code no product has yet
---                   linked         an unknown code linked on the spot
---                   misread        not a barcode that can be read
---   product_id    the product the code named, when it named one
---   reference_id  the order, pallet or area it was scanned against,
---                 read with `screen` (a purchase order on receiving, a
---                 picking slip on packing, a warehouse area on a count)
---
--- A record of a scan, never of stock: nothing here changes a balance,
--- and a scan made without signal is not recorded at all (the client
--- drops it rather than queueing it), so the counts are a floor, not a
--- census.
---
--- Additive only: one new table and an index.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS barcode_scan_events (
-  id            SERIAL PRIMARY KEY,
-  scanned_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  screen        VARCHAR(20) NOT NULL
-                CHECK (screen IN ('receiving', 'donation', 'packing', 'stock_count')),
-  outcome       VARCHAR(20) NOT NULL
-                CHECK (outcome IN ('counted', 'not_on_list', 'already_done', 'unknown', 'linked', 'misread')),
-  product_id    INTEGER REFERENCES products(id),
-  reference_id  INTEGER,
-  user_id       INTEGER REFERENCES users(id)
+CREATE TABLE public."decanting_records" (
+  "id" integer DEFAULT nextval('decanting_records_id_seq'::regclass) NOT NULL,
+  "week_of" date NOT NULL,
+  "notes" text,
+  "recorded_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS barcode_scan_events_scanned_at_idx ON barcode_scan_events (scanned_at);
+CREATE TABLE public."delivery_note_items" (
+  "id" integer DEFAULT nextval('delivery_note_items_id_seq'::regclass) NOT NULL,
+  "delivery_note_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "purchase_order_item_id" integer,
+  "expected_quantity" numeric(12,3) DEFAULT 0 NOT NULL,
+  "expected_weight_kg" numeric(12,3),
+  "received_quantity" numeric(12,3) NOT NULL,
+  "received_weight_kg" numeric(12,3),
+  "unit" character varying(20) DEFAULT 'kg'::character varying NOT NULL,
+  "discrepancy_quantity" numeric(12,3) GENERATED ALWAYS AS ((received_quantity - expected_quantity)) STORED,
+  "discrepancy_weight_kg" numeric(12,3) GENERATED ALWAYS AS ((received_weight_kg - expected_weight_kg)) STORED,
+  "discrepancy_reason" text,
+  "discrepancy_resolved" boolean DEFAULT false NOT NULL,
+  "location_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "storage_area" character varying(50),
+  "expiry_date" date
+);
 
+CREATE TABLE public."delivery_notes" (
+  "id" integer DEFAULT nextval('delivery_notes_id_seq'::regclass) NOT NULL,
+  "supplier_id" integer NOT NULL,
+  "received_by" integer,
+  "purchase_order_id" integer NOT NULL,
+  "delivery_date" date NOT NULL,
+  "status" character varying(20) DEFAULT 'recorded'::character varying NOT NULL,
+  "signature" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "driver_name" character varying(200),
+  "idempotency_key" text,
+  "delivered_at" timestamp with time zone
+);
 
--- from 054_finance_link_expiry
--- ─────────────────────────────────────────────────────────────
--- 054_finance_link_expiry.sql
---
--- A finance report link stops working 30 days after it is made, and
--- each open is counted.
---
--- The link is a bearer token: whoever holds the URL can read the
--- figures, with no sign-in. Until now it worked until someone made a
--- new one or revoked it, so a forwarded email kept working for good.
---
---   expires_at      when the link stops opening
---   last_opened_at  the last time the report was read through it
---   open_count      how many times it has been read
---
--- Links made before this get 30 days from when they were made, so
--- one older than that stops working now. Send a new one from
--- Finance if it is still needed.
---
--- Additive: three columns, filled for the existing rows.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE finance_report_access_links
-  ADD COLUMN IF NOT EXISTS expires_at timestamp with time zone,
-  ADD COLUMN IF NOT EXISTS last_opened_at timestamp with time zone,
-  ADD COLUMN IF NOT EXISTS open_count integer NOT NULL DEFAULT 0;
+CREATE TABLE public."delivery_receipts" (
+  "id" integer DEFAULT nextval('delivery_receipts_id_seq'::regclass) NOT NULL,
+  "picking_slip_id" integer NOT NULL,
+  "ecd_id" integer,
+  "dispatch_date" date NOT NULL,
+  "cohort" cohort_group NOT NULL,
+  "outcome" collection_outcome DEFAULT 'not_collected'::collection_outcome NOT NULL,
+  "collected_by_name" character varying(200),
+  "signature" text,
+  "confirmed_by" integer,
+  "confirmed_at" timestamp with time zone,
+  "override_reason" text,
+  "notes" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
 
-UPDATE finance_report_access_links
-   SET expires_at = created_at + INTERVAL '30 days'
- WHERE expires_at IS NULL;
+CREATE TABLE public."dispatch_event_lines" (
+  "id" integer DEFAULT nextval('dispatch_event_lines_id_seq'::regclass) NOT NULL,
+  "dispatch_event_id" integer NOT NULL,
+  "picking_slip_item_id" integer,
+  "product_id" integer NOT NULL,
+  "packed_quantity" numeric(12,3) NOT NULL,
+  "loaded_quantity" numeric(12,3) NOT NULL,
+  "unit" character varying(20) NOT NULL,
+  "variance_reason" text
+);
 
-ALTER TABLE finance_report_access_links
-  ALTER COLUMN expires_at SET NOT NULL;
+CREATE TABLE public."dispatch_events" (
+  "id" integer DEFAULT nextval('dispatch_events_id_seq'::regclass) NOT NULL,
+  "picking_slip_id" integer NOT NULL,
+  "status" character varying(20) DEFAULT 'awaiting'::character varying NOT NULL,
+  "collected_at" timestamp with time zone,
+  "flagged_at" timestamp with time zone,
+  "dispatched_by" integer,
+  "driver_name" character varying(120),
+  "vehicle_reg" character varying(20),
+  "signature" text,
+  "override_by" integer,
+  "override_reason" text,
+  "idempotency_key" uuid,
+  "notes" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "followed_up_at" timestamp with time zone,
+  "followed_up_by" integer
+);
 
+CREATE TABLE public."donation_allocations" (
+  "id" integer GENERATED BY DEFAULT AS IDENTITY NOT NULL,
+  "donation_item_id" integer NOT NULL,
+  "beneficiary_type" character varying(40) DEFAULT 'ecd'::character varying NOT NULL,
+  "ecd_centre_id" integer,
+  "child_count" integer NOT NULL,
+  "allocated_quantity" numeric NOT NULL,
+  "unit" character varying NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
 
--- from 055_user_session_version
--- ─────────────────────────────────────────────────────────────
--- 055_user_session_version.sql
---
--- A number on each account that every session token must match.
---
--- A session is a signed token that lasts 8 hours. Until now a token
--- kept working for all of that time after the password was changed or
--- reset, or the account was deactivated or archived. Each of those now
--- adds 1 to session_version, and auth.middleware.js turns away any
--- token carrying an older number, so the person signs in again.
---
--- Existing tokens carry no number, which counts as 0: everyone stays
--- signed in through this migration.
---
--- Additive: one column with a default.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS session_version integer NOT NULL DEFAULT 0;
+CREATE TABLE public."donation_category_routing" (
+  "category" character varying(20) NOT NULL,
+  "routing_outcome" character varying(40) NOT NULL,
+  "storage_area" storage_area,
+  "description" text,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "updated_by" integer,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
 
--- from 056_product_barcode_food_facts
--- ─────────────────────────────────────────────────────────────
--- 056_product_barcode_food_facts.sql
---
--- What the public Open Food Facts database says each linked barcode
--- is, kept beside the link (product_barcodes, migration 052).
---
--- Why: when a barcode nobody has seen is scanned, the system suggests
--- which stock item it belongs to (features/barcodeMatch). Brand B's
--- beans are matched to the stock item that already holds Brand A's
--- beans by comparing what Open Food Facts says about the two packs:
--- the same kind of food, the same size. That needs what it said about
--- Brand A's code, which is what these columns keep. They are filled
--- when a code is linked, once, and never relied on: a code Open Food
--- Facts does not know just has them empty.
---
---   food_name        its product name there, e.g. "Baked beans in tomato sauce"
---   food_brand       the first brand it lists
---   food_quantity    the pack size as printed, e.g. "410 g"
---   food_weight_kg   that size in kg, when it is a weight
---   food_categories  its category tags, most general first, without the
---                    language prefix: {"canned-foods", "baked-beans"}
---   food_checked_at  when it was asked, answered or not, so it is not
---                    asked again on every scan
---
--- Additive only: six new nullable columns.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_name TEXT;
-ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_brand TEXT;
-ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_quantity TEXT;
-ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_weight_kg NUMERIC(10, 3);
-ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_categories TEXT[];
-ALTER TABLE product_barcodes ADD COLUMN IF NOT EXISTS food_checked_at TIMESTAMPTZ;
+CREATE TABLE public."donation_email_logs" (
+  "id" bigint DEFAULT nextval('donation_email_logs_id_seq'::regclass) NOT NULL,
+  "donation_id" integer NOT NULL,
+  "certificate_id" bigint,
+  "email_type" text NOT NULL,
+  "recipient" text NOT NULL,
+  "subject" text NOT NULL,
+  "status" text NOT NULL,
+  "provider_message_id" text,
+  "error_message" text,
+  "sent_at" timestamp with time zone,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "donor_id" bigint,
+  "recipient_email" text,
+  "recipient_name" text,
+  "gmail_message_id" text,
+  "gmail_thread_id" text,
+  "sent_by_user_id" integer
+);
 
+CREATE TABLE public."donation_items" (
+  "id" integer DEFAULT nextval('donation_items_id_seq'::regclass) NOT NULL,
+  "donation_id" integer NOT NULL,
+  "product_id" integer,
+  "description" character varying(255),
+  "quantity" numeric(12,3) NOT NULL,
+  "unit" character varying(20) DEFAULT 'kg'::character varying NOT NULL,
+  "estimated_value_zar" numeric(12,2),
+  "storage_location_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "routing_status" character varying(30) DEFAULT 'pending'::character varying NOT NULL,
+  "resolved_by" integer,
+  "resolved_at" timestamp with time zone,
+  "routed_category" character varying(20),
+  "routing_outcome" character varying(40),
+  "routing_source" character varying(30) DEFAULT 'unclassified'::character varying NOT NULL,
+  "line_no" integer NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
 
--- from 057_lock_down_data_api
--- ─────────────────────────────────────────────────────────────
--- 057_lock_down_data_api.sql
---
--- Closes Supabase's public Data API to this schema.
---
--- Supabase gives its API roles, anon and authenticated, full rights on
--- every new table in public, and leaves row-level security off. With
--- the Data API on, anyone holding the project URL and the anon key
--- (which is designed to be public) could read, change or empty those
--- tables. The app never uses that API: it connects straight to
--- Postgres as the database owner, which bypasses row-level security,
--- so none of this changes what the app can do.
---
---   1. Row-level security on for every table in public. No policies are
---      added, so the API roles see no rows even if a grant comes back.
---   2. The API roles lose every right on tables, views, sequences and
---      functions in public.
---   3. Tables, sequences and functions made later by this role no longer
---      hand those rights out automatically.
---
--- A plain Postgres without Supabase has no anon or authenticated role;
--- steps 2 and 3 are skipped there.
--- ─────────────────────────────────────────────────────────────
+CREATE TABLE public."donation_routing_defaults" (
+  "product_id" integer NOT NULL,
+  "donation_category" character varying(20),
+  "set_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."donation_settings" (
+  "id" integer DEFAULT 1 NOT NULL,
+  "section18a_threshold_value" numeric DEFAULT 1000.00 NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."donations" (
+  "id" integer DEFAULT nextval('donations_id_seq'::regclass) NOT NULL,
+  "received_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "programme_id" integer,
+  "estimated_value_zar" numeric(12,2) NOT NULL,
+  "donor_name" character varying(200),
+  "donor_contact" character varying(200),
+  "donor_consent_given" boolean DEFAULT false NOT NULL,
+  "section_18a_qualifying" boolean DEFAULT false NOT NULL,
+  "section_18a_certificate_ref" character varying(100),
+  "section_18a_issued_at" timestamp with time zone,
+  "received_by" integer,
+  "notes" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "donor_tax_reference" character varying(50),
+  "idempotency_key" character varying(64),
+  "section_18a_status" character varying(30) DEFAULT 'not_evaluated'::character varying NOT NULL,
+  "donor_id" integer,
+  "donation_category" character varying(100) NOT NULL,
+  "status" character varying(40) DEFAULT 'draft'::character varying NOT NULL,
+  "created_by" integer,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "donor_registration_type" character varying(40),
+  "section18a_requested" boolean DEFAULT false NOT NULL,
+  "donor_first_name" character varying(200),
+  "donor_last_name" character varying(200),
+  "section_18a_form_token_hash" text,
+  "section_18a_form_token_expires_at" timestamp with time zone,
+  "section_18a_form_submitted_at" timestamp with time zone,
+  "section_18a_donor_form" jsonb,
+  "value_estimated" boolean DEFAULT false NOT NULL,
+  "value_verified_at" timestamp with time zone,
+  "value_verified_by" integer
+);
+
+CREATE TABLE public."donors" (
+  "id" integer DEFAULT nextval('donors_id_seq'::regclass) NOT NULL,
+  "name" character varying(200) NOT NULL,
+  "contact" character varying(200),
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."ecd_centres" (
+  "id" integer DEFAULT nextval('ecd_centres_id_seq'::regclass) NOT NULL,
+  "name" character varying(200) NOT NULL,
+  "contact_name" character varying(200),
+  "child_count" integer,
+  "cohort" cohort_group NOT NULL,
+  "last_collected_date" date,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "approved_at" timestamp with time zone,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "contact_phone" character varying(30),
+  "collection_day" weekday,
+  "mobile_number" character varying(30),
+  "contact_email" text,
+  "address" text,
+  "suburb" text,
+  "latitude" numeric(9,6),
+  "longitude" numeric(9,6),
+  "location_source" text,
+  "location_note" text,
+  "location_updated_at" timestamp with time zone,
+  "location_updated_by" integer
+);
+
+CREATE TABLE public."ecd_collection_reminders" (
+  "id" integer DEFAULT nextval('ecd_collection_reminders_id_seq'::regclass) NOT NULL,
+  "ecd_id" integer NOT NULL,
+  "collection_date" date NOT NULL,
+  "channel" character varying(30) NOT NULL,
+  "status" character varying(30) DEFAULT 'pending'::character varying NOT NULL,
+  "sent_at" timestamp with time zone,
+  "provider_message_id" text,
+  "error_message" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."ecd_order_lines" (
+  "id" integer DEFAULT nextval('ecd_order_lines_id_seq'::regclass) NOT NULL,
+  "ecd_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "quantity" numeric(10,3) NOT NULL,
+  "unit" character varying(20) NOT NULL,
+  "effective_from" date NOT NULL,
+  "effective_to" date,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."event_spaces" (
+  "space_id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "space_name" character varying(200) NOT NULL,
+  "description" text,
+  "location" character varying(255),
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."event_timeslots" (
+  "timeslot_id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "event_id" uuid NOT NULL,
+  "space_id" uuid NOT NULL,
+  "start_time" timestamp with time zone NOT NULL,
+  "end_time" timestamp with time zone NOT NULL,
+  "capacity" integer NOT NULL,
+  "status" character varying(20) NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."expiry_warning_dismissals" (
+  "id" integer DEFAULT nextval('expiry_warning_dismissals_id_seq'::regclass) NOT NULL,
+  "delivery_note_item_id" integer NOT NULL,
+  "reason" text NOT NULL,
+  "dismissed_by" integer NOT NULL,
+  "dismissed_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "restored_by" integer,
+  "restored_at" timestamp with time zone
+);
+
+CREATE TABLE public."finance_report_access_links" (
+  "id" integer DEFAULT nextval('finance_report_access_links_id_seq'::regclass) NOT NULL,
+  "token_hash" text NOT NULL,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "revoked_at" timestamp with time zone,
+  "revoked_by" integer,
+  "expires_at" timestamp with time zone NOT NULL,
+  "last_opened_at" timestamp with time zone,
+  "open_count" integer DEFAULT 0 NOT NULL
+);
+
+CREATE TABLE public."finance_report_email_logs" (
+  "id" integer DEFAULT nextval('finance_report_email_logs_id_seq'::regclass) NOT NULL,
+  "recipient_email" text NOT NULL,
+  "status" text NOT NULL,
+  "finance_link_id" integer,
+  "provider_message_id" text,
+  "error_message" text,
+  "sent_by_user_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "sent_at" timestamp with time zone
+);
+
+CREATE TABLE public."finance_report_email_settings" (
+  "id" integer DEFAULT 1 NOT NULL,
+  "recipient_email" text,
+  "updated_by" integer,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."fts_drop_points" (
+  "id" integer DEFAULT nextval('fts_drop_points_id_seq'::regclass) NOT NULL,
+  "name" character varying(120) NOT NULL,
+  "suburb" character varying(120),
+  "address" text,
+  "public_token" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."fts_dropoffs" (
+  "id" integer DEFAULT nextval('fts_dropoffs_id_seq'::regclass) NOT NULL,
+  "drop_point_id" integer,
+  "kg_compost" numeric(7,2) NOT NULL,
+  "donor_name" character varying(120),
+  "donor_email" character varying(254),
+  "status" character varying(20) DEFAULT 'logged'::character varying NOT NULL,
+  "thanks_status" character varying(20),
+  "submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "reviewed_by" integer,
+  "reviewed_at" timestamp with time zone,
+  "place_name" character varying(120)
+);
+
+CREATE TABLE public."gmail_connections" (
+  "id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "gmail_email" character varying(255),
+  "token_type" character varying(32) NOT NULL,
+  "scope" text NOT NULL,
+  "access_token_encrypted" text NOT NULL,
+  "refresh_token_encrypted" text NOT NULL,
+  "access_token_expires_at" timestamp with time zone,
+  "refresh_token_expires_at" timestamp with time zone,
+  "connected_by_user_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "display_name" character varying(255)
+);
+
+CREATE TABLE public."idempotency_keys" (
+  "key" text NOT NULL,
+  "scope" text NOT NULL,
+  "user_id" integer,
+  "status_code" smallint,
+  "response" jsonb,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."kitchens" (
+  "id" integer DEFAULT nextval('kitchens_id_seq'::regclass) NOT NULL,
+  "kind" beneficiary_type NOT NULL,
+  "name" character varying(120) NOT NULL,
+  "adult_count" integer,
+  "contact_name" character varying(120),
+  "contact_phone" character varying(40),
+  "address" text,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."love_activism_events" (
+  "event_id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "event_name" character varying(200) NOT NULL,
+  "description" text,
+  "event_date" date NOT NULL,
+  "status" character varying(20) NOT NULL,
+  "created_by" integer NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "venue_name" character varying(200),
+  "address" character varying(500)
+);
+
+CREATE TABLE public."notification_reads" (
+  "notification_id" integer NOT NULL,
+  "user_id" integer NOT NULL,
+  "read_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."notifications" (
+  "id" integer DEFAULT nextval('notifications_id_seq'::regclass) NOT NULL,
+  "type" character varying(50) NOT NULL,
+  "title" character varying(200) NOT NULL,
+  "body" text,
+  "entity_type" character varying(50),
+  "entity_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "target_roles" text[]
+);
+
+CREATE TABLE public."operating_closures" (
+  "id" integer DEFAULT nextval('operating_closures_id_seq'::regclass) NOT NULL,
+  "closed_on" date NOT NULL,
+  "kind" text NOT NULL,
+  "label" text NOT NULL,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."outbound_messages" (
+  "id" bigint DEFAULT nextval('outbound_messages_id_seq'::regclass) NOT NULL,
+  "channel" text DEFAULT 'email'::text NOT NULL,
+  "type" text NOT NULL,
+  "recipient" text,
+  "subject" text,
+  "status" text NOT NULL,
+  "error" text,
+  "related_type" text,
+  "related_id" text,
+  "sent_by" integer,
+  "attempted_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."password_resets" (
+  "id" integer DEFAULT nextval('password_resets_id_seq'::regclass) NOT NULL,
+  "user_id" integer NOT NULL,
+  "token_hash" text NOT NULL,
+  "expires_at" timestamp with time zone NOT NULL,
+  "used_at" timestamp with time zone,
+  "superseded_at" timestamp with time zone,
+  "requested_ip" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "email_status" text,
+  "email_error" text,
+  "email_attempted_at" timestamp with time zone
+);
+
+CREATE TABLE public."pending_donation_items" (
+  "id" integer DEFAULT nextval('pending_donation_items_id_seq'::regclass) NOT NULL,
+  "pending_donation_id" integer NOT NULL,
+  "line_no" integer NOT NULL,
+  "description" text NOT NULL,
+  "product_id" integer,
+  "quantity" numeric(12,3) NOT NULL,
+  "unit" character varying(30) NOT NULL,
+  "estimated_value_zar" numeric(12,2),
+  "requested_category" character varying(30),
+  "resolved_category" character varying(30),
+  "routing_status" character varying(30),
+  "storage_area_hint" character varying(50),
+  "source" character varying(30),
+  "status" character varying(30) DEFAULT 'awaiting_resolution'::character varying NOT NULL,
+  "flag_id" integer,
+  "rejection_reason" text,
+  "resolved_by" integer,
+  "rejected_at" timestamp with time zone,
+  "committed_donation_item_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."pending_donations" (
+  "id" integer DEFAULT nextval('pending_donations_id_seq'::regclass) NOT NULL,
+  "status" character varying(30) DEFAULT 'draft'::character varying NOT NULL,
+  "created_by" integer,
+  "donor_name" character varying(200),
+  "donor_contact" character varying(200),
+  "donor_tax_reference" character varying(50),
+  "donor_consent_given" boolean,
+  "estimated_value_zar" numeric(12,2),
+  "donation_category" character varying(30),
+  "programme_id" integer,
+  "notes" text,
+  "section_18a_status" character varying(40),
+  "section_18a_qualifying" boolean,
+  "draft_snapshot" jsonb NOT NULL,
+  "idempotency_key" character varying(64),
+  "committed_donation_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "resolved_at" timestamp with time zone,
+  "committed_at" timestamp with time zone,
+  "cancelled_at" timestamp with time zone,
+  "commit_failed_at" timestamp with time zone,
+  "commit_incomplete_at" timestamp with time zone,
+  "donor_registration_type" character varying(40),
+  "donor_first_name" character varying(200),
+  "donor_last_name" character varying(200),
+  "section18a_requested" boolean DEFAULT false NOT NULL,
+  "value_estimated" boolean DEFAULT false NOT NULL
+);
+
+CREATE TABLE public."photos" (
+  "id" bigint DEFAULT nextval('photos_id_seq'::regclass) NOT NULL,
+  "entity_type" text NOT NULL,
+  "entity_id" integer NOT NULL,
+  "content_type" text NOT NULL,
+  "byte_size" integer NOT NULL,
+  "data" bytea NOT NULL,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."picking_events" (
+  "id" integer DEFAULT nextval('picking_events_id_seq'::regclass) NOT NULL,
+  "picking_slip_id" integer NOT NULL,
+  "event_type" character varying(30) NOT NULL,
+  "actor_id" integer,
+  "detail" jsonb,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."picking_settings" (
+  "key" text NOT NULL,
+  "value" text NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."picking_slip_items" (
+  "id" integer DEFAULT nextval('picking_slip_items_id_seq'::regclass) NOT NULL,
+  "picking_slip_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "required_quantity" numeric(10,3) NOT NULL,
+  "unit" character varying(20) NOT NULL,
+  "packed_quantity" numeric(10,3),
+  "status" picking_item_status DEFAULT 'pending'::picking_item_status NOT NULL,
+  "flag_reason" text,
+  "confirmed_by" integer,
+  "confirmed_at" timestamp with time zone,
+  "dispatched_at" timestamp with time zone,
+  "packer_note" text
+);
+
+CREATE TABLE public."picking_slips" (
+  "id" integer DEFAULT nextval('picking_slips_id_seq'::regclass) NOT NULL,
+  "ecd_id" integer,
+  "dispatch_date" date NOT NULL,
+  "cohort" cohort_group NOT NULL,
+  "pallet_ref" character varying(50),
+  "status" character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+  "assigned_to" integer,
+  "generated_by" integer,
+  "started_at" timestamp with time zone,
+  "completed_at" timestamp with time zone,
+  "completed_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "public_token" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "collection_status" collection_outcome,
+  "assigned_volunteer_id" bigint,
+  "beneficiary_kind" beneficiary_type DEFAULT 'ecd'::beneficiary_type NOT NULL,
+  "beneficiary_name" character varying(200),
+  "dispatched_at" timestamp with time zone,
+  "assigned_to_2" integer
+);
+
+CREATE TABLE public."product_barcodes" (
+  "id" integer DEFAULT nextval('product_barcodes_id_seq'::regclass) NOT NULL,
+  "product_id" integer NOT NULL,
+  "code" character varying(64) NOT NULL,
+  "units_per_scan" numeric(12,3) DEFAULT 1 NOT NULL,
+  "supplier_id" integer,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "food_name" text,
+  "food_brand" text,
+  "food_quantity" text,
+  "food_weight_kg" numeric(10,3),
+  "food_categories" text[],
+  "food_checked_at" timestamp with time zone
+);
+
+CREATE TABLE public."products" (
+  "id" integer DEFAULT nextval('products_id_seq'::regclass) NOT NULL,
+  "name" character varying(200) NOT NULL,
+  "stock_keeping_unit" character varying(50) NOT NULL,
+  "weight_kg" numeric(10,3),
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "is_decantable" boolean DEFAULT false NOT NULL,
+  "programme_id" integer,
+  "default_location_id" integer,
+  "code_type" product_code_type DEFAULT 'fixed'::product_code_type NOT NULL,
+  "category" character varying(60),
+  "is_perishable" boolean DEFAULT false NOT NULL,
+  "default_unit" character varying(20) DEFAULT 'kg'::character varying NOT NULL,
+  "storage_type" character varying(10) DEFAULT 'dry'::character varying,
+  "archived_at" timestamp with time zone,
+  "archived_by" integer,
+  "unit_cost" numeric(12,2),
+  "quantity_per_meal" numeric,
+  "preferred_supplier_id" integer
+);
+
+CREATE TABLE public."programmes" (
+  "id" integer DEFAULT nextval('programmes_id_seq'::regclass) NOT NULL,
+  "code" character varying(30) NOT NULL,
+  "name" character varying(120) NOT NULL,
+  "description" text,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."purchase_order_items" (
+  "id" integer DEFAULT nextval('purchase_order_items_id_seq'::regclass) NOT NULL,
+  "purchase_order_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "expected_quantity" numeric NOT NULL,
+  "expected_weight_kg" numeric(10,3),
+  "unit_price" numeric(10,2),
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."purchase_orders" (
+  "id" integer DEFAULT nextval('purchase_orders_id_seq'::regclass) NOT NULL,
+  "supplier_id" integer NOT NULL,
+  "created_by" integer,
+  "status" character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+  "expected_delivery_date" date,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "status_reason" text,
+  "status_changed_at" timestamp with time zone,
+  "po_number" character varying(20) DEFAULT ((('PO-'::text || to_char((now() AT TIME ZONE 'Africa/Johannesburg'::text), 'YYYY'::text)) || '-'::text) || lpad((nextval('purchase_order_number_seq'::regclass))::text, 4, '0'::text)) NOT NULL,
+  "notes" text,
+  "finance_email_status" text,
+  "finance_email_error" text,
+  "finance_email_attempted_at" timestamp with time zone,
+  "follow_up_of" integer
+);
+
+CREATE TABLE public."push_subscriptions" (
+  "id" integer DEFAULT nextval('push_subscriptions_id_seq'::regclass) NOT NULL,
+  "user_id" integer NOT NULL,
+  "endpoint" text NOT NULL,
+  "p256dh" text NOT NULL,
+  "auth" text NOT NULL,
+  "user_agent" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "last_success_at" timestamp with time zone
+);
+
+CREATE TABLE public."quickbooks_connections" (
+  "id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "realm_id" character varying(64) NOT NULL,
+  "token_type" character varying(32) NOT NULL,
+  "scope" text NOT NULL,
+  "access_token_encrypted" text NOT NULL,
+  "refresh_token_encrypted" text NOT NULL,
+  "access_token_expires_at" timestamp with time zone,
+  "refresh_token_expires_at" timestamp with time zone,
+  "connected_by_user_id" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."quickbooks_object_map" (
+  "entity_type" character varying(60) NOT NULL,
+  "entity_id" integer NOT NULL,
+  "qbo_object_type" character varying(60) NOT NULL,
+  "qbo_id" character varying(100) NOT NULL,
+  "sync_token" character varying(50),
+  "last_synced_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."quickbooks_sync_queue" (
+  "id" bigint DEFAULT nextval('quickbooks_sync_queue_id_seq'::regclass) NOT NULL,
+  "entity_type" character varying(60) NOT NULL,
+  "entity_id" integer NOT NULL,
+  "operation" character varying(30) NOT NULL,
+  "payload" jsonb,
+  "status" sync_status DEFAULT 'pending'::sync_status NOT NULL,
+  "attempts" integer DEFAULT 0 NOT NULL,
+  "last_error" text,
+  "idempotency_key" character varying(120) NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."recipe_lines" (
+  "id" integer DEFAULT nextval('recipe_lines_id_seq'::regclass) NOT NULL,
+  "recipe_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "quantity_per_child" numeric NOT NULL,
+  "unit" character varying NOT NULL
+);
+
+CREATE TABLE public."recipe_own_order_centres" (
+  "ecd_id" integer NOT NULL,
+  "added_by" integer
+);
+
+CREATE TABLE public."recipes" (
+  "id" integer DEFAULT nextval('recipes_id_seq'::regclass) NOT NULL,
+  "name" text NOT NULL,
+  "kind" text NOT NULL,
+  "season_start_month" smallint,
+  "season_start_day" smallint,
+  "starts_on" date,
+  "ends_on" date,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."reporting_factors" (
+  "id" integer DEFAULT nextval('reporting_factors_id_seq'::regclass) NOT NULL,
+  "factor_key" character varying(50) NOT NULL,
+  "value" numeric NOT NULL,
+  "unit" character varying(50) NOT NULL,
+  "source_note" text,
+  "effective_from" date DEFAULT CURRENT_DATE NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."reporting_queries" (
+  "id" bigint DEFAULT nextval('reporting_queries_id_seq'::regclass) NOT NULL,
+  "user_id" integer,
+  "question" text NOT NULL,
+  "outcome" character varying(20) NOT NULL,
+  "metric" character varying(50),
+  "spec" jsonb,
+  "error_message" text,
+  "latency_ms" integer,
+  "provider" character varying(60),
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."reporting_targets" (
+  "user_id" integer NOT NULL,
+  "metric_id" character varying(64) NOT NULL,
+  "value" numeric NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."saved_reports" (
+  "id" integer DEFAULT nextval('saved_reports_id_seq'::regclass) NOT NULL,
+  "user_id" integer NOT NULL,
+  "title" character varying(120) NOT NULL,
+  "kind" character varying(20) NOT NULL,
+  "spec" jsonb NOT NULL,
+  "preset" character varying(20) DEFAULT 'last_3m'::character varying NOT NULL,
+  "pinned" boolean DEFAULT false NOT NULL,
+  "schedule" character varying(20) DEFAULT 'none'::character varying NOT NULL,
+  "last_sent_at" timestamp with time zone,
+  "last_error" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "narrative" jsonb,
+  "narrative_at" timestamp with time zone,
+  "narrative_range" jsonb
+);
+
+CREATE TABLE public."schema_migrations" (
+  "id" character varying(100) NOT NULL,
+  "applied_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "notes" text
+);
+
+CREATE TABLE public."section18a_certificates" (
+  "id" bigint DEFAULT nextval('section18a_certificates_id_seq'::regclass) NOT NULL,
+  "donation_id" integer NOT NULL,
+  "certificate_number" text NOT NULL,
+  "issue_date" date NOT NULL,
+  "issued_by" integer,
+  "settings_snapshot" jsonb DEFAULT '{}'::jsonb NOT NULL,
+  "donor_snapshot" jsonb DEFAULT '{}'::jsonb NOT NULL,
+  "donation_snapshot" jsonb DEFAULT '{}'::jsonb NOT NULL,
+  "pdf_content" bytea NOT NULL,
+  "pdf_filename" text NOT NULL,
+  "pdf_content_type" text DEFAULT 'application/pdf'::text NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."section18a_settings" (
+  "id" integer DEFAULT 1 NOT NULL,
+  "organisation_name" text DEFAULT ''::text NOT NULL,
+  "organisation_address" text DEFAULT ''::text NOT NULL,
+  "contact_name" text DEFAULT ''::text NOT NULL,
+  "contact_email" text DEFAULT ''::text NOT NULL,
+  "contact_phone" text DEFAULT ''::text NOT NULL,
+  "pba_declaration" text DEFAULT ''::text NOT NULL,
+  "certificate_prefix" text DEFAULT 'S18A'::text NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."stock_count_lines" (
+  "id" integer DEFAULT nextval('stock_count_lines_id_seq'::regclass) NOT NULL,
+  "stock_count_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "location_id" integer,
+  "system_quantity" numeric(12,3) NOT NULL,
+  "counted_quantity" numeric(12,3) NOT NULL,
+  "variance" numeric(12,3) GENERATED ALWAYS AS ((counted_quantity - system_quantity)) STORED,
+  "unit" character varying(20) DEFAULT 'kg'::character varying NOT NULL,
+  "reason_code" character varying(50),
+  "notes" text,
+  "counted_by" integer,
+  "counted_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."stock_counts" (
+  "id" integer DEFAULT nextval('stock_counts_id_seq'::regclass) NOT NULL,
+  "count_date" date NOT NULL,
+  "status" stock_count_status DEFAULT 'in_progress'::stock_count_status NOT NULL,
+  "started_by" integer,
+  "started_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "approved_by" integer,
+  "approved_at" timestamp with time zone,
+  "notes" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."stock_levels" (
+  "product_id" integer NOT NULL,
+  "quantity_on_hand" numeric(12,3) DEFAULT 0 NOT NULL,
+  "unit" character varying(20) NOT NULL,
+  "reorder_threshold" numeric(12,3) DEFAULT 0 NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."stock_movements" (
+  "id" integer DEFAULT nextval('stock_movements_id_seq'::regclass) NOT NULL,
+  "product_id" integer NOT NULL,
+  "quantity" numeric(12,3) NOT NULL,
+  "unit" character varying(20),
+  "movement_type" character varying(20) NOT NULL,
+  "reference_type" character varying(30),
+  "reference_id" integer,
+  "reason" text,
+  "performed_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "programme_id" integer,
+  "location_id" integer,
+  "approved_by" integer
+);
+
+CREATE TABLE public."storage_locations" (
+  "id" integer DEFAULT nextval('storage_locations_id_seq'::regclass) NOT NULL,
+  "name" character varying(100) NOT NULL,
+  "area" storage_area NOT NULL,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."supplier_products" (
+  "supplier_id" integer NOT NULL,
+  "product_id" integer NOT NULL
+);
+
+CREATE TABLE public."supplier_prospects" (
+  "id" integer DEFAULT nextval('supplier_prospects_id_seq'::regclass) NOT NULL,
+  "name" character varying(200) NOT NULL,
+  "what_they_supply" text,
+  "lead_source" character varying(200),
+  "contact_name" character varying(200),
+  "contact_email" character varying(255),
+  "contact_phone" character varying(50),
+  "notes" text,
+  "status" character varying(20) DEFAULT 'open'::character varying NOT NULL,
+  "converted_supplier_id" integer,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."suppliers" (
+  "id" integer DEFAULT nextval('suppliers_id_seq'::regclass) NOT NULL,
+  "name" character varying(200) NOT NULL,
+  "contact_email" character varying(255),
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "contact_phone" character varying(50),
+  "address" text,
+  "agreement_ref" character varying(100),
+  "contact_name" character varying(200),
+  "payment_terms" character varying(100),
+  "expected_lead_time_days" integer,
+  "category" character varying(60),
+  "notes" text,
+  "created_by" integer,
+  "deactivated_at" timestamp with time zone,
+  "deactivated_by" integer,
+  "archived_at" timestamp with time zone,
+  "archived_by" integer
+);
+
+CREATE TABLE public."user_invites" (
+  "id" integer DEFAULT nextval('user_invites_id_seq'::regclass) NOT NULL,
+  "email" text NOT NULL,
+  "role" text NOT NULL,
+  "token_hash" text NOT NULL,
+  "expires_at" timestamp with time zone NOT NULL,
+  "accepted_at" timestamp with time zone,
+  "revoked_at" timestamp with time zone,
+  "invited_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "last_sent_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "resend_count" integer DEFAULT 0 NOT NULL,
+  "email_status" text,
+  "email_error" text,
+  "email_attempted_at" timestamp with time zone
+);
+
+CREATE TABLE public."users" (
+  "id" integer DEFAULT nextval('users_id_seq'::regclass) NOT NULL,
+  "username" character varying(50) NOT NULL,
+  "first_name" character varying(100) NOT NULL,
+  "last_name" character varying(100) NOT NULL,
+  "password_hash" character varying(255) NOT NULL,
+  "role" character varying(30) NOT NULL,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "archived_at" timestamp with time zone,
+  "archived_by" integer,
+  "email" text,
+  "language" text DEFAULT 'en'::text NOT NULL,
+  "session_version" integer DEFAULT 0 NOT NULL
+);
+
+CREATE TABLE public."vms_sync" (
+  "sync_id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "entity_type" character varying(20) NOT NULL,
+  "entity_id" uuid NOT NULL,
+  "external_id" character varying(255),
+  "sync_status" character varying(20) NOT NULL,
+  "last_attempt_at" timestamp with time zone,
+  "last_success_at" timestamp with time zone,
+  "error_message" text,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."volunteer_bookings" (
+  "booking_id" uuid DEFAULT gen_random_uuid() NOT NULL,
+  "timeslot_id" uuid NOT NULL,
+  "external_booking_id" character varying(255),
+  "external_volunteer_id" character varying(255),
+  "volunteer_first_name" character varying(100) NOT NULL,
+  "volunteer_last_name" character varying(100),
+  "booking_source" character varying(20) NOT NULL,
+  "booking_status" character varying(20) NOT NULL,
+  "booked_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "last_synced_at" timestamp with time zone,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "volunteer_email" character varying(255),
+  "volunteer_phone" character varying(50)
+);
+
+CREATE TABLE public."volunteers" (
+  "id" bigint DEFAULT nextval('volunteers_id_seq'::regclass) NOT NULL,
+  "full_name" text NOT NULL,
+  "signed_in_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "signed_out_at" timestamp with time zone,
+  "source" text DEFAULT 'guest_login'::text NOT NULL,
+  "consent_given" boolean DEFAULT false NOT NULL,
+  "retention_delete_after" date,
+  "last_active_at" timestamp with time zone
+);
+
+CREATE TABLE public."warehouse_area_counts" (
+  "id" integer DEFAULT nextval('warehouse_area_counts_id_seq'::regclass) NOT NULL,
+  "area_id" integer NOT NULL,
+  "product_id" integer NOT NULL,
+  "quantity" numeric NOT NULL,
+  "unit" character varying(20) NOT NULL,
+  "on_hand_at_count" numeric NOT NULL,
+  "counted_by" integer,
+  "counted_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public."warehouse_areas" (
+  "id" integer DEFAULT nextval('warehouse_areas_id_seq'::regclass) NOT NULL,
+  "name" text NOT NULL,
+  "kind" text NOT NULL,
+  "grid_x" smallint NOT NULL,
+  "grid_y" smallint NOT NULL,
+  "grid_w" smallint NOT NULL,
+  "grid_h" smallint NOT NULL,
+  "levels" smallint DEFAULT 1 NOT NULL,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_by" integer,
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_by" integer,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "capacity_kg" numeric,
+  "pallet_spaces" integer,
+  "preferred_product_ids" integer[] DEFAULT '{}'::integer[] NOT NULL,
+  "preferred_categories" text[] DEFAULT '{}'::text[] NOT NULL
+);
+
+CREATE TABLE public."warehouse_manager_flags" (
+  "id" integer DEFAULT nextval('warehouse_manager_flags_id_seq'::regclass) NOT NULL,
+  "product_id" integer NOT NULL,
+  "quantity_kg" numeric(10,2) NOT NULL,
+  "reason" text NOT NULL,
+  "target_location" character varying(100),
+  "created_by" integer,
+  "status" character varying(50) DEFAULT 'pending'::character varying,
+  "created_at" timestamp with time zone DEFAULT now(),
+  "updated_at" timestamp with time zone DEFAULT now(),
+  "pending_donation_id" integer,
+  "pending_donation_item_id" integer
+);
+
+-- -- Keys and checks ----------------------------------------
+ALTER TABLE public."app_settings" ADD CONSTRAINT "app_settings_pkey" PRIMARY KEY (key);
+ALTER TABLE public."assistant_queries" ADD CONSTRAINT "assistant_queries_pkey" PRIMARY KEY (id);
+ALTER TABLE public."attendance" ADD CONSTRAINT "attendance_pkey" PRIMARY KEY (attendance_id);
+ALTER TABLE public."audit_log" ADD CONSTRAINT "audit_log_pkey" PRIMARY KEY (id);
+ALTER TABLE public."barcode_scan_events" ADD CONSTRAINT "barcode_scan_events_pkey" PRIMARY KEY (id);
+ALTER TABLE public."certificate_settings" ADD CONSTRAINT "certificate_settings_pkey" PRIMARY KEY (id);
+ALTER TABLE public."collection_kit_records" ADD CONSTRAINT "collection_kit_records_pkey" PRIMARY KEY (id);
+ALTER TABLE public."collection_kits" ADD CONSTRAINT "collection_kits_pkey" PRIMARY KEY (id);
+ALTER TABLE public."community_request_items" ADD CONSTRAINT "community_request_items_pkey" PRIMARY KEY (id);
+ALTER TABLE public."community_requests" ADD CONSTRAINT "community_requests_pkey" PRIMARY KEY (id);
+ALTER TABLE public."decanting_lines" ADD CONSTRAINT "decanting_lines_pkey" PRIMARY KEY (id);
+ALTER TABLE public."decanting_records" ADD CONSTRAINT "decanting_records_pkey" PRIMARY KEY (id);
+ALTER TABLE public."delivery_note_items" ADD CONSTRAINT "delivery_note_items_pkey" PRIMARY KEY (id);
+ALTER TABLE public."delivery_notes" ADD CONSTRAINT "delivery_notes_pkey" PRIMARY KEY (id);
+ALTER TABLE public."delivery_receipts" ADD CONSTRAINT "delivery_receipts_pkey" PRIMARY KEY (id);
+ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_pkey" PRIMARY KEY (id);
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_pkey" PRIMARY KEY (id);
+ALTER TABLE public."donation_allocations" ADD CONSTRAINT "donation_allocations_pkey" PRIMARY KEY (id);
+ALTER TABLE public."donation_category_routing" ADD CONSTRAINT "donation_category_routing_pkey" PRIMARY KEY (category);
+ALTER TABLE public."donation_email_logs" ADD CONSTRAINT "donation_email_logs_pkey" PRIMARY KEY (id);
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_pkey" PRIMARY KEY (id);
+ALTER TABLE public."donation_routing_defaults" ADD CONSTRAINT "donation_routing_defaults_pkey" PRIMARY KEY (product_id);
+ALTER TABLE public."donation_settings" ADD CONSTRAINT "donation_settings_pkey" PRIMARY KEY (id);
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_pkey" PRIMARY KEY (id);
+ALTER TABLE public."donors" ADD CONSTRAINT "donors_pkey" PRIMARY KEY (id);
+ALTER TABLE public."ecd_centres" ADD CONSTRAINT "ecd_centres_pkey" PRIMARY KEY (id);
+ALTER TABLE public."ecd_collection_reminders" ADD CONSTRAINT "ecd_collection_reminders_pkey" PRIMARY KEY (id);
+ALTER TABLE public."ecd_order_lines" ADD CONSTRAINT "ecd_order_lines_pkey" PRIMARY KEY (id);
+ALTER TABLE public."event_spaces" ADD CONSTRAINT "event_spaces_pkey" PRIMARY KEY (space_id);
+ALTER TABLE public."event_timeslots" ADD CONSTRAINT "event_timeslots_pkey" PRIMARY KEY (timeslot_id);
+ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_warning_dismissals_pkey" PRIMARY KEY (id);
+ALTER TABLE public."finance_report_access_links" ADD CONSTRAINT "finance_report_access_links_pkey" PRIMARY KEY (id);
+ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_pkey" PRIMARY KEY (id);
+ALTER TABLE public."finance_report_email_settings" ADD CONSTRAINT "finance_report_email_settings_pkey" PRIMARY KEY (id);
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_pkey" PRIMARY KEY (id);
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_pkey" PRIMARY KEY (id);
+ALTER TABLE public."gmail_connections" ADD CONSTRAINT "gmail_connections_pkey" PRIMARY KEY (id);
+ALTER TABLE public."idempotency_keys" ADD CONSTRAINT "idempotency_keys_pkey" PRIMARY KEY (key);
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_pkey" PRIMARY KEY (id);
+ALTER TABLE public."love_activism_events" ADD CONSTRAINT "love_activism_events_pkey" PRIMARY KEY (event_id);
+ALTER TABLE public."notification_reads" ADD CONSTRAINT "notification_reads_pkey" PRIMARY KEY (notification_id, user_id);
+ALTER TABLE public."notifications" ADD CONSTRAINT "notifications_pkey" PRIMARY KEY (id);
+ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_pkey" PRIMARY KEY (id);
+ALTER TABLE public."outbound_messages" ADD CONSTRAINT "outbound_messages_pkey" PRIMARY KEY (id);
+ALTER TABLE public."password_resets" ADD CONSTRAINT "password_resets_pkey" PRIMARY KEY (id);
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_pkey" PRIMARY KEY (id);
+ALTER TABLE public."pending_donations" ADD CONSTRAINT "pending_donations_pkey" PRIMARY KEY (id);
+ALTER TABLE public."photos" ADD CONSTRAINT "photos_pkey" PRIMARY KEY (id);
+ALTER TABLE public."picking_events" ADD CONSTRAINT "picking_events_pkey" PRIMARY KEY (id);
+ALTER TABLE public."picking_settings" ADD CONSTRAINT "picking_settings_pkey" PRIMARY KEY (key);
+ALTER TABLE public."picking_slip_items" ADD CONSTRAINT "picking_slip_items_pkey" PRIMARY KEY (id);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_pkey" PRIMARY KEY (id);
+ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_pkey" PRIMARY KEY (id);
+ALTER TABLE public."products" ADD CONSTRAINT "products_pkey" PRIMARY KEY (id);
+ALTER TABLE public."programmes" ADD CONSTRAINT "programmes_pkey" PRIMARY KEY (id);
+ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "purchase_order_items_pkey" PRIMARY KEY (id);
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_pkey" PRIMARY KEY (id);
+ALTER TABLE public."push_subscriptions" ADD CONSTRAINT "push_subscriptions_pkey" PRIMARY KEY (id);
+ALTER TABLE public."quickbooks_connections" ADD CONSTRAINT "quickbooks_connections_pkey" PRIMARY KEY (id);
+ALTER TABLE public."quickbooks_object_map" ADD CONSTRAINT "quickbooks_object_map_pkey" PRIMARY KEY (entity_type, entity_id);
+ALTER TABLE public."quickbooks_sync_queue" ADD CONSTRAINT "quickbooks_sync_queue_pkey" PRIMARY KEY (id);
+ALTER TABLE public."recipe_lines" ADD CONSTRAINT "recipe_lines_pkey" PRIMARY KEY (id);
+ALTER TABLE public."recipe_own_order_centres" ADD CONSTRAINT "recipe_own_order_centres_pkey" PRIMARY KEY (ecd_id);
+ALTER TABLE public."recipes" ADD CONSTRAINT "recipes_pkey" PRIMARY KEY (id);
+ALTER TABLE public."reporting_factors" ADD CONSTRAINT "reporting_factors_pkey" PRIMARY KEY (id);
+ALTER TABLE public."reporting_queries" ADD CONSTRAINT "reporting_queries_pkey" PRIMARY KEY (id);
+ALTER TABLE public."reporting_targets" ADD CONSTRAINT "reporting_targets_pkey" PRIMARY KEY (user_id, metric_id);
+ALTER TABLE public."saved_reports" ADD CONSTRAINT "saved_reports_pkey" PRIMARY KEY (id);
+ALTER TABLE public."schema_migrations" ADD CONSTRAINT "schema_migrations_pkey" PRIMARY KEY (id);
+ALTER TABLE public."section18a_certificates" ADD CONSTRAINT "section18a_certificates_pkey" PRIMARY KEY (id);
+ALTER TABLE public."section18a_settings" ADD CONSTRAINT "section18a_settings_pkey" PRIMARY KEY (id);
+ALTER TABLE public."stock_count_lines" ADD CONSTRAINT "stock_count_lines_pkey" PRIMARY KEY (id);
+ALTER TABLE public."stock_counts" ADD CONSTRAINT "stock_counts_pkey" PRIMARY KEY (id);
+ALTER TABLE public."stock_levels" ADD CONSTRAINT "stock_levels_pkey" PRIMARY KEY (product_id);
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_pkey" PRIMARY KEY (id);
+ALTER TABLE public."storage_locations" ADD CONSTRAINT "storage_locations_pkey" PRIMARY KEY (id);
+ALTER TABLE public."supplier_products" ADD CONSTRAINT "supplier_products_pkey" PRIMARY KEY (supplier_id, product_id);
+ALTER TABLE public."supplier_prospects" ADD CONSTRAINT "supplier_prospects_pkey" PRIMARY KEY (id);
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_pkey" PRIMARY KEY (id);
+ALTER TABLE public."user_invites" ADD CONSTRAINT "user_invites_pkey" PRIMARY KEY (id);
+ALTER TABLE public."users" ADD CONSTRAINT "users_pkey" PRIMARY KEY (id);
+ALTER TABLE public."vms_sync" ADD CONSTRAINT "vms_sync_pkey" PRIMARY KEY (sync_id);
+ALTER TABLE public."volunteer_bookings" ADD CONSTRAINT "volunteer_bookings_pkey" PRIMARY KEY (booking_id);
+ALTER TABLE public."volunteers" ADD CONSTRAINT "volunteers_pkey" PRIMARY KEY (id);
+ALTER TABLE public."warehouse_area_counts" ADD CONSTRAINT "warehouse_area_counts_pkey" PRIMARY KEY (id);
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_pkey" PRIMARY KEY (id);
+ALTER TABLE public."warehouse_manager_flags" ADD CONSTRAINT "warehouse_manager_flags_pkey" PRIMARY KEY (id);
+ALTER TABLE public."attendance" ADD CONSTRAINT "uq_attendance_booking" UNIQUE (booking_id);
+ALTER TABLE public."community_request_items" ADD CONSTRAINT "community_request_items_request_product_key" UNIQUE (request_id, product_id);
+ALTER TABLE public."delivery_receipts" ADD CONSTRAINT "delivery_receipts_picking_slip_id_key" UNIQUE (picking_slip_id);
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_idempotency_key_key" UNIQUE (idempotency_key);
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_picking_slip_id_key" UNIQUE (picking_slip_id);
+ALTER TABLE public."ecd_collection_reminders" ADD CONSTRAINT "ecd_collection_reminders_ecd_id_collection_date_channel_key" UNIQUE (ecd_id, collection_date, channel);
+ALTER TABLE public."event_spaces" ADD CONSTRAINT "uq_event_spaces_space_name" UNIQUE (space_name);
+ALTER TABLE public."event_timeslots" ADD CONSTRAINT "uq_event_timeslots_unique_slot" UNIQUE (event_id, space_id, start_time, end_time);
+ALTER TABLE public."finance_report_access_links" ADD CONSTRAINT "finance_report_access_links_token_hash_key" UNIQUE (token_hash);
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_public_token_key" UNIQUE (public_token);
+ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_closed_on_key" UNIQUE (closed_on);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_ecd_id_dispatch_date_key" UNIQUE (ecd_id, dispatch_date);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_public_token_key" UNIQUE (public_token);
+ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_code_key" UNIQUE (code);
+ALTER TABLE public."products" ADD CONSTRAINT "products_name_key" UNIQUE (name);
+ALTER TABLE public."products" ADD CONSTRAINT "products_stock_keeping_unit_key" UNIQUE (stock_keeping_unit);
+ALTER TABLE public."programmes" ADD CONSTRAINT "programmes_code_key" UNIQUE (code);
+ALTER TABLE public."push_subscriptions" ADD CONSTRAINT "push_subscriptions_endpoint_key" UNIQUE (endpoint);
+ALTER TABLE public."quickbooks_connections" ADD CONSTRAINT "quickbooks_connections_realm_id_key" UNIQUE (realm_id);
+ALTER TABLE public."quickbooks_object_map" ADD CONSTRAINT "qbo_map_unique_remote" UNIQUE (qbo_object_type, qbo_id);
+ALTER TABLE public."quickbooks_sync_queue" ADD CONSTRAINT "quickbooks_sync_queue_idempotency_key_key" UNIQUE (idempotency_key);
+ALTER TABLE public."recipe_lines" ADD CONSTRAINT "recipe_lines_one_per_product" UNIQUE (recipe_id, product_id);
+ALTER TABLE public."reporting_factors" ADD CONSTRAINT "reporting_factors_factor_key_effective_from_key" UNIQUE (factor_key, effective_from);
+ALTER TABLE public."section18a_certificates" ADD CONSTRAINT "section18a_certificates_certificate_number_key" UNIQUE (certificate_number);
+ALTER TABLE public."stock_count_lines" ADD CONSTRAINT "scl_one_line_per_product" UNIQUE (stock_count_id, product_id);
+ALTER TABLE public."storage_locations" ADD CONSTRAINT "storage_locations_name_key" UNIQUE (name);
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_name_key" UNIQUE (name);
+ALTER TABLE public."users" ADD CONSTRAINT "users_username_key" UNIQUE (username);
+ALTER TABLE public."vms_sync" ADD CONSTRAINT "uq_vms_sync_entity" UNIQUE (entity_type, entity_id);
+ALTER TABLE public."volunteer_bookings" ADD CONSTRAINT "uq_volunteer_bookings_external_booking_id" UNIQUE (external_booking_id);
+ALTER TABLE public."attendance" ADD CONSTRAINT "chk_attendance_check_in_consistency" CHECK ((((checked_in = false) AND (check_in_time IS NULL)) OR ((checked_in = true) AND (check_in_time IS NOT NULL))));
+ALTER TABLE public."barcode_scan_events" ADD CONSTRAINT "barcode_scan_events_outcome_check" CHECK (((outcome)::text = ANY ((ARRAY['counted'::character varying, 'not_on_list'::character varying, 'already_done'::character varying, 'unknown'::character varying, 'linked'::character varying, 'misread'::character varying])::text[])));
+ALTER TABLE public."barcode_scan_events" ADD CONSTRAINT "barcode_scan_events_screen_check" CHECK (((screen)::text = ANY ((ARRAY['receiving'::character varying, 'donation'::character varying, 'packing'::character varying, 'stock_count'::character varying])::text[])));
+ALTER TABLE public."certificate_settings" ADD CONSTRAINT "certificate_settings_id_check" CHECK ((id = 1));
+ALTER TABLE public."collection_kit_records" ADD CONSTRAINT "collection_kit_records_kg_compost_check" CHECK ((kg_compost >= (0)::numeric));
+ALTER TABLE public."collection_kit_records" ADD CONSTRAINT "collection_kit_records_status_check" CHECK (((status)::text = ANY ((ARRAY['logged'::character varying, 'dispatched'::character varying])::text[])));
+ALTER TABLE public."community_request_items" ADD CONSTRAINT "community_request_items_quantity_approved_check" CHECK ((quantity_approved > (0)::numeric));
+ALTER TABLE public."community_request_items" ADD CONSTRAINT "community_request_items_quantity_released_check" CHECK ((quantity_released >= (0)::numeric));
+ALTER TABLE public."community_request_items" ADD CONSTRAINT "community_request_items_released_le_approved" CHECK ((quantity_released <= quantity_approved));
+ALTER TABLE public."decanting_lines" ADD CONSTRAINT "decanting_lines_partial_bag_actual_kg_check" CHECK (((partial_bag_actual_kg IS NULL) OR ((partial_bag_actual_kg > (0)::numeric) AND (partial_bag_actual_kg < 0.5))));
+ALTER TABLE public."delivery_note_items" ADD CONSTRAINT "delivery_note_items_received_quantity_check" CHECK ((received_quantity >= (0)::numeric));
+ALTER TABLE public."delivery_note_items" ADD CONSTRAINT "delivery_note_items_storage_area_check" CHECK (((storage_area IS NULL) OR ((storage_area)::text = ANY ((ARRAY['cold_room'::character varying, 'dry_store'::character varying, 'fts_section'::character varying, 'mezzanine'::character varying, 'boardroom'::character varying])::text[]))));
+ALTER TABLE public."delivery_notes" ADD CONSTRAINT "delivery_notes_status_check" CHECK (((status)::text = ANY ((ARRAY['recorded'::character varying, 'flagged'::character varying, 'closed'::character varying])::text[])));
+ALTER TABLE public."delivery_receipts" ADD CONSTRAINT "dr_collected_requires_confirmation" CHECK (((outcome = 'not_collected'::collection_outcome) OR ((confirmed_by IS NOT NULL) AND (confirmed_at IS NOT NULL))));
+ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_loaded_quantity_check" CHECK ((loaded_quantity >= (0)::numeric));
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_status_check" CHECK (((status)::text = ANY ((ARRAY['awaiting'::character varying, 'collected'::character varying, 'late_collected'::character varying, 'not_collected'::character varying, 'cancelled'::character varying])::text[])));
+ALTER TABLE public."donation_allocations" ADD CONSTRAINT "donation_allocations_allocated_quantity_check" CHECK ((allocated_quantity >= (0)::numeric));
+ALTER TABLE public."donation_allocations" ADD CONSTRAINT "donation_allocations_beneficiary_type_valid" CHECK (((beneficiary_type)::text = ANY ((ARRAY['ecd'::character varying, 'soup_kitchen'::character varying, 'dignity_kitchen'::character varying, 'other'::character varying])::text[])));
+ALTER TABLE public."donation_category_routing" ADD CONSTRAINT "donation_category_routing_category_check" CHECK (((category)::text = ANY ((ARRAY['recipe_food'::character varying, 'add_on_food'::character varying, 'non_recipe_food'::character varying, 'non_food'::character varying])::text[])));
+ALTER TABLE public."donation_email_logs" ADD CONSTRAINT "donation_email_logs_email_type_check" CHECK ((email_type = ANY (ARRAY['THANK_YOU'::text, 'SECTION_18A'::text])));
+ALTER TABLE public."donation_email_logs" ADD CONSTRAINT "donation_email_logs_status_check" CHECK ((status = ANY (ARRAY['SENT'::text, 'FAILED'::text])));
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_identifiable" CHECK (((product_id IS NOT NULL) OR (description IS NOT NULL)));
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_line_no_positive" CHECK ((line_no > 0));
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_quantity_check" CHECK ((quantity > (0)::numeric));
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_routing_source_valid" CHECK (((routing_source)::text = ANY ((ARRAY['manual_override'::character varying, 'product_default'::character varying, 'manual_category'::character varying, 'unclassified'::character varying])::text[])));
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_routing_status_check" CHECK (((routing_status)::text = ANY ((ARRAY['pending'::character varying, 'allocated'::character varying, 'unmatched'::character varying, 'not_stock_bearing'::character varying, 'awaiting_programme_stock'::character varying])::text[])));
+ALTER TABLE public."donation_routing_defaults" ADD CONSTRAINT "donation_routing_defaults_donation_category_check" CHECK (((donation_category)::text = ANY ((ARRAY['recipe_food'::character varying, 'add_on_food'::character varying, 'non_recipe_food'::character varying, 'non_food'::character varying])::text[])));
+ALTER TABLE public."donation_settings" ADD CONSTRAINT "donation_settings_id_check" CHECK ((id = 1));
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_donation_category_valid" CHECK (((donation_category)::text = ANY ((ARRAY['recipe_food'::character varying, 'add_on_food'::character varying, 'non_recipe_food'::character varying, 'non_food'::character varying])::text[])));
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_donor_registration_type_valid" CHECK (((donor_registration_type)::text = ANY ((ARRAY['individual'::character varying, 'company'::character varying, 'company_public'::character varying, 'cc'::character varying, 'npc'::character varying, 'trust'::character varying, 'estate'::character varying, 'association'::character varying])::text[])));
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_estimated_value_zar_check" CHECK ((estimated_value_zar >= (0)::numeric));
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_s18a_consistency" CHECK (((section_18a_certificate_ref IS NULL) OR (section_18a_qualifying = true)));
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_section_18a_status_check" CHECK (((section_18a_status)::text = ANY ((ARRAY['not_evaluated'::character varying, 'not_qualifying'::character varying, 'qualifying_pending_donor'::character varying, 'queued'::character varying, 'issued'::character varying, 'failed'::character varying])::text[])));
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_status_valid" CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'under_review'::character varying, 'ready_for_commit'::character varying, 'committed'::character varying, 'cancelled'::character varying])::text[])));
+ALTER TABLE public."ecd_centres" ADD CONSTRAINT "ecd_centres_child_count_check" CHECK ((child_count >= 0));
+ALTER TABLE public."ecd_centres" ADD CONSTRAINT "ecd_centres_location_source_check" CHECK (((location_source IS NULL) OR (location_source = ANY (ARRAY['manual'::text, 'geocoded'::text, 'imported'::text]))));
+ALTER TABLE public."ecd_centres" ADD CONSTRAINT "ecd_centres_pin_check" CHECK ((((latitude IS NULL) AND (longitude IS NULL)) OR (((latitude >= ('-35'::integer)::numeric) AND (latitude <= ('-22'::integer)::numeric)) AND ((longitude >= (16)::numeric) AND (longitude <= (33)::numeric)))));
+ALTER TABLE public."ecd_collection_reminders" ADD CONSTRAINT "ecd_collection_reminders_status_check" CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'sending'::character varying, 'sent'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])));
+ALTER TABLE public."ecd_order_lines" ADD CONSTRAINT "ecd_order_lines_quantity_check" CHECK ((quantity > (0)::numeric));
+ALTER TABLE public."ecd_order_lines" ADD CONSTRAINT "ecd_order_lines_unit_check" CHECK (((unit)::text = ANY ((ARRAY['kg'::character varying, 'g'::character varying, 'l'::character varying, 'ml'::character varying, 'each'::character varying, 'bag'::character varying, 'box'::character varying, 'crate'::character varying, 'punnet'::character varying])::text[]))) NOT VALID;
+ALTER TABLE public."event_timeslots" ADD CONSTRAINT "chk_event_timeslots_capacity" CHECK ((capacity > 0));
+ALTER TABLE public."event_timeslots" ADD CONSTRAINT "chk_event_timeslots_end_after_start" CHECK ((end_time > start_time));
+ALTER TABLE public."event_timeslots" ADD CONSTRAINT "chk_event_timeslots_status" CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'CLOSED'::character varying, 'CANCELLED'::character varying])::text[])));
+ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_dismissal_restore_pair" CHECK (((restored_by IS NULL) = (restored_at IS NULL)));
+ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_warning_dismissals_reason_check" CHECK ((length(btrim(reason)) > 0));
+ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_status_check" CHECK ((status = ANY (ARRAY['SENT'::text, 'FAILED'::text])));
+ALTER TABLE public."finance_report_email_settings" ADD CONSTRAINT "finance_report_email_settings_id_check" CHECK ((id = 1));
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_name_check" CHECK ((btrim((name)::text) <> ''::text));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_kg_compost_check" CHECK (((kg_compost > (0)::numeric) AND (kg_compost <= (200)::numeric)));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_site_or_place" CHECK (((drop_point_id IS NOT NULL) OR ((place_name IS NOT NULL) AND (btrim((place_name)::text) <> ''::text))));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_status_check" CHECK (((status)::text = ANY ((ARRAY['logged'::character varying, 'rejected'::character varying])::text[])));
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_thanks_status_check" CHECK (((thanks_status)::text = ANY ((ARRAY['sent'::character varying, 'stubbed'::character varying, 'failed'::character varying])::text[])));
+ALTER TABLE public."idempotency_keys" ADD CONSTRAINT "idempotency_keys_key_check" CHECK (((char_length(key) >= 8) AND (char_length(key) <= 100)));
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_adult_count_check" CHECK (((adult_count IS NULL) OR (adult_count >= 0)));
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_kind_check" CHECK ((kind = ANY (ARRAY['soup_kitchen'::beneficiary_type, 'dignity_kitchen'::beneficiary_type])));
+ALTER TABLE public."kitchens" ADD CONSTRAINT "kitchens_name_check" CHECK ((btrim((name)::text) <> ''::text));
+ALTER TABLE public."love_activism_events" ADD CONSTRAINT "chk_love_activism_events_status" CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SCHEDULED'::character varying, 'PUBLISHED'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying])::text[])));
+ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_kind_check" CHECK ((kind = ANY (ARRAY['public_holiday'::text, 'closure'::text])));
+ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_label_check" CHECK (((char_length(label) >= 1) AND (char_length(label) <= 120)));
+ALTER TABLE public."outbound_messages" ADD CONSTRAINT "outbound_messages_status_check" CHECK ((status = ANY (ARRAY['sent'::text, 'stubbed'::text, 'failed'::text])));
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_source_check" CHECK (((source)::text = ANY ((ARRAY['product_default'::character varying, 'manual_category'::character varying, 'unclassified'::character varying, 'pending_manual_review'::character varying])::text[])));
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_status_check" CHECK (((status)::text = ANY ((ARRAY['awaiting_resolution'::character varying, 'resolved'::character varying, 'committed'::character varying, 'rejected'::character varying, 'cancelled'::character varying])::text[])));
+ALTER TABLE public."pending_donations" ADD CONSTRAINT "pending_donations_donor_registration_type_valid" CHECK (((donor_registration_type)::text = ANY ((ARRAY['individual'::character varying, 'company'::character varying, 'company_public'::character varying, 'cc'::character varying, 'npc'::character varying, 'trust'::character varying, 'estate'::character varying, 'association'::character varying])::text[])));
+ALTER TABLE public."pending_donations" ADD CONSTRAINT "pending_donations_status_check" CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'awaiting_resolution'::character varying, 'committing'::character varying, 'committed'::character varying, 'cancelled'::character varying, 'commit_failed'::character varying, 'commit_incomplete'::character varying])::text[])));
+ALTER TABLE public."photos" ADD CONSTRAINT "photos_byte_size_check" CHECK (((byte_size >= 1) AND (byte_size <= 409600)));
+ALTER TABLE public."photos" ADD CONSTRAINT "photos_content_type_check" CHECK ((content_type = ANY (ARRAY['image/jpeg'::text, 'image/webp'::text, 'image/png'::text])));
+ALTER TABLE public."photos" ADD CONSTRAINT "photos_entity_type_check" CHECK ((entity_type = ANY (ARRAY['picking_slip_item'::text, 'purchase_order'::text])));
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_status_check" CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'in_progress'::character varying, 'complete'::character varying, 'dispatched'::character varying, 'cancelled'::character varying])::text[])));
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "ps_beneficiary_consistency" CHECK ((((beneficiary_kind = 'ecd'::beneficiary_type) AND (ecd_id IS NOT NULL) AND (beneficiary_name IS NULL)) OR ((beneficiary_kind <> 'ecd'::beneficiary_type) AND (ecd_id IS NULL) AND (beneficiary_name IS NOT NULL))));
+ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_units_per_scan_check" CHECK ((units_per_scan > (0)::numeric));
+ALTER TABLE public."products" ADD CONSTRAINT "products_archived_implies_inactive" CHECK (((archived_at IS NULL) OR (is_active = false)));
+ALTER TABLE public."products" ADD CONSTRAINT "products_storage_type_check" CHECK (((storage_type)::text = ANY ((ARRAY['dry'::character varying, 'cold'::character varying])::text[])));
+ALTER TABLE public."products" ADD CONSTRAINT "products_unit_cost_non_negative" CHECK (((unit_cost IS NULL) OR (unit_cost >= (0)::numeric)));
+ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "poi_unit_price_non_negative" CHECK (((unit_price IS NULL) OR (unit_price >= (0)::numeric)));
+ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "poi_weight_non_negative" CHECK (((expected_weight_kg IS NULL) OR (expected_weight_kg >= (0)::numeric)));
+ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "purchase_order_items_expected_quantity_check" CHECK ((expected_quantity > (0)::numeric));
+ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "purchase_order_items_expected_quantity_places" CHECK ((expected_quantity = round(expected_quantity, 3)));
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_finance_email_status_check" CHECK ((finance_email_status = ANY (ARRAY['sent'::text, 'failed'::text])));
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_returned_needs_reason" CHECK ((((status)::text <> 'returned'::text) OR (status_reason IS NOT NULL)));
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_status_check" CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'approved'::character varying, 'in_transit'::character varying, 'partially_received'::character varying, 'completed'::character varying, 'returned'::character varying, 'follow_up_required'::character varying])::text[])));
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_status_reason_required" CHECK ((((status)::text <> ALL ((ARRAY['returned'::character varying, 'follow_up_required'::character varying])::text[])) OR ((status_reason IS NOT NULL) AND (btrim(status_reason) <> ''::text)))) NOT VALID;
+ALTER TABLE public."recipe_lines" ADD CONSTRAINT "recipe_lines_quantity_per_child_check" CHECK ((quantity_per_child > (0)::numeric));
+ALTER TABLE public."recipes" ADD CONSTRAINT "recipes_kind_check" CHECK ((kind = ANY (ARRAY['summer'::text, 'winter'::text, 'override'::text])));
+ALTER TABLE public."recipes" ADD CONSTRAINT "recipes_name_check" CHECK (((char_length(name) >= 1) AND (char_length(name) <= 80)));
+ALTER TABLE public."recipes" ADD CONSTRAINT "recipes_season_start_day_check" CHECK (((season_start_day >= 1) AND (season_start_day <= 31)));
+ALTER TABLE public."recipes" ADD CONSTRAINT "recipes_season_start_month_check" CHECK (((season_start_month >= 1) AND (season_start_month <= 12)));
+ALTER TABLE public."recipes" ADD CONSTRAINT "recipes_shape_check" CHECK ((((kind = 'override'::text) AND (starts_on IS NOT NULL) AND (ends_on IS NOT NULL) AND (ends_on >= starts_on) AND (season_start_month IS NULL) AND (season_start_day IS NULL)) OR ((kind <> 'override'::text) AND (starts_on IS NULL) AND (ends_on IS NULL) AND (season_start_month IS NOT NULL) AND (season_start_day IS NOT NULL))));
+ALTER TABLE public."reporting_factors" ADD CONSTRAINT "reporting_factors_value_check" CHECK ((value > (0)::numeric));
+ALTER TABLE public."reporting_queries" ADD CONSTRAINT "reporting_queries_outcome_check" CHECK (((outcome)::text = ANY ((ARRAY['ok'::character varying, 'clarify'::character varying, 'unresolved'::character varying, 'error'::character varying])::text[])));
+ALTER TABLE public."reporting_targets" ADD CONSTRAINT "reporting_targets_value_check" CHECK ((value >= (0)::numeric));
+ALTER TABLE public."saved_reports" ADD CONSTRAINT "saved_reports_kind_check" CHECK (((kind)::text = ANY ((ARRAY['report'::character varying, 'custom'::character varying, 'comparison'::character varying])::text[])));
+ALTER TABLE public."saved_reports" ADD CONSTRAINT "saved_reports_schedule_check" CHECK (((schedule)::text = ANY ((ARRAY['none'::character varying, 'weekly'::character varying, 'monthly'::character varying])::text[])));
+ALTER TABLE public."section18a_settings" ADD CONSTRAINT "section18a_settings_id_check" CHECK ((id = 1));
+ALTER TABLE public."stock_count_lines" ADD CONSTRAINT "stock_count_lines_counted_quantity_check" CHECK ((counted_quantity >= (0)::numeric));
+ALTER TABLE public."stock_levels" ADD CONSTRAINT "stock_levels_unit_check" CHECK (((unit)::text = ANY ((ARRAY['kg'::character varying, 'g'::character varying, 'l'::character varying, 'ml'::character varying, 'each'::character varying, 'bag'::character varying, 'box'::character varying, 'crate'::character varying, 'punnet'::character varying])::text[]))) NOT VALID;
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_movement_type_check" CHECK (((movement_type)::text = ANY ((ARRAY['adjustment'::character varying, 'decanted'::character varying, 'dispatched'::character varying, 'donated'::character varying, 'picked'::character varying, 'received'::character varying, 'wastage'::character varying])::text[])));
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_unit_check" CHECK (((unit IS NULL) OR ((unit)::text = ANY ((ARRAY['kg'::character varying, 'g'::character varying, 'l'::character varying, 'ml'::character varying, 'each'::character varying, 'bag'::character varying, 'box'::character varying, 'crate'::character varying, 'punnet'::character varying])::text[])))) NOT VALID;
+ALTER TABLE public."supplier_prospects" ADD CONSTRAINT "supplier_prospects_conversion_consistency" CHECK (((((status)::text = 'converted'::text) AND (converted_supplier_id IS NOT NULL)) OR (((status)::text <> 'converted'::text) AND (converted_supplier_id IS NULL))));
+ALTER TABLE public."supplier_prospects" ADD CONSTRAINT "supplier_prospects_status_check" CHECK (((status)::text = ANY ((ARRAY['open'::character varying, 'contacted'::character varying, 'rejected'::character varying, 'converted'::character varying])::text[])));
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_archived_implies_inactive" CHECK (((archived_at IS NULL) OR (is_active = false)));
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_deactivation_consistency" CHECK (((is_active = true) OR (deactivated_at IS NOT NULL)));
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_lead_time_check" CHECK (((expected_lead_time_days IS NULL) OR ((expected_lead_time_days >= 0) AND (expected_lead_time_days <= 365))));
+ALTER TABLE public."user_invites" ADD CONSTRAINT "user_invites_email_status_check" CHECK ((email_status = ANY (ARRAY['sent'::text, 'stubbed'::text, 'failed'::text])));
+ALTER TABLE public."user_invites" ADD CONSTRAINT "user_invites_role_check" CHECK ((role = ANY (ARRAY['warehouse_worker'::text, 'manager'::text, 'admin'::text])));
+ALTER TABLE public."users" ADD CONSTRAINT "users_archived_implies_inactive" CHECK (((archived_at IS NULL) OR (is_active = false)));
+ALTER TABLE public."users" ADD CONSTRAINT "users_language_check" CHECK ((language = ANY (ARRAY['en'::text, 'af'::text, 'xh'::text])));
+ALTER TABLE public."users" ADD CONSTRAINT "users_role_check" CHECK (((role)::text = ANY ((ARRAY['warehouse_worker'::character varying, 'manager'::character varying, 'admin'::character varying])::text[])));
+ALTER TABLE public."vms_sync" ADD CONSTRAINT "chk_vms_sync_entity_type" CHECK (((entity_type)::text = ANY ((ARRAY['EVENT'::character varying, 'TIMESLOT'::character varying, 'event_booking'::character varying])::text[])));
+ALTER TABLE public."vms_sync" ADD CONSTRAINT "chk_vms_sync_status" CHECK (((sync_status)::text = ANY ((ARRAY['PENDING'::character varying, 'SYNCED'::character varying, 'FAILED'::character varying])::text[])));
+ALTER TABLE public."volunteer_bookings" ADD CONSTRAINT "chk_volunteer_bookings_external_ids" CHECK ((((booking_source)::text <> 'VMS'::text) OR ((external_booking_id IS NOT NULL) AND (external_volunteer_id IS NOT NULL))));
+ALTER TABLE public."volunteer_bookings" ADD CONSTRAINT "chk_volunteer_bookings_source" CHECK (((booking_source)::text = ANY ((ARRAY['VMS'::character varying, 'WMS_GUEST'::character varying])::text[])));
+ALTER TABLE public."volunteer_bookings" ADD CONSTRAINT "chk_volunteer_bookings_status" CHECK (((booking_status)::text = ANY ((ARRAY['CONFIRMED'::character varying, 'CANCELLED'::character varying])::text[])));
+ALTER TABLE public."warehouse_area_counts" ADD CONSTRAINT "warehouse_area_counts_quantity_check" CHECK ((quantity >= (0)::numeric));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_capacity_kg_check" CHECK (((capacity_kg IS NULL) OR (capacity_kg > (0)::numeric)));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_grid_h_check" CHECK ((grid_h >= 1));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_grid_w_check" CHECK ((grid_w >= 1));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_grid_x_check" CHECK ((grid_x >= 0));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_grid_y_check" CHECK ((grid_y >= 0));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_kind_check" CHECK ((kind = ANY (ARRAY['dry'::text, 'cold'::text, 'floor'::text, 'staging'::text, 'door'::text, 'dispatch_gate'::text, 'receiving_gate'::text])));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_levels_check" CHECK (((levels >= 1) AND (levels <= 4)));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_name_check" CHECK (((char_length(btrim(name)) >= 1) AND (char_length(btrim(name)) <= 40)));
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_pallet_spaces_check" CHECK (((pallet_spaces IS NULL) OR (pallet_spaces > 0)));
+
+-- -- Foreign keys -------------------------------------------
+ALTER TABLE public."app_settings" ADD CONSTRAINT "app_settings_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id);
+ALTER TABLE public."assistant_queries" ADD CONSTRAINT "assistant_queries_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."attendance" ADD CONSTRAINT "attendance_booking_id_fkey" FOREIGN KEY (booking_id) REFERENCES volunteer_bookings(booking_id);
+ALTER TABLE public."barcode_scan_events" ADD CONSTRAINT "barcode_scan_events_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."barcode_scan_events" ADD CONSTRAINT "barcode_scan_events_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id);
+ALTER TABLE public."collection_kit_records" ADD CONSTRAINT "collection_kit_records_kit_id_fkey" FOREIGN KEY (kit_id) REFERENCES collection_kits(id);
+ALTER TABLE public."collection_kit_records" ADD CONSTRAINT "collection_kit_records_logged_by_fkey" FOREIGN KEY (logged_by) REFERENCES users(id);
+ALTER TABLE public."community_request_items" ADD CONSTRAINT "community_request_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."community_request_items" ADD CONSTRAINT "community_request_items_request_id_fkey" FOREIGN KEY (request_id) REFERENCES community_requests(id) ON DELETE CASCADE;
+ALTER TABLE public."community_requests" ADD CONSTRAINT "community_requests_approved_by_fkey" FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."community_requests" ADD CONSTRAINT "community_requests_assigned_to_fkey" FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."community_requests" ADD CONSTRAINT "community_requests_handled_by_fkey" FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."community_requests" ADD CONSTRAINT "community_requests_logged_by_fkey" FOREIGN KEY (logged_by) REFERENCES users(id);
+ALTER TABLE public."decanting_lines" ADD CONSTRAINT "decanting_lines_decanting_id_fkey" FOREIGN KEY (decanting_id) REFERENCES decanting_records(id) ON DELETE CASCADE;
+ALTER TABLE public."decanting_lines" ADD CONSTRAINT "decanting_lines_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."decanting_records" ADD CONSTRAINT "decanting_records_recorded_by_fkey" FOREIGN KEY (recorded_by) REFERENCES users(id);
+ALTER TABLE public."delivery_note_items" ADD CONSTRAINT "delivery_note_items_delivery_note_id_fkey" FOREIGN KEY (delivery_note_id) REFERENCES delivery_notes(id) ON DELETE CASCADE;
+ALTER TABLE public."delivery_note_items" ADD CONSTRAINT "delivery_note_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
+ALTER TABLE public."delivery_note_items" ADD CONSTRAINT "delivery_note_items_purchase_order_item_id_fkey" FOREIGN KEY (purchase_order_item_id) REFERENCES purchase_order_items(id) ON DELETE SET NULL;
+ALTER TABLE public."delivery_note_items" ADD CONSTRAINT "dni_location_fk" FOREIGN KEY (location_id) REFERENCES storage_locations(id) ON DELETE SET NULL;
+ALTER TABLE public."delivery_notes" ADD CONSTRAINT "delivery_notes_purchase_order_id_fkey" FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE RESTRICT;
+ALTER TABLE public."delivery_notes" ADD CONSTRAINT "delivery_notes_received_by_fkey" FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."delivery_notes" ADD CONSTRAINT "delivery_notes_supplier_id_fkey" FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT;
+ALTER TABLE public."delivery_receipts" ADD CONSTRAINT "delivery_receipts_confirmed_by_fkey" FOREIGN KEY (confirmed_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."delivery_receipts" ADD CONSTRAINT "delivery_receipts_ecd_id_fkey" FOREIGN KEY (ecd_id) REFERENCES ecd_centres(id) ON DELETE RESTRICT;
+ALTER TABLE public."delivery_receipts" ADD CONSTRAINT "delivery_receipts_picking_slip_id_fkey" FOREIGN KEY (picking_slip_id) REFERENCES picking_slips(id) ON DELETE CASCADE;
+ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_dispatch_event_id_fkey" FOREIGN KEY (dispatch_event_id) REFERENCES dispatch_events(id) ON DELETE CASCADE;
+ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_picking_slip_item_id_fkey" FOREIGN KEY (picking_slip_item_id) REFERENCES picking_slip_items(id) ON DELETE SET NULL;
+ALTER TABLE public."dispatch_event_lines" ADD CONSTRAINT "dispatch_event_lines_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_dispatched_by_fkey" FOREIGN KEY (dispatched_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_followed_up_by_fkey" FOREIGN KEY (followed_up_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_override_by_fkey" FOREIGN KEY (override_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."dispatch_events" ADD CONSTRAINT "dispatch_events_picking_slip_id_fkey" FOREIGN KEY (picking_slip_id) REFERENCES picking_slips(id) ON DELETE RESTRICT;
+ALTER TABLE public."donation_allocations" ADD CONSTRAINT "donation_allocations_donation_item_id_fkey" FOREIGN KEY (donation_item_id) REFERENCES donation_items(id) ON DELETE CASCADE;
+ALTER TABLE public."donation_allocations" ADD CONSTRAINT "donation_allocations_ecd_centre_id_fkey" FOREIGN KEY (ecd_centre_id) REFERENCES ecd_centres(id);
+ALTER TABLE public."donation_category_routing" ADD CONSTRAINT "donation_category_routing_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id);
+ALTER TABLE public."donation_email_logs" ADD CONSTRAINT "donation_email_logs_certificate_id_fkey" FOREIGN KEY (certificate_id) REFERENCES section18a_certificates(id);
+ALTER TABLE public."donation_email_logs" ADD CONSTRAINT "donation_email_logs_donation_id_fkey" FOREIGN KEY (donation_id) REFERENCES donations(id);
+ALTER TABLE public."donation_email_logs" ADD CONSTRAINT "donation_email_logs_sent_by_user_id_fkey" FOREIGN KEY (sent_by_user_id) REFERENCES users(id);
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_donation_id_fkey" FOREIGN KEY (donation_id) REFERENCES donations(id) ON DELETE CASCADE;
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_resolved_by_fkey" FOREIGN KEY (resolved_by) REFERENCES users(id);
+ALTER TABLE public."donation_items" ADD CONSTRAINT "donation_items_storage_location_id_fkey" FOREIGN KEY (storage_location_id) REFERENCES storage_locations(id) ON DELETE SET NULL;
+ALTER TABLE public."donation_routing_defaults" ADD CONSTRAINT "donation_routing_defaults_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+ALTER TABLE public."donation_routing_defaults" ADD CONSTRAINT "donation_routing_defaults_set_by_fkey" FOREIGN KEY (set_by) REFERENCES users(id);
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_donor_id_fkey" FOREIGN KEY (donor_id) REFERENCES donors(id) ON DELETE SET NULL;
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_programme_id_fkey" FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE RESTRICT;
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_received_by_fkey" FOREIGN KEY (received_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."donations" ADD CONSTRAINT "donations_value_verified_by_fkey" FOREIGN KEY (value_verified_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."ecd_centres" ADD CONSTRAINT "ecd_centres_location_updated_by_fkey" FOREIGN KEY (location_updated_by) REFERENCES users(id);
+ALTER TABLE public."ecd_collection_reminders" ADD CONSTRAINT "ecd_collection_reminders_ecd_id_fkey" FOREIGN KEY (ecd_id) REFERENCES ecd_centres(id);
+ALTER TABLE public."ecd_order_lines" ADD CONSTRAINT "ecd_order_lines_ecd_id_fkey" FOREIGN KEY (ecd_id) REFERENCES ecd_centres(id) ON DELETE CASCADE;
+ALTER TABLE public."ecd_order_lines" ADD CONSTRAINT "ecd_order_lines_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."event_timeslots" ADD CONSTRAINT "event_timeslots_event_id_fkey" FOREIGN KEY (event_id) REFERENCES love_activism_events(event_id);
+ALTER TABLE public."event_timeslots" ADD CONSTRAINT "event_timeslots_space_id_fkey" FOREIGN KEY (space_id) REFERENCES event_spaces(space_id);
+ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_warning_dismissals_delivery_note_item_id_fkey" FOREIGN KEY (delivery_note_item_id) REFERENCES delivery_note_items(id);
+ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_warning_dismissals_dismissed_by_fkey" FOREIGN KEY (dismissed_by) REFERENCES users(id);
+ALTER TABLE public."expiry_warning_dismissals" ADD CONSTRAINT "expiry_warning_dismissals_restored_by_fkey" FOREIGN KEY (restored_by) REFERENCES users(id);
+ALTER TABLE public."finance_report_access_links" ADD CONSTRAINT "finance_report_access_links_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."finance_report_access_links" ADD CONSTRAINT "finance_report_access_links_revoked_by_fkey" FOREIGN KEY (revoked_by) REFERENCES users(id);
+ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_finance_link_id_fkey" FOREIGN KEY (finance_link_id) REFERENCES finance_report_access_links(id);
+ALTER TABLE public."finance_report_email_logs" ADD CONSTRAINT "finance_report_email_logs_sent_by_user_id_fkey" FOREIGN KEY (sent_by_user_id) REFERENCES users(id);
+ALTER TABLE public."finance_report_email_settings" ADD CONSTRAINT "finance_report_email_settings_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id);
+ALTER TABLE public."fts_drop_points" ADD CONSTRAINT "fts_drop_points_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_drop_point_id_fkey" FOREIGN KEY (drop_point_id) REFERENCES fts_drop_points(id);
+ALTER TABLE public."fts_dropoffs" ADD CONSTRAINT "fts_dropoffs_reviewed_by_fkey" FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."gmail_connections" ADD CONSTRAINT "gmail_connections_connected_by_user_id_fkey" FOREIGN KEY (connected_by_user_id) REFERENCES users(id);
+ALTER TABLE public."idempotency_keys" ADD CONSTRAINT "idempotency_keys_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id);
+ALTER TABLE public."love_activism_events" ADD CONSTRAINT "love_activism_events_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."notification_reads" ADD CONSTRAINT "notification_reads_notification_id_fkey" FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE;
+ALTER TABLE public."notification_reads" ADD CONSTRAINT "notification_reads_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE public."operating_closures" ADD CONSTRAINT "operating_closures_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."outbound_messages" ADD CONSTRAINT "outbound_messages_sent_by_fkey" FOREIGN KEY (sent_by) REFERENCES users(id);
+ALTER TABLE public."password_resets" ADD CONSTRAINT "password_resets_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id);
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_committed_donation_item_id_fkey" FOREIGN KEY (committed_donation_item_id) REFERENCES donation_items(id);
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_flag_id_fkey" FOREIGN KEY (flag_id) REFERENCES warehouse_manager_flags(id);
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_pending_donation_id_fkey" FOREIGN KEY (pending_donation_id) REFERENCES pending_donations(id) ON DELETE CASCADE;
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."pending_donation_items" ADD CONSTRAINT "pending_donation_items_resolved_by_fkey" FOREIGN KEY (resolved_by) REFERENCES users(id);
+ALTER TABLE public."pending_donations" ADD CONSTRAINT "pending_donations_committed_donation_id_fkey" FOREIGN KEY (committed_donation_id) REFERENCES donations(id);
+ALTER TABLE public."pending_donations" ADD CONSTRAINT "pending_donations_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."pending_donations" ADD CONSTRAINT "pending_donations_programme_id_fkey" FOREIGN KEY (programme_id) REFERENCES programmes(id);
+ALTER TABLE public."photos" ADD CONSTRAINT "photos_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."picking_events" ADD CONSTRAINT "picking_events_actor_id_fkey" FOREIGN KEY (actor_id) REFERENCES users(id);
+ALTER TABLE public."picking_events" ADD CONSTRAINT "picking_events_picking_slip_id_fkey" FOREIGN KEY (picking_slip_id) REFERENCES picking_slips(id) ON DELETE CASCADE;
+ALTER TABLE public."picking_slip_items" ADD CONSTRAINT "picking_slip_items_confirmed_by_fkey" FOREIGN KEY (confirmed_by) REFERENCES users(id);
+ALTER TABLE public."picking_slip_items" ADD CONSTRAINT "picking_slip_items_picking_slip_id_fkey" FOREIGN KEY (picking_slip_id) REFERENCES picking_slips(id) ON DELETE CASCADE;
+ALTER TABLE public."picking_slip_items" ADD CONSTRAINT "picking_slip_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_assigned_to_2_fkey" FOREIGN KEY (assigned_to_2) REFERENCES users(id);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_assigned_to_fkey" FOREIGN KEY (assigned_to) REFERENCES users(id);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_assigned_volunteer_id_fkey" FOREIGN KEY (assigned_volunteer_id) REFERENCES volunteers(id) ON DELETE SET NULL;
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_completed_by_fkey" FOREIGN KEY (completed_by) REFERENCES users(id);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_ecd_id_fkey" FOREIGN KEY (ecd_id) REFERENCES ecd_centres(id);
+ALTER TABLE public."picking_slips" ADD CONSTRAINT "picking_slips_generated_by_fkey" FOREIGN KEY (generated_by) REFERENCES users(id);
+ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+ALTER TABLE public."product_barcodes" ADD CONSTRAINT "product_barcodes_supplier_id_fkey" FOREIGN KEY (supplier_id) REFERENCES suppliers(id);
+ALTER TABLE public."products" ADD CONSTRAINT "products_archived_by_fkey" FOREIGN KEY (archived_by) REFERENCES users(id);
+ALTER TABLE public."products" ADD CONSTRAINT "products_default_location_id_fkey" FOREIGN KEY (default_location_id) REFERENCES storage_locations(id) ON DELETE SET NULL;
+ALTER TABLE public."products" ADD CONSTRAINT "products_preferred_supplier_id_fkey" FOREIGN KEY (preferred_supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
+ALTER TABLE public."products" ADD CONSTRAINT "products_programme_id_fkey" FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE RESTRICT;
+ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "purchase_order_items_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
+ALTER TABLE public."purchase_order_items" ADD CONSTRAINT "purchase_order_items_purchase_order_id_fkey" FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE;
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_follow_up_of_fkey" FOREIGN KEY (follow_up_of) REFERENCES purchase_orders(id);
+ALTER TABLE public."purchase_orders" ADD CONSTRAINT "purchase_orders_supplier_id_fkey" FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE RESTRICT;
+ALTER TABLE public."push_subscriptions" ADD CONSTRAINT "push_subscriptions_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE public."quickbooks_connections" ADD CONSTRAINT "quickbooks_connections_connected_by_user_id_fkey" FOREIGN KEY (connected_by_user_id) REFERENCES users(id);
+ALTER TABLE public."recipe_lines" ADD CONSTRAINT "recipe_lines_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."recipe_lines" ADD CONSTRAINT "recipe_lines_recipe_id_fkey" FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE;
+ALTER TABLE public."recipe_own_order_centres" ADD CONSTRAINT "recipe_own_order_centres_added_by_fkey" FOREIGN KEY (added_by) REFERENCES users(id);
+ALTER TABLE public."recipe_own_order_centres" ADD CONSTRAINT "recipe_own_order_centres_ecd_id_fkey" FOREIGN KEY (ecd_id) REFERENCES ecd_centres(id) ON DELETE CASCADE;
+ALTER TABLE public."recipes" ADD CONSTRAINT "recipes_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."reporting_queries" ADD CONSTRAINT "reporting_queries_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id);
+ALTER TABLE public."reporting_targets" ADD CONSTRAINT "reporting_targets_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE public."saved_reports" ADD CONSTRAINT "saved_reports_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE public."section18a_certificates" ADD CONSTRAINT "section18a_certificates_donation_id_fkey" FOREIGN KEY (donation_id) REFERENCES donations(id);
+ALTER TABLE public."section18a_certificates" ADD CONSTRAINT "section18a_certificates_issued_by_fkey" FOREIGN KEY (issued_by) REFERENCES users(id);
+ALTER TABLE public."stock_count_lines" ADD CONSTRAINT "stock_count_lines_counted_by_fkey" FOREIGN KEY (counted_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."stock_count_lines" ADD CONSTRAINT "stock_count_lines_location_id_fkey" FOREIGN KEY (location_id) REFERENCES storage_locations(id) ON DELETE SET NULL;
+ALTER TABLE public."stock_count_lines" ADD CONSTRAINT "stock_count_lines_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT;
+ALTER TABLE public."stock_count_lines" ADD CONSTRAINT "stock_count_lines_stock_count_id_fkey" FOREIGN KEY (stock_count_id) REFERENCES stock_counts(id) ON DELETE CASCADE;
+ALTER TABLE public."stock_counts" ADD CONSTRAINT "stock_counts_approved_by_fkey" FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."stock_counts" ADD CONSTRAINT "stock_counts_started_by_fkey" FOREIGN KEY (started_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."stock_levels" ADD CONSTRAINT "stock_levels_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_approved_by_fkey" FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_location_id_fkey" FOREIGN KEY (location_id) REFERENCES storage_locations(id) ON DELETE SET NULL;
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_performed_by_fkey" FOREIGN KEY (performed_by) REFERENCES users(id);
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."stock_movements" ADD CONSTRAINT "stock_movements_programme_id_fkey" FOREIGN KEY (programme_id) REFERENCES programmes(id) ON DELETE RESTRICT;
+ALTER TABLE public."supplier_products" ADD CONSTRAINT "supplier_products_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."supplier_products" ADD CONSTRAINT "supplier_products_supplier_id_fkey" FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE;
+ALTER TABLE public."supplier_prospects" ADD CONSTRAINT "supplier_prospects_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."supplier_prospects" ADD CONSTRAINT "supplier_prospects_supplier_fkey" FOREIGN KEY (converted_supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_archived_by_fkey" FOREIGN KEY (archived_by) REFERENCES users(id);
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_deactivated_by_fkey" FOREIGN KEY (deactivated_by) REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE public."user_invites" ADD CONSTRAINT "user_invites_invited_by_fkey" FOREIGN KEY (invited_by) REFERENCES users(id);
+ALTER TABLE public."users" ADD CONSTRAINT "users_archived_by_fkey" FOREIGN KEY (archived_by) REFERENCES users(id);
+ALTER TABLE public."volunteer_bookings" ADD CONSTRAINT "volunteer_bookings_timeslot_id_fkey" FOREIGN KEY (timeslot_id) REFERENCES event_timeslots(timeslot_id);
+ALTER TABLE public."warehouse_area_counts" ADD CONSTRAINT "warehouse_area_counts_area_id_fkey" FOREIGN KEY (area_id) REFERENCES warehouse_areas(id);
+ALTER TABLE public."warehouse_area_counts" ADD CONSTRAINT "warehouse_area_counts_counted_by_fkey" FOREIGN KEY (counted_by) REFERENCES users(id);
+ALTER TABLE public."warehouse_area_counts" ADD CONSTRAINT "warehouse_area_counts_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_created_by_fkey" FOREIGN KEY (created_by) REFERENCES users(id);
+ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id);
+ALTER TABLE public."warehouse_manager_flags" ADD CONSTRAINT "warehouse_manager_flags_pending_donation_id_fkey" FOREIGN KEY (pending_donation_id) REFERENCES pending_donations(id) ON DELETE SET NULL;
+ALTER TABLE public."warehouse_manager_flags" ADD CONSTRAINT "warehouse_manager_flags_pending_donation_item_id_fkey" FOREIGN KEY (pending_donation_item_id) REFERENCES pending_donation_items(id) ON DELETE SET NULL;
+ALTER TABLE public."warehouse_manager_flags" ADD CONSTRAINT "warehouse_manager_flags_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+
+-- -- Indexes ------------------------------------------------
+CREATE INDEX idx_assistant_queries_outcome_date ON public.assistant_queries USING btree (outcome, created_at DESC);
+CREATE INDEX idx_assistant_queries_topic ON public.assistant_queries USING btree (topic_id) WHERE (topic_id IS NOT NULL);
+CREATE INDEX idx_attendance_checked_in ON public.attendance USING btree (checked_in);
+CREATE INDEX idx_audit_log_created_sast ON public.audit_log USING btree ((((created_at AT TIME ZONE 'Africa/Johannesburg'::text))::date));
+CREATE INDEX barcode_scan_events_scanned_at_idx ON public.barcode_scan_events USING btree (scanned_at);
+CREATE INDEX idx_collection_kit_records_kit ON public.collection_kit_records USING btree (kit_id);
+CREATE INDEX idx_collection_kit_records_status ON public.collection_kit_records USING btree (status);
+CREATE INDEX idx_community_request_items_product ON public.community_request_items USING btree (product_id);
+CREATE INDEX idx_community_requests_sast ON public.community_requests USING btree ((((requested_at AT TIME ZONE 'Africa/Johannesburg'::text))::date));
+CREATE INDEX idx_cr_outcome ON public.community_requests USING btree (outcome);
+CREATE INDEX idx_cr_requested_at ON public.community_requests USING btree (requested_at);
+CREATE INDEX idx_dl_product ON public.decanting_lines USING btree (product_id);
+CREATE INDEX idx_dl_record ON public.decanting_lines USING btree (decanting_id);
+CREATE INDEX idx_decanting_records_week_of ON public.decanting_records USING btree (week_of);
+CREATE INDEX idx_dr_recorded_by ON public.decanting_records USING btree (recorded_by);
+CREATE INDEX idx_delivery_note_items_expiry ON public.delivery_note_items USING btree (expiry_date) WHERE (expiry_date IS NOT NULL);
+CREATE INDEX idx_dni_delivery_note ON public.delivery_note_items USING btree (delivery_note_id);
+CREATE INDEX idx_dni_discrepancies ON public.delivery_note_items USING btree (delivery_note_id) WHERE ((discrepancy_quantity <> (0)::numeric) AND (discrepancy_resolved = false));
+CREATE INDEX idx_dni_note_product ON public.delivery_note_items USING btree (delivery_note_id, product_id);
+CREATE INDEX idx_dni_poi ON public.delivery_note_items USING btree (purchase_order_item_id);
+CREATE INDEX idx_dni_product ON public.delivery_note_items USING btree (product_id);
+CREATE INDEX idx_dni_unresolved ON public.delivery_note_items USING btree (delivery_note_id) WHERE ((discrepancy_resolved = false) AND (discrepancy_quantity <> (0)::numeric));
+CREATE UNIQUE INDEX delivery_notes_idempotency_key_uniq ON public.delivery_notes USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
+CREATE INDEX idx_delivery_notes_date_supplier ON public.delivery_notes USING btree (delivery_date, supplier_id);
+CREATE INDEX idx_dn_created_at ON public.delivery_notes USING btree (created_at);
+CREATE INDEX idx_dn_delivery_date ON public.delivery_notes USING btree (delivery_date);
+CREATE INDEX idx_dn_po ON public.delivery_notes USING btree (purchase_order_id);
+CREATE INDEX idx_dn_received_by ON public.delivery_notes USING btree (received_by);
+CREATE INDEX idx_dn_supplier ON public.delivery_notes USING btree (supplier_id);
+CREATE INDEX idx_dr_dispatch_date ON public.delivery_receipts USING btree (dispatch_date);
+CREATE INDEX idx_dr_ecd ON public.delivery_receipts USING btree (ecd_id);
+CREATE INDEX idx_dr_missed ON public.delivery_receipts USING btree (ecd_id, dispatch_date DESC) WHERE (outcome = 'not_collected'::collection_outcome);
+CREATE INDEX idx_dr_outcome ON public.delivery_receipts USING btree (outcome);
+CREATE INDEX idx_dispatch_event_lines_slip_item ON public.dispatch_event_lines USING btree (picking_slip_item_id);
+CREATE INDEX idx_dispatch_lines_event ON public.dispatch_event_lines USING btree (dispatch_event_id);
+CREATE INDEX idx_dispatch_lines_product ON public.dispatch_event_lines USING btree (product_id);
+CREATE INDEX idx_dispatch_events_by ON public.dispatch_events USING btree (dispatched_by);
+CREATE INDEX idx_dispatch_events_slip_status ON public.dispatch_events USING btree (picking_slip_id, status);
+CREATE INDEX idx_dispatch_events_status ON public.dispatch_events USING btree (status);
+CREATE UNIQUE INDEX donation_allocations_item_ecd_centre_key ON public.donation_allocations USING btree (donation_item_id, ecd_centre_id) WHERE (ecd_centre_id IS NOT NULL);
+CREATE INDEX idx_donation_allocations_ecd_centre_id ON public.donation_allocations USING btree (ecd_centre_id);
+CREATE INDEX idx_donation_allocations_item_id ON public.donation_allocations USING btree (donation_item_id);
+CREATE INDEX idx_donation_email_logs_created ON public.donation_email_logs USING btree (created_at DESC);
+CREATE INDEX idx_donation_email_logs_donation ON public.donation_email_logs USING btree (donation_id);
+CREATE INDEX idx_donation_email_logs_recipient_email ON public.donation_email_logs USING btree (recipient_email);
+CREATE INDEX idx_donation_email_logs_type_status ON public.donation_email_logs USING btree (email_type, status);
+CREATE UNIQUE INDEX donation_items_donation_line_no_key ON public.donation_items USING btree (donation_id, line_no);
+CREATE INDEX idx_donation_items_donation ON public.donation_items USING btree (donation_id);
+CREATE INDEX idx_donation_items_product_id ON public.donation_items USING btree (product_id);
+CREATE INDEX idx_donation_items_unmatched ON public.donation_items USING btree (routing_status) WHERE ((routing_status)::text = 'unmatched'::text);
+CREATE INDEX idx_donation_routing_defaults_category ON public.donation_routing_defaults USING btree (donation_category);
+CREATE UNIQUE INDEX donations_idempotency_key_key ON public.donations USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
+CREATE INDEX idx_donations_donation_category ON public.donations USING btree (donation_category);
+CREATE INDEX idx_donations_donor_contact ON public.donations USING btree (donor_contact);
+CREATE INDEX idx_donations_donor_name ON public.donations USING btree (donor_name);
+CREATE INDEX idx_donations_donor_tax_ref ON public.donations USING btree (donor_tax_reference);
+CREATE INDEX idx_donations_programme_id ON public.donations USING btree (programme_id);
+CREATE INDEX idx_donations_received_at ON public.donations USING btree (received_at);
+CREATE INDEX idx_donations_received_sast ON public.donations USING btree ((((received_at AT TIME ZONE 'Africa/Johannesburg'::text))::date));
+CREATE INDEX idx_donations_s18a ON public.donations USING btree (section_18a_qualifying) WHERE (section_18a_qualifying = true);
+CREATE INDEX idx_donations_s18a_pending ON public.donations USING btree (section_18a_status) WHERE ((section_18a_status)::text = ANY ((ARRAY['qualifying_pending_donor'::character varying, 'queued'::character varying])::text[]));
+CREATE INDEX idx_donations_section_18a_status ON public.donations USING btree (section_18a_status);
+CREATE INDEX idx_donations_section18a_form_token_hash ON public.donations USING btree (section_18a_form_token_hash);
+CREATE INDEX idx_donors_contact ON public.donors USING btree (contact);
+CREATE INDEX idx_donors_name ON public.donors USING btree (name);
+CREATE INDEX idx_ecd_active ON public.ecd_centres USING btree (is_active);
+CREATE INDEX idx_ecd_cohort ON public.ecd_centres USING btree (cohort);
+CREATE INDEX idx_ecd_collection_reminders_collection_date ON public.ecd_collection_reminders USING btree (collection_date);
+CREATE INDEX idx_eol_ecd ON public.ecd_order_lines USING btree (ecd_id);
+CREATE INDEX idx_eol_effective ON public.ecd_order_lines USING btree (effective_from, effective_to);
+CREATE INDEX idx_eol_product ON public.ecd_order_lines USING btree (product_id);
+CREATE INDEX idx_event_timeslots_event_id ON public.event_timeslots USING btree (event_id);
+CREATE INDEX idx_event_timeslots_space_id ON public.event_timeslots USING btree (space_id);
+CREATE INDEX idx_event_timeslots_start_time ON public.event_timeslots USING btree (start_time);
+CREATE UNIQUE INDEX expiry_warning_dismissals_one_active ON public.expiry_warning_dismissals USING btree (delivery_note_item_id) WHERE (restored_at IS NULL);
+CREATE INDEX idx_finance_report_access_links_active ON public.finance_report_access_links USING btree (token_hash) WHERE (revoked_at IS NULL);
+CREATE INDEX idx_finance_report_email_logs_created_at ON public.finance_report_email_logs USING btree (created_at DESC);
+CREATE UNIQUE INDEX idx_fts_drop_points_name ON public.fts_drop_points USING btree (lower((name)::text));
+CREATE INDEX idx_fts_dropoffs_point_time ON public.fts_dropoffs USING btree (drop_point_id, submitted_at DESC);
+CREATE UNIQUE INDEX idx_gmail_connections_connected_by_user_id ON public.gmail_connections USING btree (connected_by_user_id);
+CREATE INDEX idx_gmail_connections_updated_at ON public.gmail_connections USING btree (updated_at);
+CREATE INDEX idempotency_keys_created_at_idx ON public.idempotency_keys USING btree (created_at);
+CREATE UNIQUE INDEX idx_kitchens_kind_name ON public.kitchens USING btree (kind, lower((name)::text));
+CREATE INDEX idx_love_activism_events_event_date ON public.love_activism_events USING btree (event_date);
+CREATE INDEX idx_love_activism_events_status ON public.love_activism_events USING btree (status);
+CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (created_at DESC);
+CREATE INDEX idx_notifications_target_roles ON public.notifications USING gin (target_roles);
+CREATE INDEX idx_outbound_messages_attempted ON public.outbound_messages USING btree (attempted_at DESC, id DESC);
+CREATE INDEX idx_outbound_messages_related ON public.outbound_messages USING btree (related_type, related_id);
+CREATE INDEX idx_outbound_messages_type_attempted ON public.outbound_messages USING btree (type, attempted_at DESC, id DESC);
+CREATE INDEX idx_password_resets_active ON public.password_resets USING btree (user_id, created_at DESC) WHERE ((used_at IS NULL) AND (superseded_at IS NULL));
+CREATE INDEX idx_password_resets_token_hash ON public.password_resets USING btree (token_hash);
+CREATE INDEX idx_pending_donation_items_flag_id ON public.pending_donation_items USING btree (flag_id);
+CREATE INDEX idx_pending_donation_items_pending_donation_id ON public.pending_donation_items USING btree (pending_donation_id);
+CREATE UNIQUE INDEX idx_pending_donations_idempotency_key ON public.pending_donations USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
+CREATE INDEX photos_entity_idx ON public.photos USING btree (entity_type, entity_id);
+CREATE INDEX idx_pevent_slip ON public.picking_events USING btree (picking_slip_id);
+CREATE INDEX idx_picking_events_created_sast ON public.picking_events USING btree ((((created_at AT TIME ZONE 'Africa/Johannesburg'::text))::date));
+CREATE INDEX idx_psi_packed ON public.picking_slip_items USING btree (product_id) WHERE ((packed_quantity IS NOT NULL) AND (packed_quantity > (0)::numeric));
+CREATE INDEX idx_psi_product ON public.picking_slip_items USING btree (product_id);
+CREATE INDEX idx_psi_slip ON public.picking_slip_items USING btree (picking_slip_id);
+CREATE INDEX idx_psi_slip_status ON public.picking_slip_items USING btree (picking_slip_id, status);
+CREATE INDEX idx_psi_status ON public.picking_slip_items USING btree (status);
+CREATE INDEX idx_picking_slips_dispatch_date ON public.picking_slips USING btree (dispatch_date);
+CREATE INDEX idx_picking_slips_status_date ON public.picking_slips USING btree (status, dispatch_date);
+CREATE INDEX idx_pks_cohort ON public.picking_slips USING btree (cohort);
+CREATE INDEX idx_pks_ecd ON public.picking_slips USING btree (ecd_id);
+CREATE INDEX idx_ps_volunteer ON public.picking_slips USING btree (assigned_volunteer_id);
+CREATE INDEX idx_pslip_assigned ON public.picking_slips USING btree (assigned_to);
+CREATE INDEX idx_pslip_status ON public.picking_slips USING btree (status);
+CREATE INDEX product_barcodes_product_id_idx ON public.product_barcodes USING btree (product_id);
+CREATE INDEX idx_products_live ON public.products USING btree (name) WHERE (archived_at IS NULL);
+CREATE INDEX idx_products_programme ON public.products USING btree (programme_id);
+CREATE INDEX idx_poi_po ON public.purchase_order_items USING btree (purchase_order_id);
+CREATE INDEX idx_poi_product ON public.purchase_order_items USING btree (product_id);
+CREATE UNIQUE INDEX uq_poi_po_product ON public.purchase_order_items USING btree (purchase_order_id, product_id);
+CREATE INDEX idx_po_created_at ON public.purchase_orders USING btree (created_at DESC);
+CREATE INDEX idx_po_created_by ON public.purchase_orders USING btree (created_by);
+CREATE INDEX idx_po_status ON public.purchase_orders USING btree (status);
+CREATE INDEX idx_po_status_expected ON public.purchase_orders USING btree (status, expected_delivery_date);
+CREATE INDEX idx_po_supplier ON public.purchase_orders USING btree (supplier_id);
+CREATE INDEX purchase_orders_exception_idx ON public.purchase_orders USING btree (status, status_changed_at DESC) WHERE ((status)::text = ANY ((ARRAY['returned'::character varying, 'follow_up_required'::character varying])::text[]));
+CREATE INDEX purchase_orders_follow_up_of_idx ON public.purchase_orders USING btree (follow_up_of) WHERE (follow_up_of IS NOT NULL);
+CREATE UNIQUE INDEX uq_po_number ON public.purchase_orders USING btree (po_number);
+CREATE INDEX idx_push_subscriptions_user ON public.push_subscriptions USING btree (user_id);
+CREATE INDEX idx_qbo_queue_entity ON public.quickbooks_sync_queue USING btree (entity_type, entity_id);
+CREATE UNIQUE INDEX recipes_one_per_season ON public.recipes USING btree (kind) WHERE (kind = ANY (ARRAY['summer'::text, 'winter'::text]));
+CREATE INDEX idx_reporting_queries_outcome_date ON public.reporting_queries USING btree (outcome, created_at DESC);
+CREATE INDEX idx_saved_reports_schedule ON public.saved_reports USING btree (schedule) WHERE ((schedule)::text <> 'none'::text);
+CREATE INDEX idx_saved_reports_user ON public.saved_reports USING btree (user_id);
+CREATE INDEX idx_section18a_certificates_donation ON public.section18a_certificates USING btree (donation_id);
+CREATE INDEX idx_scl_count ON public.stock_count_lines USING btree (stock_count_id);
+CREATE INDEX idx_scl_product ON public.stock_count_lines USING btree (product_id);
+CREATE INDEX idx_scl_variance ON public.stock_count_lines USING btree (stock_count_id) WHERE (variance <> (0)::numeric);
+CREATE INDEX idx_sc_date ON public.stock_counts USING btree (count_date);
+CREATE INDEX idx_sc_status ON public.stock_counts USING btree (status);
+CREATE INDEX idx_sm_created_at ON public.stock_movements USING btree (created_at);
+CREATE INDEX idx_sm_location ON public.stock_movements USING btree (location_id);
+CREATE INDEX idx_sm_product ON public.stock_movements USING btree (product_id);
+CREATE INDEX idx_sm_programme ON public.stock_movements USING btree (programme_id);
+CREATE INDEX idx_sm_ref ON public.stock_movements USING btree (reference_type, reference_id);
+CREATE INDEX idx_stock_movements_created_sast ON public.stock_movements USING btree ((((created_at AT TIME ZONE 'Africa/Johannesburg'::text))::date));
+CREATE INDEX idx_stock_movements_type ON public.stock_movements USING btree (movement_type);
+CREATE INDEX supplier_products_product_idx ON public.supplier_products USING btree (product_id);
+CREATE UNIQUE INDEX supplier_prospects_converted_uk ON public.supplier_prospects USING btree (converted_supplier_id) WHERE (converted_supplier_id IS NOT NULL);
+CREATE INDEX supplier_prospects_status_idx ON public.supplier_prospects USING btree (status, created_at DESC);
+CREATE INDEX idx_suppliers_live ON public.suppliers USING btree (name) WHERE (archived_at IS NULL);
+CREATE INDEX suppliers_active_name_idx ON public.suppliers USING btree (is_active, name);
+CREATE INDEX idx_user_invites_pending ON public.user_invites USING btree (created_at DESC) WHERE ((accepted_at IS NULL) AND (revoked_at IS NULL));
+CREATE INDEX idx_user_invites_token_hash ON public.user_invites USING btree (token_hash);
+CREATE UNIQUE INDEX idx_users_email_role_unique ON public.users USING btree (lower(email), role) WHERE (email IS NOT NULL);
+CREATE INDEX idx_users_live ON public.users USING btree (username) WHERE (archived_at IS NULL);
+CREATE INDEX idx_users_role ON public.users USING btree (role);
+CREATE INDEX idx_vms_sync_external_id ON public.vms_sync USING btree (external_id);
+CREATE INDEX idx_vms_sync_sync_status ON public.vms_sync USING btree (sync_status);
+CREATE INDEX idx_volunteer_bookings_booking_status ON public.volunteer_bookings USING btree (booking_status);
+CREATE INDEX idx_volunteer_bookings_external_volunteer_id ON public.volunteer_bookings USING btree (external_volunteer_id);
+CREATE INDEX idx_volunteer_bookings_timeslot_id ON public.volunteer_bookings USING btree (timeslot_id);
+CREATE INDEX idx_volunteers_signed_in_at ON public.volunteers USING btree (signed_in_at DESC);
+CREATE INDEX idx_volunteers_signed_in_sast ON public.volunteers USING btree ((((signed_in_at AT TIME ZONE 'Africa/Johannesburg'::text))::date)) WHERE (signed_out_at IS NOT NULL);
+CREATE INDEX warehouse_area_counts_latest ON public.warehouse_area_counts USING btree (area_id, product_id, counted_at DESC, id DESC);
+CREATE UNIQUE INDEX warehouse_areas_active_name ON public.warehouse_areas USING btree (lower(btrim(name))) WHERE is_active;
+CREATE INDEX idx_warehouse_manager_flags_pending_donation ON public.warehouse_manager_flags USING btree (pending_donation_id, status);
+CREATE INDEX idx_warehouse_manager_flags_pending_item ON public.warehouse_manager_flags USING btree (pending_donation_item_id);
+CREATE INDEX idx_warehouse_manager_flags_status ON public.warehouse_manager_flags USING btree (status);
+
+-- -- Sequence owners ----------------------------------------
+ALTER SEQUENCE public."assistant_queries_id_seq" OWNED BY public."assistant_queries"."id";
+ALTER SEQUENCE public."barcode_scan_events_id_seq" OWNED BY public."barcode_scan_events"."id";
+ALTER SEQUENCE public."collection_kit_records_id_seq" OWNED BY public."collection_kit_records"."id";
+ALTER SEQUENCE public."collection_kits_id_seq" OWNED BY public."collection_kits"."id";
+ALTER SEQUENCE public."community_request_items_id_seq" OWNED BY public."community_request_items"."id";
+ALTER SEQUENCE public."community_requests_id_seq" OWNED BY public."community_requests"."id";
+ALTER SEQUENCE public."decanting_lines_id_seq" OWNED BY public."decanting_lines"."id";
+ALTER SEQUENCE public."decanting_records_id_seq" OWNED BY public."decanting_records"."id";
+ALTER SEQUENCE public."delivery_note_items_id_seq" OWNED BY public."delivery_note_items"."id";
+ALTER SEQUENCE public."delivery_notes_id_seq" OWNED BY public."delivery_notes"."id";
+ALTER SEQUENCE public."delivery_receipts_id_seq" OWNED BY public."delivery_receipts"."id";
+ALTER SEQUENCE public."dispatch_event_lines_id_seq" OWNED BY public."dispatch_event_lines"."id";
+ALTER SEQUENCE public."dispatch_events_id_seq" OWNED BY public."dispatch_events"."id";
+ALTER SEQUENCE public."donation_email_logs_id_seq" OWNED BY public."donation_email_logs"."id";
+ALTER SEQUENCE public."donation_items_id_seq" OWNED BY public."donation_items"."id";
+ALTER SEQUENCE public."donations_id_seq" OWNED BY public."donations"."id";
+ALTER SEQUENCE public."donors_id_seq" OWNED BY public."donors"."id";
+ALTER SEQUENCE public."ecd_centres_id_seq" OWNED BY public."ecd_centres"."id";
+ALTER SEQUENCE public."ecd_collection_reminders_id_seq" OWNED BY public."ecd_collection_reminders"."id";
+ALTER SEQUENCE public."ecd_order_lines_id_seq" OWNED BY public."ecd_order_lines"."id";
+ALTER SEQUENCE public."expiry_warning_dismissals_id_seq" OWNED BY public."expiry_warning_dismissals"."id";
+ALTER SEQUENCE public."finance_report_access_links_id_seq" OWNED BY public."finance_report_access_links"."id";
+ALTER SEQUENCE public."finance_report_email_logs_id_seq" OWNED BY public."finance_report_email_logs"."id";
+ALTER SEQUENCE public."fts_drop_points_id_seq" OWNED BY public."fts_drop_points"."id";
+ALTER SEQUENCE public."fts_dropoffs_id_seq" OWNED BY public."fts_dropoffs"."id";
+ALTER SEQUENCE public."kitchens_id_seq" OWNED BY public."kitchens"."id";
+ALTER SEQUENCE public."notifications_id_seq" OWNED BY public."notifications"."id";
+ALTER SEQUENCE public."operating_closures_id_seq" OWNED BY public."operating_closures"."id";
+ALTER SEQUENCE public."outbound_messages_id_seq" OWNED BY public."outbound_messages"."id";
+ALTER SEQUENCE public."password_resets_id_seq" OWNED BY public."password_resets"."id";
+ALTER SEQUENCE public."pending_donation_items_id_seq" OWNED BY public."pending_donation_items"."id";
+ALTER SEQUENCE public."pending_donations_id_seq" OWNED BY public."pending_donations"."id";
+ALTER SEQUENCE public."photos_id_seq" OWNED BY public."photos"."id";
+ALTER SEQUENCE public."picking_events_id_seq" OWNED BY public."picking_events"."id";
+ALTER SEQUENCE public."picking_slip_items_id_seq" OWNED BY public."picking_slip_items"."id";
+ALTER SEQUENCE public."picking_slips_id_seq" OWNED BY public."picking_slips"."id";
+ALTER SEQUENCE public."product_barcodes_id_seq" OWNED BY public."product_barcodes"."id";
+ALTER SEQUENCE public."products_id_seq" OWNED BY public."products"."id";
+ALTER SEQUENCE public."programmes_id_seq" OWNED BY public."programmes"."id";
+ALTER SEQUENCE public."purchase_order_items_id_seq" OWNED BY public."purchase_order_items"."id";
+ALTER SEQUENCE public."purchase_orders_id_seq" OWNED BY public."purchase_orders"."id";
+ALTER SEQUENCE public."push_subscriptions_id_seq" OWNED BY public."push_subscriptions"."id";
+ALTER SEQUENCE public."quickbooks_sync_queue_id_seq" OWNED BY public."quickbooks_sync_queue"."id";
+ALTER SEQUENCE public."recipe_lines_id_seq" OWNED BY public."recipe_lines"."id";
+ALTER SEQUENCE public."recipes_id_seq" OWNED BY public."recipes"."id";
+ALTER SEQUENCE public."reporting_factors_id_seq" OWNED BY public."reporting_factors"."id";
+ALTER SEQUENCE public."reporting_queries_id_seq" OWNED BY public."reporting_queries"."id";
+ALTER SEQUENCE public."saved_reports_id_seq" OWNED BY public."saved_reports"."id";
+ALTER SEQUENCE public."section18a_certificates_id_seq" OWNED BY public."section18a_certificates"."id";
+ALTER SEQUENCE public."stock_count_lines_id_seq" OWNED BY public."stock_count_lines"."id";
+ALTER SEQUENCE public."stock_counts_id_seq" OWNED BY public."stock_counts"."id";
+ALTER SEQUENCE public."stock_movements_id_seq" OWNED BY public."stock_movements"."id";
+ALTER SEQUENCE public."storage_locations_id_seq" OWNED BY public."storage_locations"."id";
+ALTER SEQUENCE public."supplier_prospects_id_seq" OWNED BY public."supplier_prospects"."id";
+ALTER SEQUENCE public."suppliers_id_seq" OWNED BY public."suppliers"."id";
+ALTER SEQUENCE public."user_invites_id_seq" OWNED BY public."user_invites"."id";
+ALTER SEQUENCE public."users_id_seq" OWNED BY public."users"."id";
+ALTER SEQUENCE public."volunteers_id_seq" OWNED BY public."volunteers"."id";
+ALTER SEQUENCE public."warehouse_area_counts_id_seq" OWNED BY public."warehouse_area_counts"."id";
+ALTER SEQUENCE public."warehouse_areas_id_seq" OWNED BY public."warehouse_areas"."id";
+ALTER SEQUENCE public."warehouse_manager_flags_id_seq" OWNED BY public."warehouse_manager_flags"."id";
+
+-- -- Row-level security -------------------------------------
+ALTER TABLE public."app_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."assistant_queries" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."attendance" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."audit_log" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."barcode_scan_events" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."certificate_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."collection_kit_records" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."collection_kits" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."community_request_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."community_requests" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."decanting_lines" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."decanting_records" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."delivery_note_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."delivery_notes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."delivery_receipts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."dispatch_event_lines" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."dispatch_events" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donation_allocations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donation_category_routing" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donation_email_logs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donation_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donation_routing_defaults" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donation_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."donors" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."ecd_centres" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."ecd_collection_reminders" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."ecd_order_lines" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."event_spaces" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."event_timeslots" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."expiry_warning_dismissals" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."finance_report_access_links" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."finance_report_email_logs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."finance_report_email_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."gmail_connections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."idempotency_keys" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."love_activism_events" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."notification_reads" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."notifications" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."operating_closures" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."outbound_messages" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."password_resets" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."pending_donation_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."pending_donations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."photos" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."picking_events" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."picking_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."picking_slip_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."picking_slips" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."product_barcodes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."products" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."programmes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."purchase_order_items" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."purchase_orders" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."push_subscriptions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."quickbooks_connections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."quickbooks_object_map" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."quickbooks_sync_queue" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."recipe_lines" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."recipe_own_order_centres" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."recipes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."reporting_factors" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."reporting_queries" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."reporting_targets" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."saved_reports" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."schema_migrations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."section18a_certificates" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."section18a_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."stock_count_lines" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."stock_counts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."stock_levels" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."stock_movements" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."storage_locations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."supplier_products" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."supplier_prospects" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."suppliers" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."user_invites" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."users" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."vms_sync" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."volunteer_bookings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."volunteers" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."warehouse_area_counts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."warehouse_areas" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."warehouse_manager_flags" ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN IF (SELECT count(*) FROM pg_roles WHERE rolname IN ('service_role')) = 1 THEN EXECUTE 'CREATE POLICY "dispatch_event_lines_service" ON public."dispatch_event_lines" AS PERMISSIVE FOR ALL TO service_role USING (true) WITH CHECK (true)'; END IF; END $$;
+DO $$ BEGIN IF (SELECT count(*) FROM pg_roles WHERE rolname IN ('service_role')) = 1 THEN EXECUTE 'CREATE POLICY "dispatch_events_service" ON public."dispatch_events" AS PERMISSIVE FOR ALL TO service_role USING (true) WITH CHECK (true)'; END IF; END $$;
+
+-- -- Closing the Data API -----------------------------------
+-- From migration 057_lock_down_data_api.sql: the API roles lose every
+-- right in public. Skipped where those roles do not exist.
 DO $$
 DECLARE
   t record;
@@ -2088,298 +2029,97 @@ BEGIN
 END
 $$;
 
+-- -- Migrations this file already contains ------------------
+-- The schema changes this file already contains, so `npm run migrate -- up`
+-- only runs the seed migrations and anything added after it.
+INSERT INTO public.schema_migrations (id, notes) VALUES
+  ('001_reporting_factors', 'In schema.sql'),
+  ('002_purchase_order_creation', 'In schema.sql'),
+  ('002_reporting_queries', 'In schema.sql'),
+  ('003_reporting_indexes', 'In schema.sql'),
+  ('015_create_volunteer_management_tables', 'In schema.sql'),
+  ('016_expand_vms_sync_entity_type', 'In schema.sql'),
+  ('019_create_section18a_certificate_engine', 'In schema.sql'),
+  ('020_add_gmail_display_name', 'In schema.sql'),
+  ('021_create_certificate_settings_table', 'In schema.sql'),
+  ('022_extend_donation_email_logs', 'In schema.sql'),
+  ('022_section18a_donor_form_flow', 'In schema.sql'),
+  ('023_add_notification_target_roles', 'In schema.sql'),
+  ('023_create_user_invites', 'In schema.sql'),
+  ('024_add_user_invite_email_status', 'In schema.sql'),
+  ('024_create_finance_report_access_links', 'In schema.sql'),
+  ('025_add_mobile_number_to_ecd_centres', 'In schema.sql'),
+  ('026_create_ecd_collection_reminders', 'In schema.sql'),
+  ('027_add_contact_email_to_ecd_centres', 'In schema.sql'),
+  ('028_add_finance_email_status_to_purchase_orders', 'In schema.sql'),
+  ('029_create_saved_reports', 'In schema.sql'),
+  ('030_create_push_subscriptions', 'In schema.sql'),
+  ('031_create_password_resets', 'In schema.sql'),
+  ('032_create_outbound_messages', 'In schema.sql'),
+  ('033_create_app_settings', 'In schema.sql'),
+  ('034_create_operating_closures', 'In schema.sql'),
+  ('035_add_approved_to_request_outcome', 'In schema.sql'),
+  ('036_create_community_request_items', 'In schema.sql'),
+  ('037_add_activity_log_date_indexes', 'In schema.sql'),
+  ('038_create_recipes', 'In schema.sql'),
+  ('039_create_supplier_products', 'In schema.sql'),
+  ('040_create_idempotency_keys', 'In schema.sql'),
+  ('041_create_photos', 'In schema.sql'),
+  ('042_add_user_language', 'In schema.sql'),
+  ('043_add_purchase_order_follow_up', 'In schema.sql'),
+  ('044_add_product_decantable', 'In schema.sql'),
+  ('045_purchase_order_part_quantities', 'In schema.sql'),
+  ('046_community_request_logged_by', 'In schema.sql'),
+  ('047_create_expiry_warning_dismissals', 'In schema.sql'),
+  ('048_create_warehouse_map', 'In schema.sql'),
+  ('049_warehouse_area_capacity', 'In schema.sql'),
+  ('050_add_ecd_centre_location', 'In schema.sql'),
+  ('051_warehouse_gates', 'In schema.sql'),
+  ('052_create_product_barcodes', 'In schema.sql'),
+  ('053_create_barcode_scan_events', 'In schema.sql'),
+  ('054_finance_link_expiry', 'In schema.sql'),
+  ('055_user_session_version', 'In schema.sql'),
+  ('056_product_barcode_food_facts', 'In schema.sql'),
+  ('057_lock_down_data_api', 'In schema.sql'),
+  ('058_runtime_schema_to_migration', 'In schema.sql'),
+  ('059_tidy_indexes', 'In schema.sql'),
+  ('060_drop_unused_schema', 'In schema.sql'),
+  ('061_delivery_delivered_at', 'In schema.sql'),
+  ('062_saved_report_narrative', 'In schema.sql'),
+  ('063_not_collected_follow_up', 'In schema.sql'),
+  ('064_donation_value_estimate', 'In schema.sql'),
+  ('065_one_email_per_role', 'In schema.sql'),
+  ('066_product_preferred_supplier', 'In schema.sql'),
+  ('067_guest_last_active', 'In schema.sql'),
+  ('068_kitchens', 'In schema.sql'),
+  ('069_fts_drop_points', 'In schema.sql'),
+  ('070_fts_dropoff_any_place', 'In schema.sql'),
+  ('2026_08_02_schema_gap_migration', 'In schema.sql'),
+  ('2026_08_13_donations', 'In schema.sql');
 
--- from 058_runtime_schema_to_migration
--- ─────────────────────────────────────────────────────────────
--- 058_runtime_schema_to_migration.sql
---
--- Schema the app used to create for itself while running, moved here.
---
--- donation.repository.js ran ALTER TABLE donations ... ADD COLUMN IF
--- NOT EXISTS on every Section 18A link save, open and submit, and
--- gmail.repository.js ran CREATE TABLE / ALTER TABLE / CREATE INDEX on
--- every Gmail read and write. Even when there is nothing to add, ALTER
--- TABLE takes the strongest table lock, so each donor opening their
--- public 18A link briefly blocked all work on donations, and the app
--- needed owner rights to run at all.
---
--- Everything below already exists in a database the app has used; this
--- makes sure every warehouse database has it, so the code can stop
--- asking. Additive only, and a no-op where it is already there.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT;
-ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ;
-ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ;
-ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_donor_form JSONB;
-
-CREATE TABLE IF NOT EXISTS gmail_connections (
-  id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  gmail_email              VARCHAR(255),
-  display_name             VARCHAR(255),
-  token_type               VARCHAR(32) NOT NULL,
-  scope                    TEXT NOT NULL,
-  access_token_encrypted   TEXT NOT NULL,
-  refresh_token_encrypted  TEXT NOT NULL,
-  access_token_expires_at  TIMESTAMPTZ,
-  refresh_token_expires_at TIMESTAMPTZ,
-  connected_by_user_id     INTEGER REFERENCES users(id),
-  created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-ALTER TABLE gmail_connections ADD COLUMN IF NOT EXISTS display_name VARCHAR(255);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_gmail_connections_connected_by_user_id
-  ON gmail_connections (connected_by_user_id);
-CREATE INDEX IF NOT EXISTS idx_gmail_connections_updated_at
-  ON gmail_connections (updated_at);
-ALTER TABLE gmail_connections ENABLE ROW LEVEL SECURITY;
-
-
--- from 059_tidy_indexes
--- ─────────────────────────────────────────────────────────────
--- 059_tidy_indexes.sql
---
--- Duplicate indexes out, one missing index in.
---
--- Over time the same columns were indexed two or three times under
--- different names (idx_pks_status and idx_pslip_status, for example).
--- A copy speeds nothing up and makes every write maintain it. Each
--- index dropped here has a twin on exactly the same columns that stays:
--- where one of the pair backs a primary key or unique constraint, that
--- one is kept; otherwise the one queries were already using is kept.
---
---   dropped                               kept
---   idx_attendance_booking_id             uq_attendance_booking (unique)
---   idx_certificate_settings_id           certificate_settings_pkey
---   idx_dl_decanting                      idx_dl_record
---   idx_dr_week, idx_dr_week_of           idx_decanting_records_week_of
---   idx_dispatch_events_slip              dispatch_events_picking_slip_id_key (unique)
---   idx_donation_email_logs_created_desc  idx_donation_email_logs_created
---   idx_di_donation                       idx_donation_items_donation
---   idx_di_product,
---   idx_donation_items_product            idx_donation_items_product_id
---   idx_donations_s18a_status             idx_donations_section_18a_status
---   idx_donations_programme               idx_donations_programme_id
---   idx_pke_slip                          idx_pevent_slip
---   idx_pksi_slip                         idx_psi_slip
---   idx_pksi_product                      idx_psi_product
---   idx_pks_dispatch_date, idx_pslip_date idx_picking_slips_dispatch_date
---   idx_pks_status                        idx_pslip_status
---   idx_pks_assigned_to                   idx_pslip_assigned
---   idx_reporting_factors_lookup          reporting_factors_factor_key_effective_from_key (unique)
---   idx_reporting_queries_outcome         idx_reporting_queries_outcome_date
---   idx_stock_count_lines_count_product   scl_one_line_per_product (unique)
---   idx_stock_counts_date                 idx_sc_date
---   idx_sm_created                        idx_sm_created_at
---   idx_sm_reference                      idx_sm_ref
---   idx_users_username                    users_username_key (unique)
---
--- Added: dispatch_event_lines.picking_slip_item_id, a foreign key on a
--- table of about 24,000 rows that had no index, so deleting or
--- checking a picking slip line scanned the whole table.
--- ─────────────────────────────────────────────────────────────
--- A copy is dropped only where its twin exists, so a database that
--- drifted and has just one of the pair keeps it.
+-- -- First admin (optional) ---------------------------------
+-- Someone has to be able to sign in. Fill in the four values and run the
+-- file as it is; with the password left as 'CHANGE-ME', no admin is made
+-- and you can make one later with
+--   npm run warehouse-admin -- create-admin <code> --username <u> --first <name> --last <name>
+-- The password is stored hashed (bcrypt), never as typed. Change it
+-- after the first sign-in: Profile, Change password.
 DO $$
 DECLARE
-  pair text[];
+  admin_username   text := 'admin';
+  admin_first_name text := 'First';
+  admin_last_name  text := 'Admin';
+  admin_password   text := 'CHANGE-ME';   -- 8 to 72 characters
 BEGIN
-  FOREACH pair SLICE 1 IN ARRAY ARRAY[
-    ['idx_attendance_booking_id', 'uq_attendance_booking'],
-    ['idx_certificate_settings_id', 'certificate_settings_pkey'],
-    ['idx_dl_decanting', 'idx_dl_record'],
-    ['idx_dr_week', 'idx_decanting_records_week_of'],
-    ['idx_dr_week_of', 'idx_decanting_records_week_of'],
-    ['idx_dispatch_events_slip', 'dispatch_events_picking_slip_id_key'],
-    ['idx_donation_email_logs_created_desc', 'idx_donation_email_logs_created'],
-    ['idx_di_donation', 'idx_donation_items_donation'],
-    ['idx_di_product', 'idx_donation_items_product_id'],
-    ['idx_donation_items_product', 'idx_donation_items_product_id'],
-    ['idx_donations_s18a_status', 'idx_donations_section_18a_status'],
-    ['idx_donations_programme', 'idx_donations_programme_id'],
-    ['idx_pke_slip', 'idx_pevent_slip'],
-    ['idx_pksi_slip', 'idx_psi_slip'],
-    ['idx_pksi_product', 'idx_psi_product'],
-    ['idx_pks_dispatch_date', 'idx_picking_slips_dispatch_date'],
-    ['idx_pslip_date', 'idx_picking_slips_dispatch_date'],
-    ['idx_pks_status', 'idx_pslip_status'],
-    ['idx_pks_assigned_to', 'idx_pslip_assigned'],
-    ['idx_reporting_factors_lookup', 'reporting_factors_factor_key_effective_from_key'],
-    ['idx_reporting_queries_outcome', 'idx_reporting_queries_outcome_date'],
-    ['idx_stock_count_lines_count_product', 'scl_one_line_per_product'],
-    ['idx_stock_counts_date', 'idx_sc_date'],
-    ['idx_sm_created', 'idx_sm_created_at'],
-    ['idx_sm_reference', 'idx_sm_ref'],
-    ['idx_users_username', 'users_username_key']
-  ] LOOP
-    IF to_regclass('public.' || pair[2]) IS NOT NULL THEN
-      EXECUTE format('DROP INDEX IF EXISTS public.%I', pair[1]);
-    END IF;
-  END LOOP;
-END
-$$;
-
-CREATE INDEX IF NOT EXISTS idx_dispatch_event_lines_slip_item
-  ON dispatch_event_lines (picking_slip_item_id);
-
-
--- from 060_drop_unused_schema
--- ─────────────────────────────────────────────────────────────
--- 060_drop_unused_schema.sql
---
--- Tables, views, a type and columns that no code reads or writes.
---
--- Each one was checked against the server, the client, the scripts and
--- the tests (October 2026 database audit). None appears in any query or
--- any field the client shows. Kept on purpose although unused today:
--- volunteers.consent_given and volunteers.retention_delete_after (for a
--- POPIA retention job) and pending_donations.commit_incomplete_at (the
--- Reconciliation tab shows it).
---
--- Not reversible: the columns' contents go with them. In the dev
--- database the only filled ones were picking_slip_items.dispatched_quantity,
--- purchase_orders.status_changed_by, storage_locations.capacity_note,
--- supplier_products.added_at, stock_count_lines.client_uuid,
--- stock_counts.submitted_at, quickbooks_sync_queue.next_attempt_at and
--- donations.quickbooks_sync_status (always 'unsynced').
---
--- No CASCADE anywhere: if anything still depends on one of these in some
--- warehouse database, the migration stops there and changes nothing.
--- ─────────────────────────────────────────────────────────────
-
--- Views nothing queries.
-DROP VIEW IF EXISTS vw_ecd_collection_history;
-DROP VIEW IF EXISTS vw_low_stock;
-
--- operational_goals: its feature was removed. schema_migration_provenance:
--- notes from manual alignments before the migration runner existed.
-DROP TABLE IF EXISTS operational_goals;
-DROP TABLE IF EXISTS schema_migration_provenance;
-
--- The donation_category enum: donations.donation_category is a text
--- column, and no column uses the type. Left alone if one ever does.
-DO $$
-BEGIN
-  IF to_regtype('public.donation_category') IS NOT NULL
-     AND NOT EXISTS (
-       SELECT 1 FROM pg_attribute a
-        WHERE a.atttypid = 'public.donation_category'::regtype
-          AND a.attnum > 0 AND NOT a.attisdropped
-     ) THEN
-    DROP TYPE public.donation_category;
+  IF admin_password = 'CHANGE-ME' THEN
+    RAISE NOTICE 'No first admin made: the password was left as CHANGE-ME.';
+    RETURN;
   END IF;
+  IF length(admin_password) < 8 OR octet_length(admin_password) > 72 THEN
+    RAISE EXCEPTION 'The first admin password must be 8 to 72 characters. Nothing was changed.';
+  END IF;
+  INSERT INTO public.users (username, first_name, last_name, password_hash, role)
+  VALUES (admin_username, admin_first_name, admin_last_name,
+          extensions.crypt(admin_password, extensions.gen_salt('bf', 10)), 'admin');
 END
 $$;
-
--- Donor address and identity fields the intake form never saved. The
--- Section 18A form keeps what the donor enters in section_18a_donor_form.
--- The QuickBooks columns were never written: syncing uses
--- quickbooks_sync_queue and quickbooks_object_map.
-ALTER TABLE donations
-  DROP COLUMN IF EXISTS donor_cellphone,
-  DROP COLUMN IF EXISTS donor_address_line1,
-  DROP COLUMN IF EXISTS donor_address_line2,
-  DROP COLUMN IF EXISTS donor_city_suburb,
-  DROP COLUMN IF EXISTS donor_province,
-  DROP COLUMN IF EXISTS donor_postal_code,
-  DROP COLUMN IF EXISTS donor_country,
-  DROP COLUMN IF EXISTS donor_identification_type,
-  DROP COLUMN IF EXISTS donor_identification_number,
-  DROP COLUMN IF EXISTS donor_identification_country_of_issue,
-  DROP COLUMN IF EXISTS quickbooks_sync_status,
-  DROP COLUMN IF EXISTS quickbooks_sync_reference_id,
-  DROP COLUMN IF EXISTS quickbooks_sync_error,
-  DROP COLUMN IF EXISTS quickbooks_synced_at,
-  DROP COLUMN IF EXISTS quickbooks_sync_attempted_at,
-  DROP COLUMN IF EXISTS section_18a_deemed_value_zar;
-
-ALTER TABLE pending_donations
-  DROP COLUMN IF EXISTS donor_cellphone,
-  DROP COLUMN IF EXISTS donor_address_line1,
-  DROP COLUMN IF EXISTS donor_address_line2,
-  DROP COLUMN IF EXISTS donor_city_suburb,
-  DROP COLUMN IF EXISTS donor_province,
-  DROP COLUMN IF EXISTS donor_postal_code,
-  DROP COLUMN IF EXISTS donor_country,
-  DROP COLUMN IF EXISTS donor_identification_type,
-  DROP COLUMN IF EXISTS donor_identification_number,
-  DROP COLUMN IF EXISTS donor_identification_country_of_issue;
-
-ALTER TABLE donors
-  DROP COLUMN IF EXISTS tax_reference,
-  DROP COLUMN IF EXISTS consent_given;
-
--- A cohort-override flow on delivery receipts that was never built. Its
--- check (an override needs a reason and an approver) goes with it;
--- override_reason itself stays, it is used.
-ALTER TABLE delivery_receipts DROP CONSTRAINT IF EXISTS dr_override_requires_reason;
-ALTER TABLE delivery_receipts
-  DROP COLUMN IF EXISTS collector_contact,
-  DROP COLUMN IF EXISTS is_cohort_override,
-  DROP COLUMN IF EXISTS override_approved_by,
-  DROP COLUMN IF EXISTS auto_flagged_at;
-
-ALTER TABLE donation_allocations
-  DROP COLUMN IF EXISTS allocation_status,
-  DROP COLUMN IF EXISTS stock_movement_id;
-
-ALTER TABLE donation_items             DROP COLUMN IF EXISTS source_reference;
-ALTER TABLE picking_slip_items         DROP COLUMN IF EXISTS dispatched_quantity;
-ALTER TABLE purchase_orders            DROP COLUMN IF EXISTS status_changed_by;
-ALTER TABLE quickbooks_sync_queue      DROP COLUMN IF EXISTS next_attempt_at;
-ALTER TABLE recipe_own_order_centres   DROP COLUMN IF EXISTS added_at;
-ALTER TABLE stock_counts               DROP COLUMN IF EXISTS submitted_at;
-ALTER TABLE storage_locations          DROP COLUMN IF EXISTS capacity_note;
-ALTER TABLE supplier_products          DROP COLUMN IF EXISTS added_at;
-ALTER TABLE stock_count_lines
-  DROP COLUMN IF EXISTS client_uuid,
-  DROP COLUMN IF EXISTS adjustment_movement_id;
-
--- The free-text location from before migration 050 added the address,
--- suburb and pin. Empty, and nothing reads it.
-ALTER TABLE ecd_centres                DROP COLUMN IF EXISTS location;
-
-
--- from 061_delivery_delivered_at
--- ─────────────────────────────────────────────────────────────
--- 061_delivery_delivered_at.sql
---
--- When a delivery arrived: the date AND the time.
---
--- delivery_notes.delivery_date is a calendar day the worker could
--- change. Receiving now records the moment the delivery was signed in
--- on the phone, in delivered_at, and works the day out from it, so
--- neither can be typed. created_at stays what it was: when the server
--- saved the note, which for a delivery recorded with no signal is
--- later than the delivery itself.
---
--- Deliveries already recorded take created_at, the nearest moment on
--- record.
---
--- Additive: one column, filled for existing rows.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE delivery_notes
-  ADD COLUMN IF NOT EXISTS delivered_at timestamptz;
-
-UPDATE delivery_notes SET delivered_at = created_at WHERE delivered_at IS NULL;
-
-
--- from 062_saved_report_narrative
--- ─────────────────────────────────────────────────────────────
--- 062_saved_report_narrative.sql
---
--- The written report kept with a saved report.
---
--- "Generate report" under an Operations chart has the AI write about
--- the chart: what it shows, the business view, what to follow up. Until
--- now a saved report kept only the chart's settings, so that writing was
--- lost and had to be generated again. It is now kept with the saved
--- report, with when it was written and the dates it was written about,
--- because the saved report itself runs over a moving period ("the last
--- three months") and the writing describes the period it was made for.
---
--- Additive: three nullable columns.
--- ─────────────────────────────────────────────────────────────
-ALTER TABLE saved_reports
-  ADD COLUMN IF NOT EXISTS narrative       jsonb,
-  ADD COLUMN IF NOT EXISTS narrative_at    timestamptz,
-  ADD COLUMN IF NOT EXISTS narrative_range jsonb;
