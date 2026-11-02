@@ -314,5 +314,9 @@
   "kitchen.routes.js POST /": "admin,manager",
   "kitchen.routes.js PATCH /:id": "admin,manager",
   "picking.routes.js POST /:id/follow-up": "admin,manager",
-  "warehouseMap.routes.js PATCH /areas/:id/capacity": "admin,manager"
+  "warehouseMap.routes.js PATCH /areas/:id/capacity": "admin,manager",
+  "translation.routes.js GET /": "admin,guest,manager,warehouse_worker",
+  "translation.routes.js PUT /": "admin",
+  "translation.routes.js DELETE /": "admin",
+  "settings.routes.js GET /letterhead": "admin,manager,warehouse_worker"
 }

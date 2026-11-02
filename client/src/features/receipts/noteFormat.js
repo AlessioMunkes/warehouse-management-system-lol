@@ -126,9 +126,11 @@ export const BENEFICIARY_LABEL = {
 };
 
 // ── Shared by every note ──────────────────────────────────────
-// The letterhead on every printed note. The Cape Town warehouse unless
-// the build sets VITE_WAREHOUSE_NAME and VITE_WAREHOUSE_ADDRESS (address
-// lines separated by |), for a deployment that prints for another site.
+// The built-in letterhead. Notes print the one an admin sets under
+// Settings > Documents (useLetterhead.js); this is used until that
+// arrives or when it cannot be read. VITE_WAREHOUSE_NAME and
+// VITE_WAREHOUSE_ADDRESS (lines separated by |) still change it at build
+// time, for older setups.
 const DEFAULT_ADDRESS = ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'];
 const addressFromEnv = (import.meta.env.VITE_WAREHOUSE_ADDRESS ?? '')
   .split('|').map((line) => line.trim()).filter(Boolean);

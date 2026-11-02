@@ -7,7 +7,8 @@
 //               belongs to whichever started most recently.
 //   Bands       the band a centre's child count is rounded up to (5 by
 //               default: 21 to 25 children all get the slip for 25).
-//               One of the /api/settings values, passed in by the page.
+//               One of the /api/settings values, passed in by the page,
+//               with the decimal places loose amounts round up to.
 //   Recipes     the summer recipe, the winter recipe, and any overrides
 //               — each a list of products with an amount PER CHILD. A
 //               centre's slip is that amount times its banded count. An
@@ -30,7 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ViewTabs from '@/components/ui/view-tabs';
 import ErrorBanner from '@/components/ui/error-banner';
 import { useToast } from '@/components/ui/toastContext';
-import { DEFAULT_CHILD_BAND, exampleCentre, exampleQuantity } from './recipeMath';
+import { DEFAULT_CHILD_BAND, DEFAULT_LOOSE_PLACES, exampleCentre, exampleQuantity } from './recipeMath';
 import AppSettingsSection from './AppSettingsSection';
 import productAPI from '../../services/productAPI';
 import beneficiaryAPI from '../../services/beneficiaryAPI';
@@ -136,7 +137,7 @@ const toDraftLines = (recipe) => (recipe?.lines ?? []).map((line) => ({
   productId: String(line.productId), quantityPerChild: String(line.quantityPerChild), unit: line.unit,
 }));
 
-function RecipeEditor({ recipe, products, band, onSaved, onCreated, onDeleted }) {
+function RecipeEditor({ recipe, products, band, places = DEFAULT_LOOSE_PLACES, onSaved, onCreated, onDeleted }) {
   const toast = useToast();
   const isNew = !recipe;
   const isOverride = isNew || recipe.kind === 'override';
@@ -228,7 +229,7 @@ function RecipeEditor({ recipe, products, band, onSaved, onCreated, onDeleted })
           <ul className="mt-3 divide-y rounded-lg border">
             {draft.lines.map((line, index) => {
               const example = exampleQuantity(line.quantityPerChild, {
-                band, unit: line.unit, whole: productById.get(line.productId)?.isDecantable === false,
+                band, places, unit: line.unit, whole: productById.get(line.productId)?.isDecantable === false,
               });
               const options = products.filter((p) => String(p.id) === line.productId || !used.has(String(p.id)));
               return (
@@ -391,8 +392,9 @@ export default function RecipesSection({ settings = null, onSettingsSaved }) {
   const current = data.recipes.find((r) => r.id === data.currentRecipeId) ?? null;
   // The band a child count is rounded up to. It lives with the other
   // admin settings (/api/settings), which the page has already loaded.
-  const bandSettings = (settings ?? []).filter((s) => s.key === 'recipes.childBand');
-  const band = Number(bandSettings[0]?.value ?? DEFAULT_CHILD_BAND);
+  const bandSettings = (settings ?? []).filter((s) => s.key === 'recipes.childBand' || s.key === 'recipes.loosePlaces');
+  const band = Number(bandSettings.find((s) => s.key === 'recipes.childBand')?.value ?? DEFAULT_CHILD_BAND);
+  const places = Number(bandSettings.find((s) => s.key === 'recipes.loosePlaces')?.value ?? DEFAULT_LOOSE_PLACES);
   const selectedId = selected ?? String(current?.id ?? data.recipes[0]?.id ?? NEW);
   const recipe = data.recipes.find((r) => String(r.id) === selectedId) ?? null;
 
@@ -418,8 +420,8 @@ export default function RecipesSection({ settings = null, onSettingsSaved }) {
 
       {bandSettings.length > 0 ? (
         <AppSettingsSection
-          title="Child count bands"
-          description="Set the band centres are supplied in, for example every 5 children."
+          title="Slip rounding"
+          description="Set the band centres are supplied in, for example every 5 children, and how loose products like oil are rounded."
           settings={bandSettings}
           onSaved={onSettingsSaved}
         />
@@ -444,6 +446,7 @@ export default function RecipesSection({ settings = null, onSettingsSaved }) {
             recipe={selectedId === NEW ? null : recipe}
             products={products}
             band={band}
+            places={places}
             onSaved={setData}
             onCreated={openCreated}
             onDeleted={(overview) => { setData(overview); setSelected(null); }}

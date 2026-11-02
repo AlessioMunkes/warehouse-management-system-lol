@@ -41,12 +41,11 @@ server/                     The API (Node, Express, Postgres)
     integrations/           Everything that talks to an outside system: email, PDFs, the volunteer system (VMS), Open Food Facts
     utils/                  Small shared helpers: email layout, donation validation and routing, transactions, barcodes
   database/
-    schema.sql              Every table, for reference. Not a script to run
-    migrations/             Numbered changes to the database, applied in order
-  scripts/                  Command-line tools (migrate, export the new-database file, load data, admin tasks)
+    schema.sql              Builds the whole database. Written by `npm run export-database`
+    migrations/             Seed data (NNN_seed_*.sql), run after schema.sql
+  scripts/                  Command-line tools (migrate, export schema.sql, load data, admin tasks)
   __tests__/                Every server test (Vitest + Supertest)
 
-docs/new-database.sql       Builds a new, empty database. Written by `npm run export-database`
 
 render.yaml                 How it is deployed on Render
 .github/workflows/ci.yml    Lint, build and test on every push
@@ -291,19 +290,25 @@ wording. One flat folder per area, with no folders inside.
 ### Configuration
 
 Every setting the server reads from its environment is listed, with its default, in
-`server/env.example`; the client's are in `client/env.local.example`. Values an admin can
-change while the app runs (expiry warnings, reminder times, unit sizes) are in Settings
-instead, defined in `features/settings/settingsDefinitions.js`.
+`server/env.example`; the client's are in `client/env.local.example`.
+`npm run check-env` (`scripts/check-env.mjs`, checks in `scripts/lib/envCheck.js`) reports on an
+environment without printing values. Values an admin can change while the app runs (expiry
+warnings, reminder times, unit sizes, recipe rounding) are in Settings instead, defined in
+`features/settings/settingsDefinitions.js`. The floor's Afrikaans and isiXhosa wording
+can be changed by an admin under Settings → Wording: overrides are kept in
+`translation_overrides` (`routes/translation.routes.js`) and win over
+`client/src/translations/messages.js` and `phrases.js`.
 
 ### Database
 
-`database/schema.sql` describes every table. To change the database, add the next numbered
-file to `database/migrations/` and append the same change to `schema.sql`, then run
-`npm run migrate -- up` in `server/`. Then run `npm run export-database`, which reads the
-updated database and writes `docs/new-database.sql` again, so a new database starts with the
-change. `scripts/export-new-database.mjs` says what goes in that file (the schema, the six
-starter tables, the migration record) and what never does (any warehouse's data).
-`npm run migrate -- init <code>` runs that file against a new database.
+`database/schema.sql` builds the whole database in one script; `database/migrations/` holds
+the seed data that runs after it (`001_seed_starter_settings.sql`: the six starter tables).
+`npm run migrate -- init <code>` runs both against a new, empty database. To change the
+schema, change the database and run `npm run export-database`, which writes `schema.sql`
+again (`scripts/export-new-database.mjs` says what goes in: the schema and the record of
+schema migrations, never any rows). Seed migrations are named `NNN_seed_*.sql` and insert
+with `ON CONFLICT DO NOTHING`, so `npm run migrate -- up` is safe on a database that already
+has them.
 
 ## Walking someone through the code
 

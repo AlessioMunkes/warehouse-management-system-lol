@@ -11,7 +11,8 @@
     "migrate": "node scripts/migrate.mjs",
     "export-database": "node scripts/export-new-database.mjs",
     "warehouse-admin": "node scripts/warehouse-admin.mjs",
-    "security-check": "node scripts/security-check.mjs"
+    "security-check": "node scripts/security-check.mjs",
+    "check-env": "node --env-file-if-exists=.env.local scripts/check-env.mjs"
   },
   "keywords": [],
   "author": "",

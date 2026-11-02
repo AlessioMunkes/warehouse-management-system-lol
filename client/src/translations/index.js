@@ -34,9 +34,17 @@
 //
 // ONLY THE FLOOR. Manager and admin screens are not translated and do
 // not read this.
+//
+// AN ADMIN'S OWN WORDING
+// Settings → Wording lets an admin replace any Afrikaans or
+// isiXhosa piece of this (GET /api/translations). Those overrides are
+// loaded the first time a screen is shown in another language and win
+// over messages.js and phrases.js. Without them (offline, signed out,
+// an older server) the built-in wording shows.
 // ─────────────────────────────────────────────────────────────
-import { useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { MESSAGES } from './messages';
+import { getOverrides } from '../services/translationAPI';
 
 export const LANGUAGES = [
   { code: 'en', name: 'English' },
@@ -81,7 +89,60 @@ const fill = (text, vars) => (vars
   ? text.replace(/\{(\w+)\}/g, (whole, name) => (vars[name] === undefined || vars[name] === null ? '' : String(vars[name])))
   : text);
 
-const lookup = (language, key) => MESSAGES[language]?.[key] ?? MESSAGES.en[key];
+// ── Overrides from Settings → Wording ──────────────────
+const NO_OVERRIDES = { key: {}, phrase: {} };
+let overrides = NO_OVERRIDES;
+let overridesVersion = 0;
+const overrideListeners = new Set();
+
+/** Replaces the admin's overrides (the shape GET /api/translations returns). */
+export const setTranslationOverrides = (data) => {
+  overrides = data && typeof data === 'object'
+    ? { key: data.key ?? {}, phrase: data.phrase ?? {} }
+    : NO_OVERRIDES;
+  overridesVersion += 1;
+  for (const listener of overrideListeners) {
+    try { listener(); } catch { /* not our problem */ }
+  }
+};
+export const subscribeOverrides = (listener) => {
+  overrideListeners.add(listener);
+  return () => overrideListeners.delete(listener);
+};
+/** The admin's wording for one English phrase, or undefined. */
+export const phraseOverride = (language, english) => overrides.phrase[language]?.[english];
+export const phraseOverrides = (language) => overrides.phrase[language] ?? {};
+
+// Asked for once per page load, the first time a screen is shown in a
+// language other than English. A failure (signed out, no signal) is
+// tried again on the next such screen, at most once a minute.
+let lastAsked = 0;
+let loaded = false;
+export const loadTranslationOverrides = async ({ force = false } = {}) => {
+  if (loaded && !force) return;
+  if (!force && Date.now() - lastAsked < 60_000) return;
+  lastAsked = Date.now();
+  try {
+    const data = await getOverrides();
+    loaded = true;
+    setTranslationOverrides(data);
+  } catch { /* the built-in wording stands */ }
+};
+
+const keyed = (language, key) => {
+  const own = overrides.key[language];
+  if (!own) return MESSAGES[language]?.[key];
+  const base = MESSAGES[language]?.[key] ?? MESSAGES.en[key];
+  // Counted wording ({ one, other }) is overridden a half at a time.
+  if (base && typeof base === 'object') {
+    const one = own[`${key}#one`];
+    const other = own[`${key}#other`];
+    return one || other ? { ...base, ...(one ? { one } : {}), ...(other ? { other } : {}) } : MESSAGES[language]?.[key];
+  }
+  return own[key] ?? MESSAGES[language]?.[key];
+};
+
+const lookup = (language, key) => (language === 'en' ? undefined : keyed(language, key)) ?? MESSAGES.en[key];
 
 // The translator for one language. Exported for tests and for code that
 // is not a component.
@@ -103,7 +164,14 @@ export const translator = (language) => {
 
 export const useLanguage = () => useSyncExternalStore(subscribe, getLanguage, () => 'en');
 
+const getOverridesVersion = () => overridesVersion;
+
 export const useT = () => {
   const language = useLanguage();
-  return useMemo(() => translator(language), [language]);
+  const version = useSyncExternalStore(subscribeOverrides, getOverridesVersion, () => 0);
+  useEffect(() => {
+    if (language !== 'en') loadTranslationOverrides();
+  }, [language]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- version: rebuilt when the admin's wording arrives
+  return useMemo(() => translator(language), [language, version]);
 };

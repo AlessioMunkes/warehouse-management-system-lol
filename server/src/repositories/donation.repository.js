@@ -46,12 +46,18 @@ const logAudit = async (client, { entityId, action, actorId, reason = null,
 // Ladles of Love policy figure that finance will change without a
 // deploy. Returns null when the settings row is missing, and the
 // service treats that as "cannot evaluate" rather than "qualifies".
+//
+// Settings > Documents, "Section 18A certificate from", wins once an
+// admin has saved it; until then the donation_settings row stands.
 const getSection18AThreshold = async () => {
   const result = await pool.query(
-    `SELECT section18a_threshold_value FROM donation_settings WHERE id = 1`
+    `SELECT COALESCE(
+       (SELECT (value #>> '{}')::numeric FROM app_settings WHERE key = 'donations.section18aThreshold'),
+       (SELECT section18a_threshold_value FROM donation_settings WHERE id = 1)
+     ) AS threshold`
   );
-  if (!result.rows[0]) return null;
-  return Number(result.rows[0].section18a_threshold_value);
+  const value = result.rows[0]?.threshold;
+  return value === null || value === undefined ? null : Number(value);
 };
 
 // ── Active ECDs with their child counts ───────────────────────

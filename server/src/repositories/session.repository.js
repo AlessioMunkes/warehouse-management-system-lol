@@ -25,15 +25,16 @@ const findStaffSession = async (userId) => {
 // after GUEST_IDLE_HOURS with nothing done (migration 067). idle is the
 // database's own clock, so a server with a wrong clock cannot misjudge
 // it.
+// The default; Settings > Access, "Sign out an idle volunteer after".
 export const GUEST_IDLE_HOURS = 4;
 
-const findGuestSession = async (volunteerId) => {
+const findGuestSession = async (volunteerId, idleHours = GUEST_IDLE_HOURS) => {
   const { rows } = await pool.query(
     `SELECT id, signed_out_at,
             COALESCE(last_active_at, signed_in_at) < now() - make_interval(hours => $2) AS idle,
             COALESCE(last_active_at, signed_in_at) < now() - interval '1 minute'     AS stale
        FROM volunteers WHERE id = $1`,
-    [volunteerId, GUEST_IDLE_HOURS],
+    [volunteerId, idleHours],
   );
   return rows[0] ?? null;
 };
@@ -59,12 +60,12 @@ const closeIdleGuestSession = async (volunteerId) => {
 
 // Every visit idle that long, for the sweep (jobs/guestIdle.job.js): a
 // guest who left without signing out and never came back.
-const closeIdleGuestSessions = async () => {
+const closeIdleGuestSessions = async (idleHours = GUEST_IDLE_HOURS) => {
   const { rowCount } = await pool.query(
     `UPDATE volunteers SET signed_out_at = COALESCE(last_active_at, signed_in_at)
       WHERE signed_out_at IS NULL
         AND COALESCE(last_active_at, signed_in_at) < now() - make_interval(hours => $1)`,
-    [GUEST_IDLE_HOURS],
+    [idleHours],
   );
   return rowCount;
 };

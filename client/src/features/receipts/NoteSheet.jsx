@@ -28,7 +28,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import usePdfDocument from '../staff/usePdfDocument';
-import { WAREHOUSE } from './noteFormat';
+import useLetterhead from './useLetterhead';
 
 const PDF_LOGO_URL = '/images/pdf_logo.png';
 
@@ -39,6 +39,7 @@ export default function NoteSheet({
   title, toolbarTitle, filename = 'document', party = null, meta = [], info, onClose, children,
 }) {
   const { documentRef, isGenerating, error: genError, openPdf } = usePdfDocument();
+  const letterhead = useLetterhead();
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -91,8 +92,8 @@ export default function NoteSheet({
           <div className="pdfnote-doc-parties">
             <div className="pdfnote-doc-party-col">
               <div className="pdfnote-doc-party">
-                <p className="pdfnote-doc-party-heading">{WAREHOUSE.name}</p>
-                {WAREHOUSE.addressLines.map((line) => (
+                <p className="pdfnote-doc-party-heading">{letterhead.name}</p>
+                {letterhead.addressLines.map((line) => (
                   <p key={line} className="pdfnote-doc-party-line">{line}</p>
                 ))}
               </div>

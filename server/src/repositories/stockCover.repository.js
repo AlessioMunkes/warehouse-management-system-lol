@@ -22,7 +22,7 @@
 import pool from '../config/db.js';
 import recipeRepository from './recipe.repository.js';
 import { committedStockSql } from './committedStock.sql.js';
-import { recipeForDate, COUNTED_UNITS } from '../features/recipes/recipeSeason.js';
+import { recipeForDate, COUNTED_UNITS, recipeLineQuantitySql, usablePlaces } from '../features/recipes/recipeSeason.js';
 import { SETTINGS } from '../features/settings/settingsDefinitions.js';
 import { unitRatioSql } from '../features/units/unitConversion.js';
 import { loadShelfLots, todayInSAST } from './shelfLots.repository.js';
@@ -34,12 +34,15 @@ const SAST_TODAY = `(NOW() AT TIME ZONE 'Africa/Johannesburg')::date`;
 const SAST = (col) => `(${col} AT TIME ZONE 'Africa/Johannesburg')`;
 const OPEN_ORDER_STATUSES = ['approved', 'in_transit', 'partially_received'];
 const CHILD_BAND = SETTINGS['recipes.childBand'];
+const LOOSE_PLACES = SETTINGS['recipes.loosePlaces'];
 
 /**
  * One row for each active product. `recipeId` is the recipe in use, or
  * null when none applies (then every centre takes its standing order).
  */
-export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyDays, programmeId = null }) => {
+export const listCoverInputs = async ({
+  recipeId = null, childBand = 1, loosePlaces = LOOSE_PLACES.default, historyDays, programmeId = null,
+}) => {
   const { rows } = await pool.query(
     `WITH pu AS (
        -- The unit each product is counted in: its stock row's, or for a
@@ -58,9 +61,7 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
      ),
      planned AS (
        SELECT 'recipe' AS kind, rl.id AS line_id, rl.product_id, rl.unit,
-              SUM(CASE WHEN rl.unit = ANY($3::text[]) OR NOT p.is_decantable
-                       THEN CEIL(rl.quantity_per_child * c.children)
-                       ELSE ROUND(rl.quantity_per_child * c.children, 2) END) AS quantity
+              SUM(${recipeLineQuantitySql('rl.quantity_per_child * c.children', '$3', '$7')}) AS quantity
          FROM recipe_lines rl
          JOIN products p ON p.id = rl.product_id AND p.archived_at IS NULL
          JOIN centres c  ON c.on_recipe
@@ -202,7 +203,7 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
       WHERE p.is_active = true AND p.archived_at IS NULL
         AND ($6::int IS NULL OR p.programme_id = $6::int)
       ORDER BY p.name ASC`,
-    [recipeId, childBand, COUNTED_UNITS, historyDays, OPEN_ORDER_STATUSES, programmeId],
+    [recipeId, childBand, COUNTED_UNITS, historyDays, OPEN_ORDER_STATUSES, programmeId, usablePlaces(loosePlaces)],
   );
   return rows;
 };
@@ -215,13 +216,15 @@ export const recipeInUse = async (today) => {
   try {
     const [recipes, band] = await Promise.all([
       recipeRepository.listRecipes(),
-      pool.query(`SELECT value FROM app_settings WHERE key = 'recipes.childBand'`),
+      pool.query(`SELECT key, value FROM app_settings WHERE key IN ('recipes.childBand', 'recipes.loosePlaces')`),
     ]);
     const recipe = recipeForDate(recipes, today);
     if (!recipe || !(recipe.lines?.length > 0)) return null;
-    const stored = Number(band.rows[0]?.value);
+    const saved = Object.fromEntries(band.rows.map((r) => [r.key, r.value]));
+    const stored = Number(saved['recipes.childBand']);
     const usable = Number.isInteger(stored) && stored >= CHILD_BAND.min && stored <= CHILD_BAND.max;
-    return { id: recipe.id, name: recipe.name, childBand: usable ? stored : CHILD_BAND.default };
+    const loosePlaces = saved['recipes.loosePlaces'] === undefined ? LOOSE_PLACES.default : usablePlaces(saved['recipes.loosePlaces']);
+    return { id: recipe.id, name: recipe.name, childBand: usable ? stored : CHILD_BAND.default, loosePlaces };
   } catch (err) {
     console.error('[stock cover] Using standing orders; could not read the recipe in use:', err.message);
     return null;
@@ -243,7 +246,7 @@ export const loadStockCover = async ({
   const recipe = await recipeInUse(today);
   const [rows, shelf] = await Promise.all([
     listCoverInputs({
-      recipeId: recipe?.id ?? null, childBand: recipe?.childBand ?? 1,
+      recipeId: recipe?.id ?? null, childBand: recipe?.childBand ?? 1, loosePlaces: recipe?.loosePlaces,
       historyDays: HISTORY_WEEKS * 7, programmeId,
     }),
     shelfLots ? loadShelfLots() : new Map(),

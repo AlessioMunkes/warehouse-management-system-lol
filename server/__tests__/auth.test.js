@@ -52,6 +52,18 @@ describe('POST /api/login', () => {
     expect(cookies.some((c) => c.startsWith('wms_token='))).toBe(true);
   });
 
+  it('keeps staff signed in for as long as Settings > Accounts says', async () => {
+    const settings = (await import('../src/services/settings.service.js')).default;
+    settings.getIn.mockResolvedValueOnce(2);
+    const app = await getFreshApp();
+    const res = await request(app).post('/api/login').send({ username: 'jdoe', password: PASSWORD });
+
+    expect(res.status).toBe(200);
+    expect(settings.getIn).toHaveBeenCalledWith(null, 'accounts.staffSessionHours');
+    const cookie = res.headers['set-cookie'].find((c) => c.startsWith('wms_token='));
+    expect(cookie).toMatch(/Max-Age=7200\b/);
+  });
+
   it('returns 401 for the wrong password', async () => {
     const app = await getFreshApp();
     const res = await request(app).post('/api/login').send({ username: 'jdoe', password: 'wrong-password' });

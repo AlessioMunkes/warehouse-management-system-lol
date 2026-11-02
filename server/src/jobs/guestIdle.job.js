@@ -13,6 +13,7 @@
 // warehouse (runInWarehouse). A failure at one site is retried on the
 // next tick without stopping the others.
 // ─────────────────────────────────────────────────────────────
+import settings from '../services/settings.service.js';
 import sessionRepo from '../repositories/session.repository.js';
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { warehouseCodes } from '../config/warehouses.js';
@@ -30,8 +31,8 @@ export const sweepIdleGuests = async () => {
     const where = code ? ` [${code}]` : '';
     try {
       const closed = code
-        ? await runInWarehouse(code, () => sessionRepo.closeIdleGuestSessions())
-        : await sessionRepo.closeIdleGuestSessions();
+        ? await runInWarehouse(code, async () => sessionRepo.closeIdleGuestSessions(await settings.get('accounts.guestIdleHours')))
+        : await sessionRepo.closeIdleGuestSessions(await settings.get('accounts.guestIdleHours'));
       if (closed > 0) console.log(`[guestIdle]${where} signed out ${closed} idle visit${closed === 1 ? '' : 's'}`);
     } catch (err) {
       console.error(`[guestIdle]${where} sweep failed:`, err.message);

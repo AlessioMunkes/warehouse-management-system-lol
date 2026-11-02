@@ -77,9 +77,8 @@ describe('listMigrationFiles and pendingMigrations', () => {
 });
 
 describe('this repo', () => {
-  // The numbered files were cleared at handover: the database has them
-  // all. No folder lists as no migrations; it comes back with the next
-  // schema change.
+  // schema.sql builds the whole database; migrations/ holds the seed
+  // data (NNN_seed_*.sql) and any schema change made since the last export.
   const migrations = listMigrationFiles(path.join(DB_DIR, 'migrations'));
   // baseline.sql, seed.sql and baseline-migrations.txt are only read by
   // `migrate init` and `mark-baseline`, and are not in the repo yet.
@@ -108,6 +107,26 @@ describe('this repo', () => {
       for (const [, name] of sql.matchAll(/ADD COLUMN (?:IF NOT EXISTS )?(\w+)/gi)) {
         expect([m.file, name, named(name)]).toEqual([m.file, name, true]);
       }
+    }
+  });
+
+  // schema.sql is the script that builds a new database, so it must be
+  // real SQL, not Supabase's "for context only" table listing (which has
+  // USER-DEFINED column types and cannot be run).
+  it('schema.sql is a runnable build script', () => {
+    const schema = fs.readFileSync(inDb('schema.sql'), 'utf8');
+    expect(schema).not.toMatch(/USER-DEFINED|not meant to be run/);
+    expect(schema).toMatch(/CREATE TABLE public\."users"/);
+    expect(unsafeMigrationReason(schema)).toBeNull();
+  });
+
+  // Seed migrations also run on databases that already hold the rows,
+  // so every insert in one must skip rows that are already there.
+  it('every seed migration inserts with ON CONFLICT', () => {
+    for (const m of migrations.filter((f) => /^\d{3}_seed_/.test(f.file))) {
+      const sql = stripSqlNoise(fs.readFileSync(m.path, 'utf8'));
+      const inserts = sql.split(';').filter((st) => /\bINSERT\s+INTO\b/i.test(st));
+      for (const st of inserts) expect([m.file, /\bON CONFLICT\b/i.test(st)]).toEqual([m.file, true]);
     }
   });
 

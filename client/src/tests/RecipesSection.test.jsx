@@ -60,14 +60,21 @@ describe('recipe sums', () => {
   });
 
   it('multiplies the amount per child by the banded count', () => {
-    expect(exampleQuantity('0.3')).toBe(7.5);                                  // 23 children, counted as 25
-    expect(exampleQuantity(0.58, { children: 25, band: 5 })).toBe(14.5);
-    expect(exampleQuantity(0.3, { children: 23, band: 1 })).toBe(6.9);
+    // Loose amounts round UP to whole units by default (3.3 L of oil is 4 L).
+    expect(exampleQuantity('0.3')).toBe(8);                                    // 7.5: 23 children, counted as 25
+    expect(exampleQuantity(0.58, { children: 25, band: 5 })).toBe(15);         // 14.5
+    expect(exampleQuantity(0.3, { children: 23, band: 1 })).toBe(7);           // 6.9
     expect(exampleQuantity(0.3, { children: 23, band: 10 })).toBe(9);
+    // ...or to the decimal places set under Settings → Recipes.
+    expect(exampleQuantity('0.3', { places: 1 })).toBe(7.5);
+    expect(exampleQuantity(0.58, { children: 25, band: 5, places: 2 })).toBe(14.5);
+    expect(exampleQuantity(0.132, { children: 25, band: 5, places: 1 })).toBe(3.3);
+    expect(exampleQuantity(0.132, { children: 25, band: 5 })).toBe(4);
     // Cans are counted, so they round up to a whole one; kilograms do not.
     expect(exampleQuantity(0.12, { children: 28, band: 5, unit: 'each' })).toBe(4);   // 3.6
     expect(exampleQuantity(0.12, { children: 75, band: 5, unit: 'each' })).toBe(9);   // exactly 9, not 10
-    expect(exampleQuantity(0.12, { children: 28, band: 5, unit: 'kg' })).toBe(3.6);
+    expect(exampleQuantity(0.12, { children: 28, band: 5, unit: 'kg', places: 1 })).toBe(3.6);
+    expect(exampleQuantity(0.12, { children: 28, band: 5, unit: 'each', places: 2 })).toBe(4);
     expect(exampleQuantity('')).toBeNull();
     expect(exampleQuantity('-1')).toBeNull();
   });
@@ -91,7 +98,15 @@ describe('RecipesSection', () => {
 
   it('shows what a line comes to for a centre, rounded up to its band', async () => {
     render(<RecipesSection />);
+    expect(await screen.findByText('8 kg for 23 children (counted as 25)')).toBeInTheDocument();
+  });
+
+  it('uses the decimal places for loose products from settings', async () => {
+    const places = { key: 'recipes.loosePlaces', section: 'recipes', label: 'Decimal places for loose products', help: 'Round up.', default: 0, min: 0, max: 2, unit: 'decimal places', value: 1 };
+    render(<RecipesSection settings={[places]} onSettingsSaved={vi.fn()} />);
+
     expect(await screen.findByText('7.5 kg for 23 children (counted as 25)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Decimal places for loose products')).toHaveValue(1);
   });
 
   it('uses the band from settings, and lets the admin change it', async () => {
