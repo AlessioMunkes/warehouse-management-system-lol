@@ -103,7 +103,8 @@ describe('assertDecantable', () => {
 describe('slipQuantity for a product that is not decantable', () => {
   it('rounds up to a whole number whatever the unit', () => {
     expect(slipQuantity(0.058, 'kg', 25, { whole: true })).toBe(2);     // carrots: 1.45 kg
-    expect(slipQuantity(0.058, 'kg', 25)).toBe(1.45);
+    expect(slipQuantity(0.058, 'kg', 25, { places: 2 })).toBe(1.45);
+    expect(slipQuantity(0.058, 'kg', 25, { whole: true, places: 2 })).toBe(2);
     expect(slipQuantity(0.12, 'each', 75, { whole: true })).toBe(9);    // exactly 9, not 10
   });
 });

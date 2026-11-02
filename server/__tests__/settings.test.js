@@ -40,6 +40,9 @@ describe('defaults', () => {
       // New with recipes, not a replaced constant: centres are supplied
       // in bands of five children.
       'recipes.childBand': 5,
+      // Loose products round up to whole units (feedback: 3.3 L of oil
+      // on a slip should be 4 L). Was a fixed two decimals.
+      'recipes.loosePlaces': 0,
       // New with unit sizes: 0 is "not set", so no unit is converted
       // until an admin says what one weighs.
       'units.crateKg': 0,

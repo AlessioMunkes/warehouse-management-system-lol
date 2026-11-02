@@ -102,6 +102,16 @@ export const SETTINGS = Object.freeze({
     help: 'Round each centre’s child count up to a multiple of this before working out its slip. Enter 1 to use the exact count.',
     default: 5, min: 1, max: 50, unit: 'children',
   },
+  // Loose products (oil, maize meal, rice: anything decantable, in a
+  // weighed or poured unit) are rounded UP to this many decimal places
+  // on a slip. 0 gives whole units, so 3.3 L of oil becomes 4 L.
+  // Counted units and products that are not decantable are always whole.
+  'recipes.loosePlaces': {
+    section: 'recipes',
+    label: 'Decimal places for loose products',
+    help: 'Round loose amounts (oil, maize meal, rice) up to this many decimal places on a slip. 0 gives whole units: 3.3 L becomes 4 L.',
+    default: 0, min: 0, max: 2, unit: 'decimal places',
+  },
   'invites.linkDays': {
     section: 'accounts',
     label: 'Invite link lifetime',

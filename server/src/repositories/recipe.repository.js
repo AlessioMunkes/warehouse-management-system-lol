@@ -6,10 +6,11 @@
 // what may be saved is recipe.service.js's business.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
-import { recipeForDate, COUNTED_UNITS } from '../features/recipes/recipeSeason.js';
+import { recipeForDate, COUNTED_UNITS, recipeLineQuantitySql, usablePlaces } from '../features/recipes/recipeSeason.js';
 import { SETTINGS } from '../features/settings/settingsDefinitions.js';
 
 const CHILD_BAND = SETTINGS['recipes.childBand'];
+const LOOSE_PLACES = SETTINGS['recipes.loosePlaces'];
 
 const RECIPE_COLUMNS = `
   r.id, r.name, r.kind, r.season_start_month, r.season_start_day,
@@ -170,15 +171,20 @@ const resolveForDate = async (client, dispatchDate) => {
     // The band child counts are rounded up to (Settings → Recipes). Read
     // here, on the same connection, so a slip and its band come from one
     // look at the database. Anything unusable falls back to the default.
-    const stored = await client.query(`SELECT value FROM app_settings WHERE key = 'recipes.childBand'`);
+    // The decimal places loose amounts are rounded up to come with it.
+    const stored = await client.query(
+      `SELECT key, value FROM app_settings WHERE key IN ('recipes.childBand', 'recipes.loosePlaces')`
+    );
     await client.query('RELEASE SAVEPOINT recipe_lookup');
 
     const recipe = recipeForDate(rows, dispatchDate);
     if (!recipe || recipe.line_count === 0) return null;
 
-    const band = Number(stored.rows[0]?.value);
+    const saved = Object.fromEntries(stored.rows.map((r) => [r.key, r.value]));
+    const band = Number(saved['recipes.childBand']);
     const usable = Number.isInteger(band) && band >= CHILD_BAND.min && band <= CHILD_BAND.max;
-    return { ...recipe, child_band: usable ? band : CHILD_BAND.default };
+    const places = saved['recipes.loosePlaces'] === undefined ? LOOSE_PLACES.default : usablePlaces(saved['recipes.loosePlaces']);
+    return { ...recipe, child_band: usable ? band : CHILD_BAND.default, loose_places: places };
   } catch (err) {
     await client.query('ROLLBACK TO SAVEPOINT recipe_lookup');
     console.error('[recipes] Using standing orders; could not read recipes:', err.message);
@@ -190,10 +196,11 @@ const resolveForDate = async (client, dispatchDate) => {
 // child count, with the count first rounded UP to a multiple of
 // `childBand` (bandedChildCount in recipeSeason.js is the same sum).
 // A line in a counted unit — cans, bags — or for any product that is not
-// decantable is rounded up to a whole one (slipQuantity in recipeSeason.js).
+// decantable is rounded up to a whole one; a loose amount is rounded up
+// to `loosePlaces` decimals (slipQuantity in recipeSeason.js).
 // Writes nothing — and the caller falls back to the standing order —
 // for a centre that keeps its own order or has no child count.
-const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, childBand = CHILD_BAND.default }) => {
+const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, childBand = CHILD_BAND.default, loosePlaces = LOOSE_PLACES.default }) => {
   const { rowCount } = await client.query(
     `WITH centre AS (
        SELECT e.id, CEIL(e.child_count::numeric / $4::numeric) * $4::numeric AS children
@@ -206,10 +213,7 @@ const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, chil
      SELECT $1, line.product_id, line.quantity, line.unit
        FROM (
          SELECT rl.product_id, rl.unit,
-                CASE WHEN rl.unit = ANY($5::text[]) OR NOT p.is_decantable
-                     THEN CEIL(rl.quantity_per_child * c.children)
-                     ELSE ROUND(rl.quantity_per_child * c.children, 2)
-                END AS quantity
+                ${recipeLineQuantitySql('rl.quantity_per_child * c.children', '$5', '$6')} AS quantity
            FROM recipe_lines rl
            JOIN products p ON p.id = rl.product_id
            CROSS JOIN centre c
@@ -218,7 +222,7 @@ const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, chil
        ) line
       WHERE line.quantity > 0
      RETURNING id`,
-    [slipId, ecdId, recipeId, childBand, COUNTED_UNITS]
+    [slipId, ecdId, recipeId, childBand, COUNTED_UNITS, usablePlaces(loosePlaces)]
   );
   return rowCount;
 };
@@ -228,7 +232,7 @@ const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, chil
 // that is most of a minute. `slips` is [{ id, ecd_id }]. Returns a Map
 // of slip id -> how many lines it was given (a slip left out got none,
 // and takes its standing order instead).
-const insertSlipItemsFromRecipeForMany = async (client, { slips, recipeId, childBand = CHILD_BAND.default }) => {
+const insertSlipItemsFromRecipeForMany = async (client, { slips, recipeId, childBand = CHILD_BAND.default, loosePlaces = LOOSE_PLACES.default }) => {
   const counts = new Map();
   if (slips.length === 0) return counts;
   const { rows } = await client.query(
@@ -246,10 +250,7 @@ const insertSlipItemsFromRecipeForMany = async (client, { slips, recipeId, child
      SELECT line.slip_id, line.product_id, line.quantity, line.unit
        FROM (
          SELECT c.slip_id, rl.product_id, rl.unit,
-                CASE WHEN rl.unit = ANY($5::text[]) OR NOT p.is_decantable
-                     THEN CEIL(rl.quantity_per_child * c.children)
-                     ELSE ROUND(rl.quantity_per_child * c.children, 2)
-                END AS quantity
+                ${recipeLineQuantitySql('rl.quantity_per_child * c.children', '$5', '$6')} AS quantity
            FROM recipe_lines rl
            JOIN products p ON p.id = rl.product_id
            CROSS JOIN centre c
@@ -258,7 +259,7 @@ const insertSlipItemsFromRecipeForMany = async (client, { slips, recipeId, child
        ) line
       WHERE line.quantity > 0
      RETURNING picking_slip_id`,
-    [slips.map((s) => s.id), slips.map((s) => s.ecd_id), recipeId, childBand, COUNTED_UNITS]
+    [slips.map((s) => s.id), slips.map((s) => s.ecd_id), recipeId, childBand, COUNTED_UNITS, usablePlaces(loosePlaces)]
   );
   for (const row of rows) counts.set(row.picking_slip_id, (counts.get(row.picking_slip_id) ?? 0) + 1);
   return counts;

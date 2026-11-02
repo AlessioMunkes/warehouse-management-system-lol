@@ -162,10 +162,11 @@ describe.skipIf(!LOCAL)('stock cover against a real database', () => {
   });
 
   it('adds the recipe for centres on it to the standing orders of the rest, less committed stock', () => {
-    // 0.5 kg x 25 children for A, plus C's own order of 4 kg.
+    // 0.5 kg x 25 children for A (12.5 kg, rounded up to a whole 13 kg
+    // the way slips round loose products), plus C's own order of 4 kg.
     expect(item('Maize meal')).toMatchObject({
       unit: 'kg', onHand: 100, committed: 20, available: 80,
-      recipeWeekly: 12.5, standingWeekly: 4, weeklyDemand: 16.5,
+      recipeWeekly: 13, standingWeekly: 4, weeklyDemand: 17,
       demandSource: 'planned', demandLabel: 'Summer recipe and standing orders',
     });
   });
