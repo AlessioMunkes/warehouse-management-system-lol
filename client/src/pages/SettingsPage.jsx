@@ -49,7 +49,7 @@ import ErrorBanner from '@/components/ui/error-banner';
 const SECTIONS = [
   { id: 'email',         label: 'Email' },
   { id: 'connections',   label: 'Connections' },
-  { id: 'notifications', label: 'Notifications & reminders' },
+  { id: 'notifications', label: 'Reminders' },
   { id: 'stock',         label: 'Stock rules' },
   { id: 'recipes',       label: 'Recipes' },
   { id: 'reporting',     label: 'Reporting' },
