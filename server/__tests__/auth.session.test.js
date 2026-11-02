@@ -102,7 +102,8 @@ describe('guest tokens', () => {
   it('lets an open visit through, without reading users', async () => {
     const res = await request(app).get('/any').set('Cookie', cookieFor(GUEST));
     expect(res.status).toBe(200);
-    expect(sessionRepo.findGuestSession).toHaveBeenCalledWith(9);
+    // 4: Settings > Accounts, "Sign out an idle volunteer after" (default).
+    expect(sessionRepo.findGuestSession).toHaveBeenCalledWith(9, 4);
     expect(sessionRepo.findStaffSession).not.toHaveBeenCalled();
   });
 

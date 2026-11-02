@@ -61,18 +61,39 @@ export const bandedChildCount = (childCount, band) => {
 export const COUNTED_UNITS = ['each', 'bag', 'box', 'crate', 'punnet'];
 
 // What a slip carries for one recipe line, for a child count already
-// rounded to its band. The SQL in recipe.repository.js does the same sum.
+// rounded to its band. The SQL in recipe.repository.js does the same sum
+// (looseQuantitySql below).
 //
 // `whole` is for a product that is not decantable, whatever its unit:
 // only a decantable product can be a part quantity (migration 044).
-export const slipQuantity = (quantityPerChild, unit, children, { whole = false } = {}) => {
+// `places` is how many decimals a loose (decantable) amount is rounded
+// UP to (Settings → Recipes, "Decimal places for loose products").
+export const slipQuantity = (quantityPerChild, unit, children, { whole = false, places = 0 } = {}) => {
   const amount = Number(quantityPerChild) * Number(children);
   if (!Number.isFinite(amount) || amount <= 0) return 0;
   // Rounded to six places first: 0.12 × 75 is 9.000000000000002 in
   // floating point, and that must not become 10 cans.
-  if (whole || COUNTED_UNITS.includes(unit)) return Math.ceil(Math.round(amount * 1e6) / 1e6);
-  return Math.round(amount * 100) / 100;
+  const exact = Math.round(amount * 1e6) / 1e6;
+  if (whole || COUNTED_UNITS.includes(unit)) return Math.ceil(exact);
+  const step = 10 ** usablePlaces(places);
+  return Math.ceil(Math.round(exact * step * 1e6) / 1e6) / step;
 };
+
+// 0, 1 or 2; anything else is 0 (whole units).
+export const usablePlaces = (places) => {
+  const n = Number(places);
+  return Number.isInteger(n) && n >= 0 && n <= 2 ? n : 0;
+};
+
+// The SQL for one recipe line's slip quantity, the same sum as
+// slipQuantity. `amount` is the quantity-per-child times children
+// expression; `counted` and `places` are the placeholders holding
+// COUNTED_UNITS and the decimal places.
+export const recipeLineQuantitySql = (amount, counted, places) =>
+  `CASE WHEN rl.unit = ANY(${counted}::text[]) OR NOT p.is_decantable
+        THEN CEIL(ROUND(${amount}, 6))
+        ELSE CEIL(ROUND(${amount}, 6) * (10::numeric ^ ${places}::int)) / (10::numeric ^ ${places}::int)
+   END`;
 
 // A day that exists every year: 29 February is refused so a season
 // never starts on a date that is missing three years in four.

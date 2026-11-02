@@ -381,6 +381,55 @@ describe('the 3D marks', () => {
     expect(screen.getByText(/Solid block: stock against capacity. Red top: over capacity. Stacks: each product/)).toBeInTheDocument();
   });
 
+  // Feedback: the 3D map sometimes would not take a click.
+  it('still opens an area after a tap that wobbles a few pixels', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const svg = screen.getByRole('group', { name: /3D view/ });
+    const store = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
+    // 10 px between press and release: a finger tap, not a turn.
+    fireEvent.pointerDown(svg, { clientX: 100, clientY: 100, pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerMove(svg, { clientX: 110, clientY: 100, pointerId: 1, pointerType: 'touch' });
+    fireEvent.pointerUp(svg, { clientX: 110, clientY: 100, pointerId: 1, pointerType: 'touch' });
+    fireEvent.click(store);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('treats a real drag as turning the floor, not as a click', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const svg = screen.getByRole('group', { name: /3D view/ });
+    const store = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
+    fireEvent.pointerDown(svg, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(svg, { clientX: 160, clientY: 100, pointerId: 1 });
+    fireEvent.pointerUp(svg, { clientX: 160, clientY: 100, pointerId: 1 });
+    fireEvent.click(store);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('lifts the drawing on hover but not the shapes that take the pointer', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const store = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
+    fireEvent.pointerEnter(store, { clientX: 50, clientY: 50 });
+    expect(store.querySelector('.wm-lift')).toHaveAttribute('transform', 'translate(0 -4)');
+    expect(store.querySelector('.wm-lift')).toHaveClass('pointer-events-none');
+    expect(store.querySelector('[data-hit]')).not.toHaveAttribute('transform');
+  });
+
+  it('lets a click through the glass of a see-through rack', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /3D/ }));
+    const store = screen.getByRole('button', { name: /^Dry store 1, Dry store/ });
+    // The frame's hit shape takes its edges only; its stock takes the rest.
+    const frame = store.querySelector('[data-hit] > polygon');
+    expect(frame).toHaveAttribute('pointer-events', 'stroke');
+  });
+
   it('lights up the areas that need attention', async () => {
     const user = userEvent.setup();
     const over = { ...MAP.areas[0], fill: 1.4 };

@@ -31,6 +31,7 @@ import { warehouseName, isMultiWarehouse } from '../config/warehouses.js';
 import { accountChangeRateLimiter } from '../middleware/rateLimiter.middleware.js';
 import accountService from '../services/account.service.js';
 import { sendError } from '../utils/httpError.js';
+import settings from '../services/settings.service.js';
 
 const router = express.Router();
 
@@ -141,7 +142,7 @@ const keepThisSession = async (req, res) => {
   } else {
     claims.sv = sv;
   }
-  setStaffSessionCookie(res, claims);
+  setStaffSessionCookie(res, claims, await settings.get('accounts.staffSessionHours'));
 };
 
 router.patch('/password', auth, accountChangeRateLimiter,

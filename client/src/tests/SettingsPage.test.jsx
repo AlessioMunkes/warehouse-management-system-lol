@@ -90,8 +90,8 @@ describe('SettingsPage', () => {
   it('changes section from the email-integration address Google returns to', async () => {
     const user = userEvent.setup();
     renderAt('/admin/email-integration?gmail=connected', { defaultSection: 'email' });
-    await user.click(screen.getByRole('tab', { name: 'Stock rules' }));
+    await user.click(screen.getByRole('tab', { name: 'Stock' }));
     // MemoryRouter: the new URL is reflected in the selected tab.
-    expect(screen.getByRole('tab', { name: 'Stock rules' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Stock' })).toHaveAttribute('aria-selected', 'true');
   });
 });

@@ -20,6 +20,7 @@ import slipAccessRepo               from '../repositories/slipAccess.repository.
 import { isTodayGateCode, todayGateCode } from '../services/gateCode.service.js';
 import { guestSignInRateLimiter } from '../middleware/rateLimiter.middleware.js';
 import { sendError } from '../utils/httpError.js';
+import settings from '../services/settings.service.js';
 
 const router = express.Router();
 
@@ -47,7 +48,8 @@ router.get('/gate-code', auth, requireRole(...MANAGERS_UP), (_req, res) => {
 const asDate = (value) =>
   (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
 
-const SESSION_HOURS = 12;
+// How long a volunteer stays signed in: Settings > Access,
+// "Volunteer sign-in lasts" (12 hours unless changed).
 
 router.post('/sign-in', guestSignInRateLimiter, async (req, res) => {
   try {
@@ -72,15 +74,16 @@ router.post('/sign-in', guestSignInRateLimiter, async (req, res) => {
     // signed_in_at comes from the DB default — never from the client
     const volunteer = await volunteerRepo.createGuestVisit(name.trim());
 
+    const hours = await settings.get('accounts.guestSessionHours');
     const token = jwt.sign(
       { id: volunteer.id, role: 'guest', ...guestWarehouseClaim() },
       process.env.JWT_SECRET,
-      { expiresIn: `${SESSION_HOURS}h` }
+      { expiresIn: `${hours}h` }
     );
 
     res.cookie(AUTH_COOKIE, token, {
       ...authCookieOptions(),
-      maxAge: sessionMaxAge(SESSION_HOURS),
+      maxAge: sessionMaxAge(hours),
     });
 
     return res.status(201).json({

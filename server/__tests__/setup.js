@@ -85,7 +85,11 @@ vi.mock('../src/services/settings.service.js', async () => {
   const { defaults } = await import('../src/features/settings/settingsDefinitions.js');
   const get = vi.fn(async (key) => defaults()[key]);
   const getAll = vi.fn(async () => defaults());
-  return { get, getAll, list: vi.fn(), update: vi.fn(), default: { get, getAll, list: vi.fn(), update: vi.fn() } };
+  const getIn = vi.fn(async (_code, key) => defaults()[key]);
+  return {
+    get, getAll, getIn, list: vi.fn(), update: vi.fn(),
+    default: { get, getAll, getIn, list: vi.fn(), update: vi.fn() },
+  };
 });
 
 // The operating calendar's closed days live in the database. Every

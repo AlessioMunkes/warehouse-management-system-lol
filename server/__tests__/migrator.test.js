@@ -77,9 +77,8 @@ describe('listMigrationFiles and pendingMigrations', () => {
 });
 
 describe('this repo', () => {
-  // The numbered files were cleared at handover: the database has them
-  // all. No folder lists as no migrations; it comes back with the next
-  // schema change.
+  // schema.sql builds the whole database; migrations/ holds the seed
+  // data (NNN_seed_*.sql) and any schema change made since the last export.
   const migrations = listMigrationFiles(path.join(DB_DIR, 'migrations'));
   // baseline.sql, seed.sql and baseline-migrations.txt are only read by
   // `migrate init` and `mark-baseline`, and are not in the repo yet.
@@ -111,6 +110,26 @@ describe('this repo', () => {
     }
   });
 
+  // schema.sql is the script that builds a new database, so it must be
+  // real SQL, not Supabase's "for context only" table listing (which has
+  // USER-DEFINED column types and cannot be run).
+  it('schema.sql is a runnable build script', () => {
+    const schema = fs.readFileSync(inDb('schema.sql'), 'utf8');
+    expect(schema).not.toMatch(/USER-DEFINED|not meant to be run/);
+    expect(schema).toMatch(/CREATE TABLE public\."users"/);
+    expect(unsafeMigrationReason(schema)).toBeNull();
+  });
+
+  // Seed migrations also run on databases that already hold the rows,
+  // so every insert in one must skip rows that are already there.
+  it('every seed migration inserts with ON CONFLICT', () => {
+    for (const m of migrations.filter((f) => /^\d{3}_seed_/.test(f.file))) {
+      const sql = stripSqlNoise(fs.readFileSync(m.path, 'utf8'));
+      const inserts = sql.split(';').filter((st) => /\bINSERT\s+INTO\b/i.test(st));
+      for (const st of inserts) expect([m.file, /\bON CONFLICT\b/i.test(st)]).toEqual([m.file, true]);
+    }
+  });
+
   // Supabase's API roles were shut out of the schema in 057. The app
   // never uses them, so no migration should let them back in.
   it('no migration grants anything to the Supabase API roles', () => {
@@ -139,5 +158,21 @@ describe('this repo', () => {
     const sql = stripSqlNoise(baseline);
     expect(sql).not.toMatch(/\b(auth|storage|realtime|vault|graphql|pgbouncer)\.\w/);
     expect(sql).not.toMatch(/^\\(un)?restrict/m);
+  });
+});
+
+describe('docs/new-database.sql', () => {
+  // The one-file installer is built from schema.sql and the seed
+  // migrations. If either changes, `npm run build-new-database` must be
+  // run, or a new installation would miss the change.
+  it('is up to date with schema.sql and the seed migrations', async () => {
+    const { buildNewDatabaseSql } = await import('../scripts/build-new-database.mjs');
+    const onDisk = fs.readFileSync(path.join(DB_DIR, '..', '..', 'docs', 'new-database.sql'), 'utf8');
+    expect(onDisk === buildNewDatabaseSql(), 'run: cd server && npm run build-new-database').toBe(true);
+  });
+
+  it('contains the Summer and Winter recipes, so Settings → Recipes works on a new install', () => {
+    const sql = fs.readFileSync(path.join(DB_DIR, '..', '..', 'docs', 'new-database.sql'), 'utf8');
+    expect(sql).toMatch(/INSERT INTO public\.recipes[\s\S]*'Summer', 'summer'[\s\S]*'Winter', 'winter'/);
   });
 });

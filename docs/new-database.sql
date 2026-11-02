@@ -1,34 +1,27 @@
 -- -------------------------------------------------------------
--- new-database.sql — a new, empty Batches warehouse database
+-- new-database.sql — a new Batches warehouse database, in one file
 --
--- Written by server/scripts/export-new-database.mjs on 2026-10-28,
--- from a database on PostgreSQL 17.6, with 63 migrations applied
--- (the last: 2026_08_13_donations). Do not edit by hand: change the
--- database through a migration, then run `npm run export-database` again.
+-- Built by server/scripts/build-new-database.mjs from
+-- server/database/schema.sql (every table, type, key and index) and
+-- the seed migrations in server/database/migrations/ (the starter
+-- settings and the Summer and Winter recipes). Do not edit by hand:
+-- change those files and run `npm run build-new-database` again.
 --
--- HOW TO RUN IT
---   Supabase: open the new project, SQL Editor, New query, paste this
---   whole file, set the first admin below (optional), press Run.
+-- HOW TO RUN IT (on a NEW, EMPTY database only; it refuses otherwise)
+--   Supabase: SQL Editor, New query, paste this whole file, set the
+--             first admin at the bottom (optional), press Run.
 --   psql:     psql "<connection string>" --single-transaction -f docs/new-database.sql
---   The app:  npm run migrate -- init <code>   (from the server folder)
+--   The app:  cd server && npm run migrate -- init <code>  (does the same
+--             from schema.sql and the migrations)
 --
--- It builds every table, type, key, index and sequence the app uses,
--- turns on row-level security and closes Supabase's Data API (the app
--- connects to Postgres directly), adds the starter configuration every
--- warehouse shares, and records the migrations it already contains, so
--- `npm run migrate -- up` carries on from here.
---
--- It stops without changing anything if the database already has tables:
--- it is for a new, empty database only.
---
--- It holds no data from any warehouse: no people, stock, donations,
--- dispatches, centres, connections or contact details.
+-- It holds no warehouse's data: no people, stock, donations, centres,
+-- connections or contact details.
 -- -------------------------------------------------------------
 
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public') THEN
-    RAISE EXCEPTION 'This database already has tables in public. new-database.sql is for a new, empty database only. Nothing was changed.';
+    RAISE EXCEPTION 'This database already has tables in public. schema.sql is for a new, empty database only. Nothing was changed.';
   END IF;
 END
 $$;
@@ -1162,6 +1155,15 @@ CREATE TABLE public."suppliers" (
   "archived_by" integer
 );
 
+CREATE TABLE public."translation_overrides" (
+  "language" character varying(5) NOT NULL,
+  "kind" character varying(10) NOT NULL,
+  "source" text NOT NULL,
+  "text" text NOT NULL,
+  "updated_by" integer,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE public."user_invites" (
   "id" integer DEFAULT nextval('user_invites_id_seq'::regclass) NOT NULL,
   "email" text NOT NULL,
@@ -1361,6 +1363,11 @@ ALTER TABLE public."storage_locations" ADD CONSTRAINT "storage_locations_pkey" P
 ALTER TABLE public."supplier_products" ADD CONSTRAINT "supplier_products_pkey" PRIMARY KEY (supplier_id, product_id);
 ALTER TABLE public."supplier_prospects" ADD CONSTRAINT "supplier_prospects_pkey" PRIMARY KEY (id);
 ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_pkey" PRIMARY KEY (id);
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_pkey" PRIMARY KEY (language, kind, source);
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_language_check" CHECK (((language)::text = ANY ((ARRAY['af'::character varying, 'xh'::character varying])::text[])));
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_kind_check" CHECK (((kind)::text = ANY ((ARRAY['key'::character varying, 'phrase'::character varying])::text[])));
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_source_check" CHECK (((length(source) >= 1) AND (length(source) <= 500)));
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_text_check" CHECK (((length(btrim(text)) >= 1) AND (length(btrim(text)) <= 1000)));
 ALTER TABLE public."user_invites" ADD CONSTRAINT "user_invites_pkey" PRIMARY KEY (id);
 ALTER TABLE public."users" ADD CONSTRAINT "users_pkey" PRIMARY KEY (id);
 ALTER TABLE public."vms_sync" ADD CONSTRAINT "vms_sync_pkey" PRIMARY KEY (sync_id);
@@ -1524,6 +1531,7 @@ ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_pallet_spac
 
 -- -- Foreign keys -------------------------------------------
 ALTER TABLE public."app_settings" ADD CONSTRAINT "app_settings_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id);
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."assistant_queries" ADD CONSTRAINT "assistant_queries_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."attendance" ADD CONSTRAINT "attendance_booking_id_fkey" FOREIGN KEY (booking_id) REFERENCES volunteer_bookings(booking_id);
 ALTER TABLE public."barcode_scan_events" ADD CONSTRAINT "barcode_scan_events_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
@@ -1980,6 +1988,7 @@ ALTER TABLE public."storage_locations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."supplier_products" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."supplier_prospects" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."suppliers" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."translation_overrides" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."user_invites" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."vms_sync" ENABLE ROW LEVEL SECURITY;
@@ -2027,19 +2036,96 @@ BEGIN
 END
 $$;
 
--- -- Starter configuration ----------------------------------
+-- -- Migrations this file already contains ------------------
+-- The schema changes this file already contains, so `npm run migrate -- up`
+-- only runs the seed migrations and anything added after it.
+INSERT INTO public.schema_migrations (id, notes) VALUES
+  ('001_reporting_factors', 'In schema.sql'),
+  ('002_purchase_order_creation', 'In schema.sql'),
+  ('002_reporting_queries', 'In schema.sql'),
+  ('003_reporting_indexes', 'In schema.sql'),
+  ('015_create_volunteer_management_tables', 'In schema.sql'),
+  ('016_expand_vms_sync_entity_type', 'In schema.sql'),
+  ('019_create_section18a_certificate_engine', 'In schema.sql'),
+  ('020_add_gmail_display_name', 'In schema.sql'),
+  ('021_create_certificate_settings_table', 'In schema.sql'),
+  ('022_extend_donation_email_logs', 'In schema.sql'),
+  ('022_section18a_donor_form_flow', 'In schema.sql'),
+  ('023_add_notification_target_roles', 'In schema.sql'),
+  ('023_create_user_invites', 'In schema.sql'),
+  ('024_add_user_invite_email_status', 'In schema.sql'),
+  ('024_create_finance_report_access_links', 'In schema.sql'),
+  ('025_add_mobile_number_to_ecd_centres', 'In schema.sql'),
+  ('026_create_ecd_collection_reminders', 'In schema.sql'),
+  ('027_add_contact_email_to_ecd_centres', 'In schema.sql'),
+  ('028_add_finance_email_status_to_purchase_orders', 'In schema.sql'),
+  ('029_create_saved_reports', 'In schema.sql'),
+  ('030_create_push_subscriptions', 'In schema.sql'),
+  ('031_create_password_resets', 'In schema.sql'),
+  ('032_create_outbound_messages', 'In schema.sql'),
+  ('033_create_app_settings', 'In schema.sql'),
+  ('034_create_operating_closures', 'In schema.sql'),
+  ('035_add_approved_to_request_outcome', 'In schema.sql'),
+  ('036_create_community_request_items', 'In schema.sql'),
+  ('037_add_activity_log_date_indexes', 'In schema.sql'),
+  ('038_create_recipes', 'In schema.sql'),
+  ('039_create_supplier_products', 'In schema.sql'),
+  ('040_create_idempotency_keys', 'In schema.sql'),
+  ('041_create_photos', 'In schema.sql'),
+  ('042_add_user_language', 'In schema.sql'),
+  ('043_add_purchase_order_follow_up', 'In schema.sql'),
+  ('044_add_product_decantable', 'In schema.sql'),
+  ('045_purchase_order_part_quantities', 'In schema.sql'),
+  ('046_community_request_logged_by', 'In schema.sql'),
+  ('047_create_expiry_warning_dismissals', 'In schema.sql'),
+  ('048_create_warehouse_map', 'In schema.sql'),
+  ('049_warehouse_area_capacity', 'In schema.sql'),
+  ('050_add_ecd_centre_location', 'In schema.sql'),
+  ('051_warehouse_gates', 'In schema.sql'),
+  ('052_create_product_barcodes', 'In schema.sql'),
+  ('053_create_barcode_scan_events', 'In schema.sql'),
+  ('054_finance_link_expiry', 'In schema.sql'),
+  ('055_user_session_version', 'In schema.sql'),
+  ('056_product_barcode_food_facts', 'In schema.sql'),
+  ('057_lock_down_data_api', 'In schema.sql'),
+  ('058_runtime_schema_to_migration', 'In schema.sql'),
+  ('059_tidy_indexes', 'In schema.sql'),
+  ('060_drop_unused_schema', 'In schema.sql'),
+  ('061_delivery_delivered_at', 'In schema.sql'),
+  ('062_saved_report_narrative', 'In schema.sql'),
+  ('063_not_collected_follow_up', 'In schema.sql'),
+  ('064_donation_value_estimate', 'In schema.sql'),
+  ('065_one_email_per_role', 'In schema.sql'),
+  ('066_product_preferred_supplier', 'In schema.sql'),
+  ('067_guest_last_active', 'In schema.sql'),
+  ('068_kitchens', 'In schema.sql'),
+  ('069_fts_drop_points', 'In schema.sql'),
+  ('070_fts_dropoff_any_place', 'In schema.sql'),
+  ('2026_08_02_schema_gap_migration', 'In schema.sql'),
+  ('2026_08_13_donations', 'In schema.sql'),
+  ('002_translation_overrides', 'In schema.sql');
+
+
+-- -- Starter data (seed migrations) --------------------------
+-- from server/database/migrations/001_seed_starter_settings.sql
 INSERT INTO public."reporting_factors" ("id", "factor_key", "value", "unit", "source_note", "effective_from", "created_at")
-SELECT "id", "factor_key", "value", "unit", "source_note", "effective_from", "created_at" FROM jsonb_populate_recordset(NULL::public."reporting_factors", $json$[{"id":1,"factor_key":"kg_to_meals","value":"2.5","unit":"meals per kg","source_note":"PLACEHOLDER — confirm with Ladles of Love before publishing any figure.","effective_from":"2025-12-31T22:00:00.000Z","created_at":"2026-08-22T19:21:05.188Z"},{"id":2,"factor_key":"kg_to_adults_served","value":"1.5","unit":"adults per kg","source_note":"Placeholder — replace with a real figure from the organisation.","effective_from":"2026-09-14T22:00:00.000Z","created_at":"2026-09-15T22:04:44.327Z"},{"id":3,"factor_key":"kg_to_dignity_kitchen_served","value":"2.5","unit":"people per kg","source_note":"Placeholder seed value — replace via Adjust factors once the org has a real figure.","effective_from":"2026-09-21T22:00:00.000Z","created_at":"2026-09-22T21:44:30.859Z"},{"id":4,"factor_key":"kg_to_community_served","value":"2.5","unit":"people per kg","source_note":"Placeholder seed value — replace via Adjust factors once the org has a real figure.","effective_from":"2026-09-21T22:00:00.000Z","created_at":"2026-09-22T21:44:30.859Z"}]$json$);
+SELECT "id", "factor_key", "value", "unit", "source_note", "effective_from", "created_at" FROM jsonb_populate_recordset(NULL::public."reporting_factors", $json$[{"id":1,"factor_key":"kg_to_meals","value":"2.5","unit":"meals per kg","source_note":"PLACEHOLDER — confirm with Ladles of Love before publishing any figure.","effective_from":"2025-12-31T22:00:00.000Z","created_at":"2026-08-22T19:21:05.188Z"},{"id":2,"factor_key":"kg_to_adults_served","value":"1.5","unit":"adults per kg","source_note":"Placeholder — replace with a real figure from the organisation.","effective_from":"2026-09-14T22:00:00.000Z","created_at":"2026-09-15T22:04:44.327Z"},{"id":3,"factor_key":"kg_to_dignity_kitchen_served","value":"2.5","unit":"people per kg","source_note":"Placeholder seed value — replace via Adjust factors once the org has a real figure.","effective_from":"2026-09-21T22:00:00.000Z","created_at":"2026-09-22T21:44:30.859Z"},{"id":4,"factor_key":"kg_to_community_served","value":"2.5","unit":"people per kg","source_note":"Placeholder seed value — replace via Adjust factors once the org has a real figure.","effective_from":"2026-09-21T22:00:00.000Z","created_at":"2026-09-22T21:44:30.859Z"}]$json$)
+ON CONFLICT DO NOTHING;
 INSERT INTO public."programmes" ("id", "code", "name", "description", "is_active", "created_at")
-SELECT "id", "code", "name", "description", "is_active", "created_at" FROM jsonb_populate_recordset(NULL::public."programmes", $json$[{"id":1,"code":"NOC","name":"Nourish Our Children","description":"Fortnightly food parcels to registered ECD centres.","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":2,"code":"FTS","name":"Feed the Soil","description":"Fresh produce programme supplying ECDs and community kitchens.","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":3,"code":"LOVE_ACTIVISM","name":"Love Activism","description":"Dignity kitchens, soup kitchens and community relief drives.","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"}]$json$);
+SELECT "id", "code", "name", "description", "is_active", "created_at" FROM jsonb_populate_recordset(NULL::public."programmes", $json$[{"id":1,"code":"NOC","name":"Nourish Our Children","description":"Fortnightly food parcels to registered ECD centres.","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":2,"code":"FTS","name":"Feed the Soil","description":"Fresh produce programme supplying ECDs and community kitchens.","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":3,"code":"LOVE_ACTIVISM","name":"Love Activism","description":"Dignity kitchens, soup kitchens and community relief drives.","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"}]$json$)
+ON CONFLICT DO NOTHING;
 INSERT INTO public."storage_locations" ("id", "name", "area", "is_active", "created_at")
-SELECT "id", "name", "area", "is_active", "created_at" FROM jsonb_populate_recordset(NULL::public."storage_locations", $json$[{"id":1,"name":"Dry Store","area":"dry_store","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":2,"name":"Cold Room","area":"cold_room","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":3,"name":"Decanting Bay","area":"dry_store","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":4,"name":"Dispatch Staging","area":"dry_store","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"}]$json$);
+SELECT "id", "name", "area", "is_active", "created_at" FROM jsonb_populate_recordset(NULL::public."storage_locations", $json$[{"id":1,"name":"Dry Store","area":"dry_store","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":2,"name":"Cold Room","area":"cold_room","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":3,"name":"Decanting Bay","area":"dry_store","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"},{"id":4,"name":"Dispatch Staging","area":"dry_store","is_active":true,"created_at":"2026-08-19T13:28:02.358Z"}]$json$)
+ON CONFLICT DO NOTHING;
 INSERT INTO public."donation_category_routing" ("category", "routing_outcome", "storage_area", "description", "is_active", "updated_by", "updated_at")
-SELECT "category", "routing_outcome", "storage_area", "description", "is_active", "updated_by", "updated_at" FROM jsonb_populate_recordset(NULL::public."donation_category_routing", $json$[{"category":"recipe_food","routing_outcome":"ecd_fefo_stock","storage_area":null,"description":"Routed to core ECD stock allocation under recipe inventory.","is_active":true,"updated_by":null,"updated_at":"2026-08-24T19:39:33.639Z"},{"category":"add_on_food","routing_outcome":"proportional_ecd_distribution","storage_area":null,"description":"Routed to proportional ECD distribution alongside core recipe allocations.","is_active":true,"updated_by":null,"updated_at":"2026-08-24T19:39:33.639Z"},{"category":"non_recipe_food","routing_outcome":"soup_kitchen_stock","storage_area":"Soup Kitchen Prep","description":"Bulk or non-standard edible stock routed directly to soup kitchen inventory.","is_active":true,"updated_by":null,"updated_at":"2026-08-24T19:39:33.639Z"},{"category":"non_food","routing_outcome":"external_distribution_flag_wm","storage_area":"Mezzanine or Boardroom storage","description":"Non-food item routed to external distribution channel and flagged for Warehouse Manager review.","is_active":true,"updated_by":null,"updated_at":"2026-10-05T08:41:52.921Z"}]$json$);
+SELECT "category", "routing_outcome", "storage_area", "description", "is_active", "updated_by", "updated_at" FROM jsonb_populate_recordset(NULL::public."donation_category_routing", $json$[{"category":"recipe_food","routing_outcome":"ecd_fefo_stock","storage_area":null,"description":"Routed to core ECD stock allocation under recipe inventory.","is_active":true,"updated_by":null,"updated_at":"2026-08-24T19:39:33.639Z"},{"category":"add_on_food","routing_outcome":"proportional_ecd_distribution","storage_area":null,"description":"Routed to proportional ECD distribution alongside core recipe allocations.","is_active":true,"updated_by":null,"updated_at":"2026-08-24T19:39:33.639Z"},{"category":"non_recipe_food","routing_outcome":"soup_kitchen_stock","storage_area":"Soup Kitchen Prep","description":"Bulk or non-standard edible stock routed directly to soup kitchen inventory.","is_active":true,"updated_by":null,"updated_at":"2026-08-24T19:39:33.639Z"},{"category":"non_food","routing_outcome":"external_distribution_flag_wm","storage_area":"Mezzanine or Boardroom storage","description":"Non-food item routed to external distribution channel and flagged for Warehouse Manager review.","is_active":true,"updated_by":null,"updated_at":"2026-10-05T08:41:52.921Z"}]$json$)
+ON CONFLICT DO NOTHING;
 INSERT INTO public."picking_settings" ("key", "value", "updated_at")
-SELECT "key", "value", "updated_at" FROM jsonb_populate_recordset(NULL::public."picking_settings", $json$[{"key":"cohort_anchor_monday","value":"2026-08-17","updated_at":"2026-08-19T13:28:02.358Z"},{"key":"default_bag_sizes_kg","value":"[2,1,0.5,0.25]","updated_at":"2026-08-19T13:28:02.358Z"}]$json$);
+SELECT "key", "value", "updated_at" FROM jsonb_populate_recordset(NULL::public."picking_settings", $json$[{"key":"cohort_anchor_monday","value":"2026-08-17","updated_at":"2026-08-19T13:28:02.358Z"},{"key":"default_bag_sizes_kg","value":"[2,1,0.5,0.25]","updated_at":"2026-08-19T13:28:02.358Z"}]$json$)
+ON CONFLICT DO NOTHING;
 INSERT INTO public."donation_settings" ("id", "section18a_threshold_value", "updated_at")
-SELECT "id", "section18a_threshold_value", "updated_at" FROM jsonb_populate_recordset(NULL::public."donation_settings", $json$[{"id":1,"section18a_threshold_value":"1000.00","updated_at":"2026-08-19T13:28:02.358Z"}]$json$);
+SELECT "id", "section18a_threshold_value", "updated_at" FROM jsonb_populate_recordset(NULL::public."donation_settings", $json$[{"id":1,"section18a_threshold_value":"1000.00","updated_at":"2026-08-19T13:28:02.358Z"}]$json$)
+ON CONFLICT DO NOTHING;
 DO $$
 DECLARE
   s record;
@@ -2059,72 +2145,16 @@ BEGIN
 END
 $$;
 
--- -- Migrations this file already contains ------------------
--- So `npm run migrate -- up` only applies migrations added after it.
+-- from server/database/migrations/003_seed_season_recipes.sql
+INSERT INTO public.recipes (name, kind, season_start_month, season_start_day)
+VALUES ('Summer', 'summer', 9, 1),
+       ('Winter', 'winter', 5, 1)
+ON CONFLICT DO NOTHING;
+
 INSERT INTO public.schema_migrations (id, notes) VALUES
-  ('001_reporting_factors', 'In new-database.sql'),
-  ('002_purchase_order_creation', 'In new-database.sql'),
-  ('002_reporting_queries', 'In new-database.sql'),
-  ('003_reporting_indexes', 'In new-database.sql'),
-  ('015_create_volunteer_management_tables', 'In new-database.sql'),
-  ('016_expand_vms_sync_entity_type', 'In new-database.sql'),
-  ('019_create_section18a_certificate_engine', 'In new-database.sql'),
-  ('020_add_gmail_display_name', 'In new-database.sql'),
-  ('021_create_certificate_settings_table', 'In new-database.sql'),
-  ('022_extend_donation_email_logs', 'In new-database.sql'),
-  ('022_section18a_donor_form_flow', 'In new-database.sql'),
-  ('023_add_notification_target_roles', 'In new-database.sql'),
-  ('023_create_user_invites', 'In new-database.sql'),
-  ('024_add_user_invite_email_status', 'In new-database.sql'),
-  ('024_create_finance_report_access_links', 'In new-database.sql'),
-  ('025_add_mobile_number_to_ecd_centres', 'In new-database.sql'),
-  ('026_create_ecd_collection_reminders', 'In new-database.sql'),
-  ('027_add_contact_email_to_ecd_centres', 'In new-database.sql'),
-  ('028_add_finance_email_status_to_purchase_orders', 'In new-database.sql'),
-  ('029_create_saved_reports', 'In new-database.sql'),
-  ('030_create_push_subscriptions', 'In new-database.sql'),
-  ('031_create_password_resets', 'In new-database.sql'),
-  ('032_create_outbound_messages', 'In new-database.sql'),
-  ('033_create_app_settings', 'In new-database.sql'),
-  ('034_create_operating_closures', 'In new-database.sql'),
-  ('035_add_approved_to_request_outcome', 'In new-database.sql'),
-  ('036_create_community_request_items', 'In new-database.sql'),
-  ('037_add_activity_log_date_indexes', 'In new-database.sql'),
-  ('038_create_recipes', 'In new-database.sql'),
-  ('039_create_supplier_products', 'In new-database.sql'),
-  ('040_create_idempotency_keys', 'In new-database.sql'),
-  ('041_create_photos', 'In new-database.sql'),
-  ('042_add_user_language', 'In new-database.sql'),
-  ('043_add_purchase_order_follow_up', 'In new-database.sql'),
-  ('044_add_product_decantable', 'In new-database.sql'),
-  ('045_purchase_order_part_quantities', 'In new-database.sql'),
-  ('046_community_request_logged_by', 'In new-database.sql'),
-  ('047_create_expiry_warning_dismissals', 'In new-database.sql'),
-  ('048_create_warehouse_map', 'In new-database.sql'),
-  ('049_warehouse_area_capacity', 'In new-database.sql'),
-  ('050_add_ecd_centre_location', 'In new-database.sql'),
-  ('051_warehouse_gates', 'In new-database.sql'),
-  ('052_create_product_barcodes', 'In new-database.sql'),
-  ('053_create_barcode_scan_events', 'In new-database.sql'),
-  ('054_finance_link_expiry', 'In new-database.sql'),
-  ('055_user_session_version', 'In new-database.sql'),
-  ('056_product_barcode_food_facts', 'In new-database.sql'),
-  ('057_lock_down_data_api', 'In new-database.sql'),
-  ('058_runtime_schema_to_migration', 'In new-database.sql'),
-  ('059_tidy_indexes', 'In new-database.sql'),
-  ('060_drop_unused_schema', 'In new-database.sql'),
-  ('061_delivery_delivered_at', 'In new-database.sql'),
-  ('062_saved_report_narrative', 'In new-database.sql'),
-  ('063_not_collected_follow_up', 'In new-database.sql'),
-  ('064_donation_value_estimate', 'In new-database.sql'),
-  ('065_one_email_per_role', 'In new-database.sql'),
-  ('066_product_preferred_supplier', 'In new-database.sql'),
-  ('067_guest_last_active', 'In new-database.sql'),
-  ('068_kitchens', 'In new-database.sql'),
-  ('069_fts_drop_points', 'In new-database.sql'),
-  ('070_fts_dropoff_any_place', 'In new-database.sql'),
-  ('2026_08_02_schema_gap_migration', 'In new-database.sql'),
-  ('2026_08_13_donations', 'In new-database.sql');
+  ('001_seed_starter_settings', 'In new-database.sql'),
+  ('003_seed_season_recipes', 'In new-database.sql')
+ON CONFLICT (id) DO NOTHING;
 
 -- -- First admin (optional) ---------------------------------
 -- Someone has to be able to sign in. Fill in the four values and run the

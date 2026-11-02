@@ -70,7 +70,12 @@ import {
 import { cn } from '@/lib/utils';
 
 const FONT = 11;
-const DRAG_START_PX = 4;
+// How far the pointer has to move before a press turns the floor
+// instead of clicking. A finger or a trackpad wobbles more than a
+// mouse, so a tap is given more room before it counts as a drag.
+const DRAG_START_PX = { mouse: 8, touch: 14, pen: 12 };
+const dragStartPx = (pointerType) => DRAG_START_PX[pointerType] ?? DRAG_START_PX.touch;
+const HOVER_LIFT = 'translate(0 -4)';
 const YAW_PER_PX = 0.4;
 const TILT_PER_PX = 0.25;
 const TURN_MS = 450;
@@ -207,7 +212,28 @@ function Box({ faces, className, strokeWidth = 1, dashed, fillOpacity }) {
   );
 }
 
+// The invisible shape that takes the pointer for a box. It never moves
+// (the drawing lifts on hover, this does not), so an area cannot slide
+// out from under the pointer and drop back over and over. `outline`
+// takes clicks on the edges only: a see-through rack lets a click on its
+// glass reach whatever is drawn behind it.
+function HitBox({ faces, outline = false }) {
+  const look = {
+    fill: 'transparent', stroke: 'transparent', strokeWidth: outline ? 6 : 1,
+    strokeLinejoin: 'round', pointerEvents: outline ? 'stroke' : 'all',
+  };
+  return (
+    <>
+      {faces.walls.map((wall) => <polygon key={wall.points} points={wall.points} {...look} />)}
+      <polygon points={faces.top} {...look} />
+    </>
+  );
+}
+
 // An area in 3D: its frame, and inside it the stock as high as it is full.
+//
+// Drawn twice: the picture (lifted while hovered, takes no pointer
+// events) and on top of it the hit shapes, which stay where they are.
 function Area3D({ box, view, s }) {
   const { area } = box;
   const t = TONES[s.tone] ?? TONES.neutral;
@@ -226,45 +252,60 @@ function Area3D({ box, view, s }) {
   const levels = (area.kind === 'dry' || area.kind === 'cold') ? Math.round(H / LEVEL_HEIGHT) : 0;
   const shelves = levels > 1 ? shelfLines(box, view, Array.from({ length: levels - 1 }, (_, i) => (i + 1) * LEVEL_HEIGHT)) : [];
 
+  const glassOpacity = glass ? (mode === 'stacks' ? 0.22 : 0.3) : undefined;
+
   return (
     <g
       {...pressable(area, s.onSelect)}
       aria-label={s.label}
       opacity={s.dimmed ? 0.25 : 1}
-      className={cn(s.onSelect ? 'cursor-pointer outline-none focus-visible:[&_polygon]:stroke-[2.5]' : '', 'wm-lift')}
-      transform={s.hovered ? 'translate(0 -4)' : undefined}
+      className={cn(s.onSelect ? 'cursor-pointer outline-none focus-visible:[&_polygon]:stroke-[2.5]' : '')}
       onPointerEnter={s.onHover}
       onPointerMove={s.onHover}
       onPointerLeave={s.onLeave}
     >
-      {area.kind === 'floor' ? <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} /> : null}
-      {stacks.map((st) => {
-        const hit = matches(st.item, s.matchProduct);
-        return (
+      <g className="wm-lift pointer-events-none" transform={s.hovered ? HOVER_LIFT : undefined}>
+        {area.kind === 'floor' ? <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} /> : null}
+        {stacks.map((st) => {
+          const hit = matches(st.item, s.matchProduct);
+          return (
+            <g key={st.id} opacity={s.matchProduct && !hit ? 0.35 : 1}>
+              <Box
+                faces={boxFaces(st, view)}
+                className={cn(hit ? 'fill-info stroke-ink' : (STACK_LOOK[s.tone] ?? cn(t.solid, t.stroke)), st.item.expected && !hit && 'opacity-60')}
+                strokeWidth={hit ? 1.5 : 0.6}
+                fillOpacity={0.95}
+              />
+            </g>
+          );
+        })}
+        {inner ? <Box faces={boxFaces(inner, view)} className={cn(t.solid, t.stroke)} strokeWidth={0.75} fillOpacity={0.92} /> : null}
+        {cap ? <Box faces={boxFaces(cap, view)} className="fill-danger stroke-danger" strokeWidth={0.75} fillOpacity={0.85} /> : null}
+        {area.kind === 'floor' ? null : (
+          <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} fillOpacity={glassOpacity} />
+        )}
+        {shelves.map((l) => (
+          <line key={`${l.x1},${l.y1}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className={t.stroke} strokeWidth={0.75} strokeOpacity={0.6} />
+        ))}
+      </g>
+
+      <g data-hit="">
+        {/* A solid area takes the pointer anywhere on it; a see-through one
+            only on its edges, its stock and its fill. */}
+        <HitBox faces={boxFaces(box, view)} outline={glass} />
+        {inner ? <HitBox faces={boxFaces(inner, view)} /> : null}
+        {cap ? <HitBox faces={boxFaces(cap, view)} /> : null}
+        {stacks.map((st) => (
           <g
             key={st.id}
             onPointerEnter={(e) => s.onHover(e, st.item)}
             onPointerMove={(e) => s.onHover(e, st.item)}
-            opacity={s.matchProduct && !hit ? 0.35 : 1}
           >
             <title>{`${st.item.name}: ${fmtCount(st.item.about)} ${st.item.unit}`}</title>
-            <Box
-              faces={boxFaces(st, view)}
-              className={cn(hit ? 'fill-info stroke-ink' : (STACK_LOOK[s.tone] ?? cn(t.solid, t.stroke)), st.item.expected && !hit && 'opacity-60')}
-              strokeWidth={hit ? 1.5 : 0.6}
-              fillOpacity={0.95}
-            />
+            <HitBox faces={boxFaces(st, view)} />
           </g>
-        );
-      })}
-      {inner ? <Box faces={boxFaces(inner, view)} className={cn(t.solid, t.stroke)} strokeWidth={0.75} fillOpacity={0.92} /> : null}
-      {cap ? <Box faces={boxFaces(cap, view)} className="fill-danger stroke-danger" strokeWidth={0.75} fillOpacity={0.85} /> : null}
-      {area.kind === 'floor' ? null : (
-        <Box faces={boxFaces(box, view)} className={cn(t.fill, t.stroke)} strokeWidth={stroke} dashed={t.dashed} fillOpacity={glass ? (mode === 'stacks' ? 0.22 : 0.3) : undefined} />
-      )}
-      {shelves.map((l) => (
-        <line key={`${l.x1},${l.y1}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} className={cn('pointer-events-none', t.stroke)} strokeWidth={0.75} strokeOpacity={0.6} />
-      ))}
+        ))}
+      </g>
     </g>
   );
 }
@@ -285,7 +326,7 @@ function Label3D({ box, view, s, showText }) {
   // their names instead (drawn with the name tags).
   if (showText && area.gate?.kind === 'dispatch' && area.gate.trucks) return null;
   return (
-    <g className="pointer-events-none" opacity={s.dimmed ? 0.25 : 1} transform={s.hovered ? 'translate(0 -4)' : undefined}>
+    <g className="pointer-events-none" opacity={s.dimmed ? 0.25 : 1} transform={s.hovered ? HOVER_LIFT : undefined}>
       <line x1={top.px} y1={top.py} x2={float.px} y2={float.py} className="stroke-ink-soft" strokeWidth={0.75} strokeDasharray="2 2" />
       {showText ? (
         <>
@@ -518,7 +559,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct, on
     moved.current = false;
     // A pinch or a Shift-drag is the zoom's; anything else turns the floor.
     if (z.onPointerDown(e)) { drag.current = null; setHover(null); return; }
-    drag.current = { x: e.clientX, y: e.clientY, from: camRef.current, active: false };
+    drag.current = { x: e.clientX, y: e.clientY, from: camRef.current, active: false, slack: dragStartPx(e.pointerType) };
   };
   const move = (e) => {
     if (z.onPointerMove(e)) return;
@@ -526,7 +567,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct, on
     if (!d) return;
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
-    if (!d.active && Math.hypot(dx, dy) < DRAG_START_PX) return;
+    if (!d.active && Math.hypot(dx, dy) < d.slack) return;
     if (!d.active) { d.active = true; e.currentTarget.setPointerCapture?.(e.pointerId); setHover(null); }
     moved.current = true;
     // At most one redraw a screen frame, however fast the pointer moves.

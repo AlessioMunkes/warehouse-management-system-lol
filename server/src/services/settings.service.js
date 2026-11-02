@@ -16,6 +16,7 @@
 // admin saves.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { runInWarehouse } from '../config/warehouseContext.js';
 import settingsRepository from '../repositories/settings.repository.js';
 import {
   SETTINGS, SETTING_KEYS, defaults, isSettingKey, validateValue,
@@ -40,6 +41,18 @@ export const get = async (key) => {
   return (await getAll())[key];
 };
 
+// One setting read in a named warehouse, for a request that has none
+// yet (signing in, before the session says which warehouse). No code:
+// read where the request already is. Falls back to the default.
+export const getIn = async (code, key) => {
+  if (!code) return get(key);
+  try {
+    return await runInWarehouse(code, () => get(key));
+  } catch {
+    return SETTINGS[key].default;
+  }
+};
+
 // For the Settings screen: every setting with its definition, current
 // value and whether it has been changed from the default.
 export const list = async () => {
@@ -61,6 +74,12 @@ export const update = async (changes, userId) => {
   }
   const keys = Object.keys(changes);
   if (keys.length === 0) throw fail(400, 'Nothing to change.');
+  // Wording is kept without stray spaces at either end (or line ends).
+  changes = Object.fromEntries(Object.entries(changes).map(([key, value]) => [
+    key,
+    isSettingKey(key) && SETTINGS[key].type === 'text' && typeof value === 'string'
+      ? value.split('\n').map((line) => line.trim()).join('\n').trim() : value,
+  ]));
   for (const key of keys) {
     if (!isSettingKey(key)) throw fail(400, `Unknown setting "${key}".`);
     const message = validateValue(key, changes[key]);
@@ -93,4 +112,4 @@ export const update = async (changes, userId) => {
   return list();
 };
 
-export default { get, getAll, list, update };
+export default { get, getAll, getIn, list, update };

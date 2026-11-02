@@ -95,10 +95,28 @@ describe('bandedChildCount', () => {
 });
 
 describe('slipQuantity', () => {
-  it('rounds weighed and poured amounts to two decimals', () => {
-    expect(slipQuantity(0.058, 'kg', 25)).toBe(1.45);
-    expect(slipQuantity(0.0132, 'l', 30)).toBe(0.4);
-    expect(slipQuantity(0.001, 'kg', 25)).toBe(0.03);
+  it('rounds loose amounts up to a whole unit by default (3.3 L of oil is 4 L)', () => {
+    expect(slipQuantity(0.132, 'l', 25)).toBe(4);
+    expect(slipQuantity(0.058, 'kg', 25)).toBe(2);
+    expect(slipQuantity(0.12, 'kg', 75)).toBe(9);      // exactly 9, not 10
+  });
+
+  it('rounds loose amounts up to the decimal places set (Settings → Recipes)', () => {
+    expect(slipQuantity(0.132, 'l', 25, { places: 1 })).toBe(3.3);
+    expect(slipQuantity(0.132, 'l', 25, { places: 2 })).toBe(3.3);
+    expect(slipQuantity(0.058, 'kg', 25, { places: 1 })).toBe(1.5);
+    expect(slipQuantity(0.058, 'kg', 25, { places: 2 })).toBe(1.45);
+    expect(slipQuantity(0.0132, 'l', 30, { places: 2 })).toBe(0.4);
+    expect(slipQuantity(0.001, 'kg', 25, { places: 2 })).toBe(0.03);
+  });
+
+  it('treats an unusable number of places as whole units', () => {
+    expect(slipQuantity(0.132, 'l', 25, { places: 7 })).toBe(4);
+    expect(slipQuantity(0.132, 'l', 25, { places: 'x' })).toBe(4);
+  });
+
+  it('keeps counted units whole whatever the places', () => {
+    expect(slipQuantity(0.12, 'each', 30, { places: 2 })).toBe(4);
   });
 
   it('rounds counted units up to a whole one', () => {

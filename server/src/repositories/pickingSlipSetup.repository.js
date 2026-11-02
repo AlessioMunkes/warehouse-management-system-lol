@@ -21,7 +21,7 @@ import { logEvent }     from './pickingEvents.repository.js';
 const insertSlipItems = async (client, { slipId, ecdId, dispatchDate, recipe }) => {
   if (recipe) {
     const rowCount = await recipeRepository.insertSlipItemsFromRecipe(client, {
-      slipId, ecdId, recipeId: recipe.id, childBand: recipe.child_band,
+      slipId, ecdId, recipeId: recipe.id, childBand: recipe.child_band, loosePlaces: recipe.loose_places,
     });
     if (rowCount > 0) return { rowCount, source: 'recipe' };
   }
@@ -129,7 +129,7 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy, beforeCommit }
     // most of a minute with the manager watching a spinner.
     const fromRecipe = recipe
       ? await recipeRepository.insertSlipItemsFromRecipeForMany(client, {
-          slips: slips.rows, recipeId: recipe.id, childBand: recipe.child_band,
+          slips: slips.rows, recipeId: recipe.id, childBand: recipe.child_band, loosePlaces: recipe.loose_places,
         })
       : new Map();
     const rest = slips.rows.filter((slip) => !fromRecipe.has(slip.id));
