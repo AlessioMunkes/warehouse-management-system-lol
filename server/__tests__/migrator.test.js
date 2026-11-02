@@ -160,3 +160,19 @@ describe('this repo', () => {
     expect(sql).not.toMatch(/^\\(un)?restrict/m);
   });
 });
+
+describe('docs/new-database.sql', () => {
+  // The one-file installer is built from schema.sql and the seed
+  // migrations. If either changes, `npm run build-new-database` must be
+  // run, or a new installation would miss the change.
+  it('is up to date with schema.sql and the seed migrations', async () => {
+    const { buildNewDatabaseSql } = await import('../scripts/build-new-database.mjs');
+    const onDisk = fs.readFileSync(path.join(DB_DIR, '..', '..', 'docs', 'new-database.sql'), 'utf8');
+    expect(onDisk === buildNewDatabaseSql(), 'run: cd server && npm run build-new-database').toBe(true);
+  });
+
+  it('contains the Summer and Winter recipes, so Settings → Recipes works on a new install', () => {
+    const sql = fs.readFileSync(path.join(DB_DIR, '..', '..', 'docs', 'new-database.sql'), 'utf8');
+    expect(sql).toMatch(/INSERT INTO public\.recipes[\s\S]*'Summer', 'summer'[\s\S]*'Winter', 'winter'/);
+  });
+});

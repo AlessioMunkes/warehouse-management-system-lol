@@ -303,7 +303,8 @@ can be changed by an admin under Settings → Wording: overrides are kept in
 
 `database/schema.sql` builds the whole database in one script; `database/migrations/` holds
 the seed data that runs after it (`001_seed_starter_settings.sql`: the six starter tables).
-`npm run migrate -- init <code>` runs both against a new, empty database. To change the
+`npm run migrate -- init <code>` runs both against a new, empty database. `docs/new-database.sql` is the same thing in one file (schema plus seed
+data), built by `npm run build-new-database`; a test keeps it in step. To change the
 schema, change the database and run `npm run export-database`, which writes `schema.sql`
 again (`scripts/export-new-database.mjs` says what goes in: the schema and the record of
 schema migrations, never any rows). Seed migrations are named `NNN_seed_*.sql` and insert
