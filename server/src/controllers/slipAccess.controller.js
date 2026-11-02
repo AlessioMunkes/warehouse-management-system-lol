@@ -15,7 +15,7 @@ import { guestWarehouseClaim } from '../config/warehouses.js';
 import { sendError } from '../utils/httpError.js';
 import settings from '../services/settings.service.js';
 
-// How long a volunteer stays signed in: Settings > Accounts,
+// How long a volunteer stays signed in: Settings > Access,
 // "Volunteer sign-in lasts" (12 hours unless changed).
 
 // Errors carry .status from the service. Anything without one is a bug

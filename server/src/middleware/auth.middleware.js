@@ -3,6 +3,7 @@
 //
 // token now read from httpOnly cookie instead of the Authorization header.
 // ─────────────────────────────────────────────────────────────
+import settings from '../services/settings.service.js';
 import jwt from 'jsonwebtoken';
 import { runInWarehouse, isValidWarehouseCode, currentWarehouse } from '../config/warehouseContext.js';
 import { isMultiWarehouse, warehouseCodes } from '../config/warehouses.js';
@@ -72,14 +73,15 @@ const checkCurrentAccount = async (req, res, next, claims) => {
   let refusal = null;
   try {
     if (req.user.role === ROLES.GUEST) {
-      const visit = await sessionRepo.findGuestSession(req.user.id);
+      const idleHours = await settings.get('accounts.guestIdleHours');
+      const visit = await sessionRepo.findGuestSession(req.user.id, idleHours);
       if (!visit) refusal = 'Session expired. Please sign in again.';
       else if (visit.signed_out_at) refusal = 'This visit has been signed out.';
       else if (visit.idle) {
         // Four hours with nothing done (migration 067): the visit ends
         // when they last did something.
         await sessionRepo.closeIdleGuestSession(req.user.id);
-        refusal = 'You were signed out after 4 hours with nothing done. Please sign in again.';
+        refusal = `You were signed out after ${idleHours} hour${idleHours === 1 ? '' : 's'} with nothing done. Please sign in again.`;
       } else if (visit.stale) {
         await sessionRepo.touchGuestSession(req.user.id);
       }

@@ -74,6 +74,12 @@ export const update = async (changes, userId) => {
   }
   const keys = Object.keys(changes);
   if (keys.length === 0) throw fail(400, 'Nothing to change.');
+  // Wording is kept without stray spaces at either end (or line ends).
+  changes = Object.fromEntries(Object.entries(changes).map(([key, value]) => [
+    key,
+    isSettingKey(key) && SETTINGS[key].type === 'text' && typeof value === 'string'
+      ? value.split('\n').map((line) => line.trim()).join('\n').trim() : value,
+  ]));
   for (const key of keys) {
     if (!isSettingKey(key)) throw fail(400, `Unknown setting "${key}".`);
     const message = validateValue(key, changes[key]);

@@ -42,7 +42,7 @@ let phrasesTable = null;
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// `own` is the admin's wording from Settings → Translations, by
+// `own` is the admin's wording from Settings → Wording, by
 // language and English: { af: { 'Cancel': '…' }, xh: {…} }. It replaces
 // that column of the row; an English phrase the table does not have is
 // added.

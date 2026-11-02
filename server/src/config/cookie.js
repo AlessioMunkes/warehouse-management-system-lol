@@ -34,7 +34,7 @@ export const sessionMaxAge = (hours) => hours * 60 * 60 * 1000;
 // (that ends every other session, but not the one they are using).
 // The token is the cookie's whole content; JavaScript on the page
 // (including any XSS attack) cannot read it.
-// How long is a setting (Settings > Accounts, "Staff sign-in lasts");
+// How long is a setting (Settings > Access, "Staff sign-in lasts");
 // this is its default, used when the caller does not pass one.
 export const STAFF_SESSION_HOURS = 8;
 

@@ -48,7 +48,7 @@ router.get('/gate-code', auth, requireRole(...MANAGERS_UP), (_req, res) => {
 const asDate = (value) =>
   (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null);
 
-// How long a volunteer stays signed in: Settings > Accounts,
+// How long a volunteer stays signed in: Settings > Access,
 // "Volunteer sign-in lasts" (12 hours unless changed).
 
 router.post('/sign-in', guestSignInRateLimiter, async (req, res) => {

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/routes/translation.routes.js
 //
-// Settings → Translations (translation.service.js).
+// Settings → Wording (translation.service.js).
 //   GET    /api/translations   the overrides, for every signed-in screen
 //                              that is shown in Afrikaans or isiXhosa:
 //                              staff and volunteers alike. Not secret.

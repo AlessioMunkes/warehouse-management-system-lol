@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/services/translation.service.js
 //
-// Settings → Translations. The wording itself lives in the app
+// Settings → Wording. The wording itself lives in the app
 // (client/src/translations); an admin can replace any Afrikaans or
 // isiXhosa piece of it here, without a developer.
 //

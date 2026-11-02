@@ -37,6 +37,15 @@ describe('defaults', () => {
       // SESSION_HOURS): 8 hours for staff, 12 for volunteers.
       'accounts.staffSessionHours': 8,
       'accounts.guestSessionHours': 12,
+      // Were GUEST_IDLE_HOURS, REPORT_LINK_DAYS and IDLE_KIT_MONTHS.
+      'accounts.guestIdleHours': 4,
+      'finance.reportLinkDays': 30,
+      'feedTheSoil.idleKitMonths': 3,
+      // Organisation: the letterhead (was VITE_WAREHOUSE_NAME / _ADDRESS)
+      // and the Section 18A threshold (was only in donation_settings).
+      'documents.letterheadName': 'Ladles of Love, Cape Town Warehouse',
+      'documents.letterheadAddress': 'Unit 4, Hewett Park\n17 Hewett Ave, Epping\nCape Town, 7460',
+      'donations.section18aThreshold': 1000,
       // The operating calendar's cohort days (were picking.service's
       // fixed WEEKDAY_FOR_COHORT): Tuesday and Thursday, 1 = Monday.
       'calendar.tuesdayCohortWeekday': 2,
@@ -109,5 +118,30 @@ describe('saving', () => {
     expect(sql.find(([q]) => q.startsWith('INSERT INTO app_settings'))[1]).toEqual(['reminders.runHour', '9', 5]);
     expect(sql.find(([q]) => q.startsWith('DELETE FROM app_settings'))[1]).toEqual(['invites.linkDays']);
     expect(sql.map(([q]) => q)).toContain('COMMIT');
+  });
+});
+
+describe('wording and organisation settings', async () => {
+  const { validateValue, SETTINGS } = await import('../src/features/settings/settingsDefinitions.js');
+
+  it('takes text for the letterhead, and refuses empty or over-long text', () => {
+    expect(validateValue('documents.letterheadName', 'Ladles of Love, Gauteng')).toBeNull();
+    expect(validateValue('documents.letterheadName', '   ')).toMatch(/cannot be empty/);
+    expect(validateValue('documents.letterheadName', 5)).toMatch(/cannot be empty/);
+    expect(validateValue('documents.letterheadName', 'x'.repeat(121))).toMatch(/at most 120/);
+    expect(validateValue('documents.letterheadAddress', 'Line 1\nLine 2')).toBeNull();
+  });
+
+  it('keeps whole numbers for the rest, including the Section 18A threshold', () => {
+    expect(validateValue('donations.section18aThreshold', 2500)).toBeNull();
+    expect(validateValue('donations.section18aThreshold', 99.5)).toMatch(/whole number/);
+    expect(validateValue('donations.section18aThreshold', -1)).toMatch(/from 0/);
+  });
+
+  it('will not sign a volunteer out for idling later than their sign-in ends', () => {
+    const all = { ...defaults(), 'accounts.guestSessionHours': 3 };
+    expect(SETTINGS['accounts.guestIdleHours'].check(4, all)).toMatch(/cannot be longer/);
+    expect(SETTINGS['accounts.guestSessionHours'].check(3, { ...defaults(), 'accounts.guestIdleHours': 4 })).toMatch(/cannot be shorter/);
+    expect(SETTINGS['accounts.guestIdleHours'].check(2, all)).toBeNull();
   });
 });

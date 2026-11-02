@@ -16,7 +16,7 @@ leaves, the owner removes their login; no key has to change.
 | **Supabase** | The database, its backups and its connection string | IT person and a backup, as Owners |
 | **Google Cloud** | The Gmail sending account's OAuth client, and the Gemini key | IT person |
 | **Intuit developer** | The QuickBooks app keys | IT person |
-| **Batches itself** | Business settings: cut-off hours, reminder time, expiry warnings, unit weights, recipe rounding and bands, collection days, translations | Admins, from Settings |
+| **Batches itself** | Business settings: cut-off hours, reminder time, expiry warnings, unit weights, recipe rounding and bands, collection days, the letterhead, the Section 18A threshold, sign-in and link lifetimes, the floor's Afrikaans and isiXhosa wording | Admins, from Settings |
 | **QuickBooks** | The finance company | Finance, connected from Batches > Settings > Connections |
 
 Warehouse staff and managers only ever sign into Batches. They never see a key.
@@ -29,8 +29,10 @@ Two Owners on every account, so nobody is locked out if one person leaves.
   Render redeploys with it. Then update the same entry in Bitwarden.
 - **Check the server's setup:** Render > Shell, then `cd server && node scripts/check-env.mjs`.
   It lists what is set, missing or wrong, and never prints a value.
-- **Change a business value** (rounding, bands, reminder time, wording): an admin does it in
-  Batches > Settings. No developer needed.
+- **Change a business value** (rounding, bands, reminder time, letterhead, Section 18A
+  threshold, wording): an admin does it in Batches > Settings. No developer needed.
+- **Change the email sender:** Settings > Email. Emails go from the connected Gmail account,
+  with the sender name set there.
 - **Work on a laptop:** copy `server/env.example` to `server/.env`, fill it from Bitwarden, and
   point `DATABASE_URL` at a **separate test database**, never production. Run
   `npm run check-env`.
@@ -67,3 +69,13 @@ two-factor set up there and then.
 
 `npm run check-env` flags most of these on a live server (sandbox QuickBooks, a localhost
 address, emails switched off, missing headers).
+
+## Not yet on the Settings screen (next steps)
+
+Possible today only through the database or code; each needs its own screen:
+
+- Donation category routing (where each donation category goes). The API exists
+  (`PATCH /api/donations/admin/category-routing/:category`); only the screen is missing.
+- Adding or renaming storage locations and programmes.
+- The logo at the top of emails (`EMAIL_LOGO_URL`): needs an upload button rather than a web
+  address.

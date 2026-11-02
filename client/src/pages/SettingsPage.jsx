@@ -20,6 +20,8 @@
 //   Reporting                how kilograms become people fed (the
 //                            impact factors). Targets are each
 //                            manager's own, on Operations Reports.
+//   Documents                the letterhead on printed notes, and the
+//                            Section 18A certificate threshold
 //   Accounts                 how long a sign-in and an invite link last
 //   Translations             the floor's Afrikaans and isiXhosa wording,
 //                            changed by the admin (TranslationsSection)
@@ -50,20 +52,25 @@ const SECTIONS = [
   { id: 'email',         label: 'Email' },
   { id: 'connections',   label: 'Connections' },
   { id: 'notifications', label: 'Reminders' },
-  { id: 'stock',         label: 'Stock rules' },
+  { id: 'stock',         label: 'Stock' },
   { id: 'recipes',       label: 'Recipes' },
-  { id: 'reporting',     label: 'Reporting' },
-  { id: 'accounts',      label: 'Accounts' },
-  { id: 'translations',  label: 'Translations' },
+  { id: 'reporting',     label: 'Impact' },
+  { id: 'organisation',  label: 'Documents' },
+  { id: 'accounts',      label: 'Access' },
+  { id: 'translations',  label: 'Wording' },
 ];
 
 const VALUE_SECTIONS = {
   notifications: {
     title: 'Notifications & reminders',
-    description: 'Set when uncollected pallets are written off and when reminders go out.',
+    description: 'Set when uncollected pallets are written off, when reminders go out, and when a compost kit counts as idle.',
   },
   stock:    { title: 'Stock rules', description: 'Set when managers are warned about expiring stock, and what a crate, bag, box and punnet weigh.' },
-  accounts: { title: 'Accounts', description: 'Set how long sign-ins and invite links last.' },
+  organisation: {
+    title: 'Documents',
+    description: 'Set the letterhead on printed notes and the value from which a donation gets a Section 18A certificate.',
+  },
+  accounts: { title: 'Access', description: 'Set how long sign-ins and links last, and when an idle volunteer is signed out.' },
 };
 
 export default function SettingsPage({ defaultSection = 'email' }) {

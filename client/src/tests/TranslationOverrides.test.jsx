@@ -1,4 +1,4 @@
-// Settings → Translations: an admin's own Afrikaans / isiXhosa wording
+// Settings → Wording: an admin's own Afrikaans / isiXhosa wording
 // wins over the built-in wording, on keyed text and on page phrases.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';

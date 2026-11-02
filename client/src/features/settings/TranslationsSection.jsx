@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/settings/TranslationsSection.jsx
 //
-// Settings → Translations: change the Afrikaans or isiXhosa wording of
+// Settings → Wording: change the Afrikaans or isiXhosa wording of
 // the floor and volunteer screens, without a developer.
 //
 // Lists every piece of translated text the app has: the keyed messages

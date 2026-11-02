@@ -36,7 +36,7 @@
 // not read this.
 //
 // AN ADMIN'S OWN WORDING
-// Settings → Translations lets an admin replace any Afrikaans or
+// Settings → Wording lets an admin replace any Afrikaans or
 // isiXhosa piece of this (GET /api/translations). Those overrides are
 // loaded the first time a screen is shown in another language and win
 // over messages.js and phrases.js. Without them (offline, signed out,
@@ -89,7 +89,7 @@ const fill = (text, vars) => (vars
   ? text.replace(/\{(\w+)\}/g, (whole, name) => (vars[name] === undefined || vars[name] === null ? '' : String(vars[name])))
   : text);
 
-// ── Overrides from Settings → Translations ──────────────────
+// ── Overrides from Settings → Wording ──────────────────
 const NO_OVERRIDES = { key: {}, phrase: {} };
 let overrides = NO_OVERRIDES;
 let overridesVersion = 0;

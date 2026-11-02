@@ -295,7 +295,7 @@ Every setting the server reads from its environment is listed, with its default,
 environment without printing values. Values an admin can change while the app runs (expiry
 warnings, reminder times, unit sizes, recipe rounding) are in Settings instead, defined in
 `features/settings/settingsDefinitions.js`. The floor's Afrikaans and isiXhosa wording
-can be changed by an admin under Settings → Translations: overrides are kept in
+can be changed by an admin under Settings → Wording: overrides are kept in
 `translation_overrides` (`routes/translation.routes.js`) and win over
 `client/src/translations/messages.js` and `phrases.js`.
 

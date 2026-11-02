@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/services/translationAPI.js
 //
-// Settings → Translations: an admin's own wording for the floor and
+// Settings → Wording: an admin's own wording for the floor and
 // volunteer screens (server: translation.routes.js).
 // ─────────────────────────────────────────────────────────────
 import { apiDelete, apiGet, apiPut } from './api';

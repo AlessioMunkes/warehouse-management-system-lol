@@ -13,6 +13,7 @@
 // API and the UI — the user was explicit that a mix of "logged" and
 // "recorded" was itself part of what made the previous version unclear.
 // ─────────────────────────────────────────────────────────────
+import settings from './settings.service.js';
 import pool from '../config/db.js';
 import kitRepo, { IDLE_KIT_MONTHS } from '../repositories/collectionKit.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
@@ -175,7 +176,7 @@ const dayInWords = (value) =>
 const runIdleKitCheck = async () => {
   let idle;
   try {
-    idle = await kitRepo.listIdleKits({ months: IDLE_KIT_MONTHS });
+    idle = await kitRepo.listIdleKits({ months: await settings.get('feedTheSoil.idleKitMonths') });
   } catch (err) {
     // A warehouse without the kit tables has no kits to chase.
     if (err.code === '42P01') return { checked: 0, notified: 0 };

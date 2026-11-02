@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/settings/AppSettingsSection.jsx
 //
-// One Settings section's values from /api/settings: a number each,
-// with what it does, its unit and its default. Saved together with one
+// One Settings section's values from /api/settings: a number each
+// (or wording, for a setting of type 'text'), with what it does, its
+// unit and its default. Saved together with one
 // button, so two values that depend on each other (the two expiry
 // warnings) are checked as a pair.
 // ─────────────────────────────────────────────────────────────
@@ -10,6 +11,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toastContext';
 import { updateSettings } from '../../services/settingsAPI';
@@ -25,7 +27,9 @@ export default function AppSettingsSection({ title, description, settings, onSav
   const save = async () => {
     setBusy(true); setError(null);
     try {
-      const updated = await updateSettings(Object.fromEntries(changed.map((s) => [s.key, Number(draft[s.key])])));
+      const updated = await updateSettings(Object.fromEntries(changed.map((s) => [
+        s.key, s.type === 'text' ? draft[s.key] : Number(draft[s.key]),
+      ])));
       onSaved(updated);
       toast({ variant: 'success', title: `${title} saved` });
     } catch (err) {
@@ -44,6 +48,20 @@ export default function AppSettingsSection({ title, description, settings, onSav
       <CardContent className="space-y-5">
         {settings.map((s) => {
           const id = `setting-${s.key}`;
+          if (s.type === 'text') {
+            const TextInput = s.multiline ? Textarea : Input;
+            return (
+              <Field key={s.key}>
+                <FieldLabel htmlFor={id}>{s.label}</FieldLabel>
+                <TextInput
+                  id={id} className="max-w-xl" maxLength={s.maxLength} rows={s.multiline ? 4 : undefined}
+                  value={draft[s.key]}
+                  onChange={(e) => setDraft((d) => ({ ...d, [s.key]: e.target.value }))}
+                />
+                <FieldDescription>{s.help}</FieldDescription>
+              </Field>
+            );
+          }
           return (
             <Field key={s.key}>
               <FieldLabel htmlFor={id}>{s.label}</FieldLabel>

@@ -88,8 +88,12 @@ const createKit = async ({ ownerName, suburb, assignedAt, actorId }) => {
 // either not being used or not being collected, and either way
 // somebody needs to speak to its owner. The daily follow-up notice,
 // the manager's Idle tab and the dashboard count all use this rule.
+// How long is a setting (Settings > Reminders, "Flag a compost kit as
+// idle after"); with no `months` given the SQL reads it itself, so every
+// caller follows it. IDLE_KIT_MONTHS is its default.
 export const IDLE_KIT_MONTHS = 3;
-export const idleKitSql = (alias = 'k', months = String(IDLE_KIT_MONTHS)) =>
+const SETTING_MONTHS = `COALESCE((SELECT (value #>> '{}')::int FROM app_settings WHERE key = 'feedTheSoil.idleKitMonths'), ${IDLE_KIT_MONTHS})`;
+export const idleKitSql = (alias = 'k', months = SETTING_MONTHS) =>
   `(${alias}.assigned_at <= (now() AT TIME ZONE 'Africa/Johannesburg')::date - make_interval(months => ${months})
      AND NOT EXISTS (SELECT 1 FROM collection_kit_records r WHERE r.kit_id = ${alias}.id))`;
 
@@ -305,13 +309,13 @@ const listRecords = async ({ status = null, search = null, limit = 200 } = {}) =
   return rows;
 };
 
-const listIdleKits = async ({ months = IDLE_KIT_MONTHS } = {}) => {
+const listIdleKits = async ({ months = null } = {}) => {
   const { rows } = await pool.query(
     `SELECT k.id, k.owner_name, k.suburb, k.assigned_at
        FROM collection_kits k
-      WHERE ${idleKitSql('k', '$1::int')}
+      WHERE ${months === null ? idleKitSql('k') : idleKitSql('k', '$1::int')}
       ORDER BY k.assigned_at ASC, k.id ASC`,
-    [months],
+    months === null ? [] : [months],
   );
   return rows;
 };
