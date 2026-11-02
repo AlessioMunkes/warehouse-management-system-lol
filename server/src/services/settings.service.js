@@ -16,6 +16,7 @@
 // admin saves.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { runInWarehouse } from '../config/warehouseContext.js';
 import settingsRepository from '../repositories/settings.repository.js';
 import {
   SETTINGS, SETTING_KEYS, defaults, isSettingKey, validateValue,
@@ -38,6 +39,18 @@ export const getAll = async () => {
 export const get = async (key) => {
   if (!isSettingKey(key)) throw new Error(`Unknown setting "${key}".`);
   return (await getAll())[key];
+};
+
+// One setting read in a named warehouse, for a request that has none
+// yet (signing in, before the session says which warehouse). No code:
+// read where the request already is. Falls back to the default.
+export const getIn = async (code, key) => {
+  if (!code) return get(key);
+  try {
+    return await runInWarehouse(code, () => get(key));
+  } catch {
+    return SETTINGS[key].default;
+  }
 };
 
 // For the Settings screen: every setting with its definition, current
@@ -93,4 +106,4 @@ export const update = async (changes, userId) => {
   return list();
 };
 
-export default { get, getAll, list, update };
+export default { get, getAll, getIn, list, update };

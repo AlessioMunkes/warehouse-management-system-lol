@@ -23,6 +23,7 @@ import { AUTH_COOKIE, authCookieOptions, setStaffSessionCookie as setSessionCook
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { parseWarehouseNames, warehouseName } from '../config/warehouses.js';
 import { sendError } from '../utils/httpError.js';
+import settings from '../services/settings.service.js';
 
 const router = express.Router();
 
@@ -64,7 +65,7 @@ const loginSingle = async (req, res, username, password) => {
   // (auth.middleware.js), so a password change ends this session.
   setSessionCookie(res, {
     id: user.id, username: user.username, role: user.role, sv: user.session_version ?? 0,
-  });
+  }, await settings.getIn(null, 'accounts.staffSessionHours'));
 
   // Return the safe user info (no token in the body anymore)
   return res.json({
@@ -130,12 +131,13 @@ const loginMulti = async (req, res, username, password) => {
   // the one a multi-site user lands in by default.
   const primary = active[0];
 
+  // How long it lasts is the landing warehouse's setting.
   setSessionCookie(res, {
     username:   primary.user.username,
     warehouses: Object.fromEntries(
       active.map(({ code, user }) => [code, { id: user.id, role: user.role, sv: user.session_version ?? 0 }])
     ),
-  });
+  }, await settings.getIn(primary.code, 'accounts.staffSessionHours'));
 
   return res.json({
     success: true,

@@ -33,6 +33,10 @@ describe('defaults', () => {
       'stock.expiryWarningFirstDays': 14,
       'stock.expiryWarningSecondDays': 7,
       'invites.linkDays': 7,
+      // Sign-in lengths (were STAFF_SESSION_HOURS and the guest
+      // SESSION_HOURS): 8 hours for staff, 12 for volunteers.
+      'accounts.staffSessionHours': 8,
+      'accounts.guestSessionHours': 12,
       // The operating calendar's cohort days (were picking.service's
       // fixed WEEKDAY_FOR_COHORT): Tuesday and Thursday, 1 = Monday.
       'calendar.tuesdayCohortWeekday': 2,

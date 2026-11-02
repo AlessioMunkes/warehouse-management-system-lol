@@ -112,6 +112,20 @@ export const SETTINGS = Object.freeze({
     help: 'Round loose amounts (oil, maize meal, rice) up to this many decimal places on a slip. 0 gives whole units: 3.3 L becomes 4 L.',
     default: 0, min: 0, max: 2, unit: 'decimal places',
   },
+  // How long a sign-in lasts. Were STAFF_SESSION_HOURS (config/cookie.js)
+  // and the guest SESSION_HOURS in volunteer.routes / slipAccess.
+  'accounts.staffSessionHours': {
+    section: 'accounts',
+    label: 'Staff sign-in lasts',
+    help: 'Staff are signed out this many hours after signing in. Shorter is safer on shared phones and tablets.',
+    default: 8, min: 1, max: 24, unit: 'hours',
+  },
+  'accounts.guestSessionHours': {
+    section: 'accounts',
+    label: 'Volunteer sign-in lasts',
+    help: 'A volunteer signed in with the gate code or a slip QR code stays signed in this long.',
+    default: 12, min: 1, max: 24, unit: 'hours',
+  },
   'invites.linkDays': {
     section: 'accounts',
     label: 'Invite link lifetime',

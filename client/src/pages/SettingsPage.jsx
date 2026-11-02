@@ -59,7 +59,7 @@ const VALUE_SECTIONS = {
     description: 'Set when uncollected pallets are written off and when reminders go out.',
   },
   stock:    { title: 'Stock rules', description: 'Set when managers are warned about expiring stock, and what a crate, bag, box and punnet weigh.' },
-  accounts: { title: 'Accounts', description: 'Set how long invite links stay valid.' },
+  accounts: { title: 'Accounts', description: 'Set how long sign-ins and invite links last.' },
 };
 
 export default function SettingsPage({ defaultSection = 'email' }) {

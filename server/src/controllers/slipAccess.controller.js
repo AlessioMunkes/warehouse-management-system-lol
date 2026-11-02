@@ -13,11 +13,10 @@ import slipAccessService from '../services/slipAccess.service.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
 import { guestWarehouseClaim } from '../config/warehouses.js';
 import { sendError } from '../utils/httpError.js';
+import settings from '../services/settings.service.js';
 
-// Matches the gate sign-in in volunteer.routes.js. A volunteer's day is
-// longer than a staff shift's 8 hours and they cannot reset a password
-// if it lapses mid-pallet.
-const SESSION_HOURS = 12;
+// How long a volunteer stays signed in: Settings > Accounts,
+// "Volunteer sign-in lasts" (12 hours unless changed).
 
 // Errors carry .status from the service. Anything without one is a bug
 // or a dead database, and gets a generic 500 — never a raw message,
@@ -65,15 +64,16 @@ const claim = async (req, res) => {
       existingVolunteerId: req.guest?.id ?? null,
     });
 
+    const hours = await settings.get('accounts.guestSessionHours');
     const token = jwt.sign(
       { id: volunteer.id, role: 'guest', ...guestWarehouseClaim() },
       process.env.JWT_SECRET,
-      { expiresIn: `${SESSION_HOURS}h` },
+      { expiresIn: `${hours}h` },
     );
 
     res.cookie(AUTH_COOKIE, token, {
       ...authCookieOptions(),
-      maxAge: sessionMaxAge(SESSION_HOURS),
+      maxAge: sessionMaxAge(hours),
     });
 
     return res.status(201).json({
