@@ -8,6 +8,7 @@ import stockModel        from '../repositories/stock.repository.js';
 import { isMovementType } from '../constants/movementTypes.js';
 import { assertWholeByProduct } from '../features/units/wholeItems.js';
 import { toQuantity } from '../utils/validation.js';
+import settings from './settings.service.js';
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors picking.service.js. Without a `.status` on the error, the
@@ -22,8 +23,15 @@ const fail = (status, message) => {
 };
 
 // ── Get the current manifest ────────────────────────────────
+// Each row carries the urgent-expiry window from Settings (the first
+// expiry warning), so the red "expires soon" badges on the page draw
+// the line where the warning emails and the action list do.
 const getManifest = async () => {
-  return await stockModel.getManifest();
+  const [rows, urgentDays] = await Promise.all([
+    stockModel.getManifest(),
+    settings.get('stock.expiryWarningFirstDays'),
+  ]);
+  return rows.map((row) => ({ ...row, urgent_expiry_days: urgentDays }));
 };
 
 // ── Get movement history for one product ──────────────────────

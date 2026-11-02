@@ -14,7 +14,10 @@ import cookieParser from 'cookie-parser';
 import request      from 'supertest';
 import jwt          from 'jsonwebtoken';
 
-const sessionRepo = { findStaffSession: vi.fn(), findGuestSession: vi.fn() };
+const sessionRepo = {
+  findStaffSession: vi.fn(), findGuestSession: vi.fn(),
+  touchGuestSession: vi.fn(), closeIdleGuestSession: vi.fn(),
+};
 vi.mock('../src/repositories/session.repository.js', () => ({ default: sessionRepo }));
 
 const changePassword = vi.fn();
@@ -101,6 +104,29 @@ describe('guest tokens', () => {
     expect(res.status).toBe(200);
     expect(sessionRepo.findGuestSession).toHaveBeenCalledWith(9);
     expect(sessionRepo.findStaffSession).not.toHaveBeenCalled();
+  });
+
+  // Migration 067: a guest session ends after four hours with nothing
+  // done, the visit signed out when they last did something.
+  it('signs out a visit idle for four hours, and ends the session', async () => {
+    sessionRepo.findGuestSession.mockResolvedValue({ id: 9, signed_out_at: null, idle: true, stale: true });
+    const res = await request(app).get('/any').set('Cookie', cookieFor(GUEST));
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/4 hours with nothing done/);
+    expect(clearsCookie(res)).toBe(true);
+    expect(sessionRepo.closeIdleGuestSession).toHaveBeenCalledWith(9);
+    expect(sessionRepo.touchGuestSession).not.toHaveBeenCalled();
+  });
+
+  it('keeps an active guest active, writing it at most once a minute', async () => {
+    sessionRepo.findGuestSession.mockResolvedValue({ id: 9, signed_out_at: null, idle: false, stale: true });
+    expect((await request(app).get('/any').set('Cookie', cookieFor(GUEST))).status).toBe(200);
+    expect(sessionRepo.touchGuestSession).toHaveBeenCalledWith(9);
+
+    sessionRepo.touchGuestSession.mockClear();
+    sessionRepo.findGuestSession.mockResolvedValue({ id: 9, signed_out_at: null, idle: false, stale: false });
+    expect((await request(app).get('/any').set('Cookie', cookieFor(GUEST))).status).toBe(200);
+    expect(sessionRepo.touchGuestSession).not.toHaveBeenCalled();
   });
 
   it('refuses a copied token once the visit is signed out', async () => {

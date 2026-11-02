@@ -30,10 +30,13 @@ import {
 
 const BCRYPT_COST = 10;
 
-// idx_users_email_unique is the last line of defence against two
-// accounts sharing an address; the pre-checks below give the friendly
-// message, this catches the race between check and write.
-const emailTaken = (email) => fail(409, `Another user already has this email address. Use a different one.`);
+// An address may be on one account of each role: Grizel's admin and
+// manager accounts share hers (migration 065). idx_users_email_role_unique
+// is the last line of defence against two accounts in one role sharing
+// it; the pre-checks below give the friendly message, this catches the
+// race between check and write.
+const ROLE_WORDS = { admin: 'admin', manager: 'manager', warehouse_worker: 'warehouse worker' };
+const emailTaken = (email, role) => fail(409, `Another ${ROLE_WORDS[role] ?? role} account already has this email address. Use a different one, or give this account another role.`);
 
 const isEmailUniqueViolation = (err) =>
   err?.code === '23505' && /email/i.test(`${err.constraint ?? ''} ${err.detail ?? ''}`);
@@ -78,15 +81,15 @@ const createUser = async (body, actorId) => {
   }
 
   if (payload.email) {
-    const emailClash = await repo.findUserByEmail(payload.email);
-    if (emailClash) throw emailTaken(payload.email);
+    const emailClash = await repo.findUserByEmail(payload.email, { role: payload.role });
+    if (emailClash) throw emailTaken(payload.email, payload.role);
   }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
   try {
     return await repo.insertUser({ ...payload, passwordHash }, actorId);
   } catch (err) {
-    if (isEmailUniqueViolation(err)) throw emailTaken(payload.email);
+    if (isEmailUniqueViolation(err)) throw emailTaken(payload.email, payload.role);
     throw err;
   }
 };
@@ -117,12 +120,7 @@ const updateUser = async (rawId, body, actorId) => {
   }
   if (has('email')) {
     // null clears the address.
-    const email = validOptionalEmail(body.email);
-    if (email) {
-      const emailClash = await repo.findUserByEmail(email);
-      if (emailClash && emailClash.id !== id) throw emailTaken(email);
-    }
-    patch.email = email;
+    patch.email = validOptionalEmail(body.email);
   }
   if (has('role')) {
     const role = validRole(body.role);
@@ -136,10 +134,19 @@ const updateUser = async (rawId, body, actorId) => {
 
   if (!Object.keys(patch).length) throw fail(400, 'No changes were supplied.');
 
+  // The address and the role it is checked against, as they will be:
+  // a new address, or the same address on a new role, can clash.
+  const email = has('email') ? patch.email : existing.email;
+  const role  = patch.role ?? existing.role;
+  if (email && (has('email') || has('role'))) {
+    const emailClash = await repo.findUserByEmail(email, { role });
+    if (emailClash && emailClash.id !== id) throw emailTaken(email, role);
+  }
+
   try {
     return await repo.updateUser(id, patch, existing, actorId);
   } catch (err) {
-    if (patch.email && isEmailUniqueViolation(err)) throw emailTaken(patch.email);
+    if (email && isEmailUniqueViolation(err)) throw emailTaken(email, role);
     throw err;
   }
 };

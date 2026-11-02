@@ -23,7 +23,7 @@ import { earliestLive } from '../features/stock/shelfLots.js';
 import { placeStock } from '../features/warehouseMap/placement.js';
 import { checkLayout } from '../features/warehouseMap/layout.js';
 import { assertWholeByProduct } from '../features/units/wholeItems.js';
-import { GRID, isStorageKind } from '../constants/warehouseMap.js';
+import { GRID, isStorageKind, MAX_CAPACITY_KG, MAX_PALLET_SPACES } from '../constants/warehouseMap.js';
 import { toQuantity } from '../utils/validation.js';
 import { currentWarehouse } from '../config/warehouseContext.js';
 import { withTransaction } from '../utils/transaction.js';
@@ -60,14 +60,22 @@ const buildMap = async () => {
   const areas = await mapModel.listAreas();
   if (areas === null) return { ready: false, grid: GRID, areas: [], products: [] };
   const today = todayInSAST();
-  const [counts, products, pallets, sizes, shelf, day] = await Promise.all([
+  const [counts, products, pallets, sizes, shelf, day, toPackRows] = await Promise.all([
     mapModel.listLatestCounts(),
     mapModel.listMapProducts(),
     mapModel.listPackedPallets(),
     mapModel.readUnitSizes(),
     loadShelfLots(),
     mapModel.listDayActivity(today),
+    mapModel.listToPack(),
   ]);
+  // Still to pack, per product: [{ quantity, unit, pallets, firstDay }].
+  const toPackOf = new Map();
+  for (const r of toPackRows) {
+    const list = toPackOf.get(r.product_id) ?? [];
+    list.push({ quantity: num(r.to_pack), unit: r.unit, pallets: r.pallets, firstDay: r.first_day });
+    toPackOf.set(r.product_id, list);
+  }
   const placed = placeStock({
     areas: areas.map((a) => ({
       id: a.id, name: a.name, kind: a.kind,
@@ -87,6 +95,7 @@ const buildMap = async () => {
       storageType: p.storage_type ?? null,
       programmeId: p.programme_id ?? null, programmeName: p.programme_name ?? null,
       earliestExpiry: earliestLive(shelf.get(p.id)?.lots ?? [], today)?.expiryDate ?? null,
+      toPack: toPackOf.get(p.id) ?? [],
     })),
     pallets: pallets.map((r) => ({
       id: r.id, ref: r.pallet_ref ?? null, beneficiary: r.beneficiary ?? null, dispatchDate: r.dispatch_date ?? null,
@@ -177,7 +186,40 @@ const recordCount = async (areaId, body, userId) => {
   return getMap();
 };
 
+// ── An area's capacity, from the map ──────────────────────────
+// A manager adjusts what an area holds without redrawing the plan
+// (Warehouse layout, admins only): kilograms for a store, pallet spaces
+// for staging. Blank clears it. Answers with the map.
+const positiveOrNull = (raw, { whole = false, label }) => {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || (whole && !Number.isInteger(n))) {
+    fail(400, `${label} must be ${whole ? 'a whole number' : 'a number'} above 0, or blank for none.`);
+  }
+  return n;
+};
+
+const setCapacity = async (areaId, body = {}) => {
+  const id = Number(areaId);
+  if (!Number.isInteger(id) || id <= 0) fail(400, 'Choose an area.');
+  const area = await mapModel.getArea(id);
+  if (!area) fail(404, 'That area is not on the plan any more. Reload the map.');
+  if (!isStorageKind(area.kind) && area.kind !== 'staging') fail(400, 'This area has no capacity to set.');
+  const capacityKg = area.kind === 'staging'
+    ? (area.capacity_kg ?? null)
+    : positiveOrNull(body.capacityKg, { label: 'Capacity' });
+  const palletSpaces = area.kind === 'staging'
+    ? positiveOrNull(body.palletSpaces, { whole: true, label: 'Pallet spaces' })
+    : (area.pallet_spaces ?? null);
+  // The same ceilings the layout keeps (constants/warehouseMap.js).
+  if (capacityKg !== null && capacityKg > MAX_CAPACITY_KG) fail(400, 'That capacity is more than any area holds. Check the number.');
+  if (palletSpaces !== null && palletSpaces > MAX_PALLET_SPACES) fail(400, 'That is more pallet spaces than any area has. Check the number.');
+  await mapModel.setAreaCapacity(id, { capacityKg, palletSpaces });
+  forget();
+  return getMap();
+};
+
 // For tests: start from an empty cache.
 export const clearMapCache = () => cache.clear();
 
-export default { getMap, saveLayout, recordCount, clearMapCache };
+export default { getMap, saveLayout, recordCount, setCapacity, clearMapCache };

@@ -13,6 +13,7 @@ const repoMock = {
   getArea: vi.fn(),
   listLatestCounts: vi.fn(),
   listMapProducts: vi.fn(),
+  listToPack: vi.fn(),
   listPackedPallets: vi.fn(),
   readUnitSizes: vi.fn(),
   listDayActivity: vi.fn(),
@@ -38,6 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mapService.clearMapCache();
   repoMock.listPackedPallets.mockResolvedValue([]);
+  repoMock.listToPack.mockResolvedValue([]);
   repoMock.readUnitSizes.mockResolvedValue({});
   repoMock.listDayActivity.mockResolvedValue({ packing: 2, inbound: [], receivedToday: [] });
   repoMock.listAreas.mockResolvedValue([AREA]);
@@ -60,6 +62,18 @@ describe('getMap', () => {
     expect(map.grid).toEqual({ cols: 40, rows: 24 });
     expect(map.areas[0].items[0]).toMatchObject({ productId: 1, about: 15 });
     expect(map.products[0]).toMatchObject({ onHand: 40, placed: 15, unplaced: 25 });
+  });
+
+  it('says what of each product is still to be packed, per unit', async () => {
+    repoMock.listToPack.mockResolvedValue([
+      { product_id: 1, unit: 'kg', to_pack: '12.5', pallets: 3, first_day: '2026-10-20' },
+      { product_id: 1, unit: 'each', to_pack: '4', pallets: 1, first_day: '2026-10-21' },
+    ]);
+    const map = await mapService.getMap();
+    expect(map.products[0].toPack).toEqual([
+      { quantity: 12.5, unit: 'kg', pallets: 3, firstDay: '2026-10-20' },
+      { quantity: 4, unit: 'each', pallets: 1, firstDay: '2026-10-21' },
+    ]);
   });
 
   it('keeps the answer for a few seconds, and drops it when a count is saved', async () => {

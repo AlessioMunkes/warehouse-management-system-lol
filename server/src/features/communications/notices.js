@@ -105,14 +105,14 @@ export const purchaseOrderNeedsAttention = async (client, { purchaseOrder, statu
 };
 
 // delivery.repository.js createDelivery — a delivery came in short, so
-// the order is Partially received and flagged Follow-up required. The
+// the order is Partially received with a balance outstanding. The
 // same type as above, so it goes to the same people and opens the
 // order; the body is what was short.
 export const purchaseOrderDeliveredShort = async (client, { purchaseOrder, reason }) => {
   if (!purchaseOrder) return;
   await createNotification(client, {
     type:       'purchase_order_needs_attention',
-    title:      `Follow-up required: ${purchaseOrder.po_number} was delivered short`,
+    title:      `Balance outstanding: ${purchaseOrder.po_number} was delivered short`,
     body:       reason ?? null,
     entityType: 'purchase_order',
     entityId:   purchaseOrder.id,

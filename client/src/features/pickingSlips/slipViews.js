@@ -70,6 +70,11 @@ export const volunteerHolder = (slip) => {
 export const packers = (slip) =>
   [slip.packer_name, slip.packer_name_2, volunteerHolder(slip)].filter(Boolean).join(' & ');
 
+// A pallet with a flagged line that has not gone out yet: the manager
+// still has time to act on it. The dashboard counts the same rule.
+export const isFlaggedOpen = (slip) =>
+  Number(slip.flagged_items ?? 0) > 0 && ['pending', 'in_progress', 'complete'].includes(slipState(slip));
+
 // ── Views (the tabs) ──────────────────────────────────────────
 // `id` is what goes in ?status=, the value the dashboard's Needs
 // attention list links to.
@@ -78,6 +83,8 @@ export const VIEWS = [
   { id: 'unassigned',   label: 'On the floor',  test: (s) => slipState(s) === 'pending' },
   { id: 'packing',      label: 'Packing',       test: (s) => slipState(s) === 'in_progress' },
   { id: 'ready',        label: 'Ready at gate', test: (s) => slipState(s) === 'complete' },
+  // A packer flagged a line (short, damaged) on a pallet not yet gone out.
+  { id: 'flagged',      label: 'Flagged',       alert: true, test: (s) => isFlaggedOpen(s) },
   { id: 'notcollected', label: 'Not collected', alert: true, test: (s) => slipState(s) === 'not_collected' },
 ];
 

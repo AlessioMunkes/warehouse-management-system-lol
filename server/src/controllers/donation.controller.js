@@ -87,6 +87,32 @@ const listSection18AQueue = async (req, res) => {
   }
 };
 
+// ── Estimate a donation's value ───────────────────────────────
+// POST /api/donations/estimate-value  { items: [{ productId, quantity, unit }] }
+// Returns: { valueZar, pricedCount, itemCount }.
+const estimateDonationValue = async (req, res) => {
+  try {
+    const estimate = await donationService.estimateDonationValue(req.body);
+    res.status(200).json({ success: true, data: estimate });
+  } catch (err) {
+    console.error('[estimateDonationValue]', err.message);
+    sendError(res, err, 'Failed to estimate the value.');
+  }
+};
+
+// ── Verify a donation's value ─────────────────────────────────
+// PATCH /api/donations/:id/value  { estimatedValueZar }
+// Manager only. Returns: the donation's value, now verified.
+const verifyDonationValue = async (req, res) => {
+  try {
+    const donation = await donationService.verifyDonationValue(req.params.id, req.body, req.user.id);
+    res.status(200).json({ success: true, data: donation });
+  } catch (err) {
+    console.error('[verifyDonationValue]', err.message);
+    sendError(res, err, 'Failed to verify the value.');
+  }
+};
+
 const listEmailHistory = async (req, res) => {
   try {
     // Served from the DB only — Gmail is never queried for history.
@@ -254,6 +280,8 @@ const updateSection18ASettings = async (req, res) => {
 };
 
 export default {
+  estimateDonationValue,
+  verifyDonationValue,
   listDonations,
   createDonation,
   listUnmatchedItems,

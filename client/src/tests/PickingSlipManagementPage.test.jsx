@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
-  countViews, shiftWeek, slipState, weekLabel, weekOf,
+  countViews, isFlaggedOpen, shiftWeek, slipState, weekLabel, weekOf,
 } from '../features/pickingSlips/slipViews';
 
 vi.mock('../services/pickingAPI', () => ({
@@ -20,6 +20,7 @@ vi.mock('../services/pickingAPI', () => ({
   assignSlip: vi.fn(),
   releaseSlip: vi.fn(),
   addSecondPacker: vi.fn(),
+  followUpSlip: vi.fn(),
   generateSlips: vi.fn(),
   createSlip: vi.fn(),
   editSlip: vi.fn(),
@@ -85,7 +86,17 @@ describe('slipViews', () => {
   });
 
   it('counts each tab', () => {
-    expect(countViews(SLIPS)).toEqual({ all: 4, unassigned: 1, packing: 1, ready: 1, notcollected: 1 });
+    expect(countViews(SLIPS)).toEqual({ all: 4, unassigned: 1, packing: 1, ready: 1, notcollected: 1, flagged: 0 });
+  });
+
+  // The dashboard's "pallets with a flagged item" links here: a flag
+  // only needs the manager while the pallet has not gone out.
+  it('lists a flagged pallet until it goes out', () => {
+    expect(isFlaggedOpen(slip({ status: 'in_progress', flagged_items: 1 }))).toBe(true);
+    expect(isFlaggedOpen(slip({ status: 'complete', flagged_items: '2' }))).toBe(true);
+    expect(isFlaggedOpen(slip({ status: 'complete', flagged_items: 0 }))).toBe(false);
+    expect(isFlaggedOpen(slip({ status: 'dispatched', dispatch_status: 'collected', flagged_items: 1 }))).toBe(false);
+    expect(isFlaggedOpen(slip({ status: 'cancelled', flagged_items: 1 }))).toBe(false);
   });
 });
 
@@ -196,6 +207,31 @@ describe('PickingSlipManagementPage', () => {
 
     expect(await screen.findByText(/Pop-up blocked/)).toBeInTheDocument();
     expect(buildPickingSlipPdf).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  // A pallet nobody came for: the centre is followed up from its panel,
+  // and the list says which ones still have to be.
+  it('follows up a pallet that was not collected, on WhatsApp', async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const link = 'https://wa.me/27825550101?text=Hello';
+    api.fetchPickingSlip.mockImplementation(async (id) => ({
+      ...SLIPS.find((s) => s.id === Number(id)), items: [],
+      follow_up: { message: 'Hello', whatsappNumber: '+27825550101', whatsappLink: link },
+    }));
+    api.followUpSlip.mockResolvedValue({});
+    router.params = new URLSearchParams('status=notcollected');
+    render(<PickingSlipManagementPage />);
+
+    expect(within((await screen.findByText('Hope House')).closest('tr')).getByText('To follow up')).toBeInTheDocument();
+    await user.click(screen.getByText('Hope House'));
+    const panel = within(await screen.findByRole('dialog', { name: 'Hope House' }));
+    expect(panel.getByText(/nobody has followed it up yet/)).toBeInTheDocument();
+    await user.click(panel.getByRole('button', { name: /Follow up on WhatsApp/ }));
+
+    expect(open).toHaveBeenCalledWith(link, '_blank', 'noopener,noreferrer');
+    await waitFor(() => expect(api.followUpSlip).toHaveBeenCalledWith(4));
     open.mockRestore();
   });
 

@@ -62,6 +62,8 @@ import productBarcodeRouter from './src/routes/productBarcode.routes.js';
 import dashboardRouter   from './src/routes/dashboard.routes.js';
 import financeRouter     from './src/routes/finance.routes.js';
 import beneficiaryRouter from './src/routes/beneficiary.routes.js';
+import kitchenRouter from './src/routes/kitchen.routes.js';
+import ftsDropPointRouter from './src/routes/ftsDropPoint.routes.js';
 import notificationRouter from './src/routes/notification.routes.js';
 import pushRouter        from './src/routes/push.routes.js';
 import ecdCollectionReminderRouter from './src/routes/ecdCollectionReminder.routes.js';
@@ -84,6 +86,7 @@ import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
 import adminRouter       from './src/routes/admin.routes.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
+import guestIdleJob      from './src/jobs/guestIdle.job.js';
 import savedReportsJob   from './src/jobs/savedReports.job.js';
 import { startEmailReminderScheduler } from './src/jobs/ecdCollectionReminder.job.js';
 import { sendError } from './src/utils/httpError.js';
@@ -145,7 +148,12 @@ app.use(helmet({
                    'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
       fontSrc:    ["'self'", 'data:',
                    'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
-      imgSrc:     ["'self'", "data:"],           // data: needed for base64 signature images
+      // data: for base64 signature images. OpenStreetMap for the map
+      // tiles on the landing page, the Impact map and the location
+      // picker: without it the browser blocks every tile and the maps
+      // are blank in production (Vite's dev server sends no CSP, so
+      // they still work locally).
+      imgSrc:     ["'self'", "data:", 'https://tile.openstreetmap.org'],
       connectSrc: ["'self'", ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : [])],
       objectSrc:  ["'none'"],
       frameSrc:   ["'none'"],
@@ -249,6 +257,8 @@ app.use('/api/products',   productRouter);
 app.use('/api/dashboard',  dashboardRouter);
 app.use('/api/finance',    financeRouter);
 app.use('/api/beneficiaries', beneficiaryRouter);
+app.use('/api/kitchens', kitchenRouter);
+app.use('/api/fts', ftsDropPointRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/push',          pushRouter);
 app.use('/api/collection-reminders', ecdCollectionReminderRouter);
@@ -318,6 +328,8 @@ app.listen(port, () => {
   console.log(`[env] PORT: ${process.env.PORT || 5000}`);
   console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
   expiryWarningJob.startExpiryWarningJob();
+  // Guest visits idle for four hours are signed out (migration 067).
+  if (process.env.NODE_ENV !== 'test') guestIdleJob.startGuestIdleJob();
   if (process.env.NODE_ENV !== 'test' && process.env.SAVED_REPORTS_SCHEDULER !== 'false') {
     savedReportsJob.startSavedReportsJob();
   }

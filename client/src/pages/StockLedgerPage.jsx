@@ -15,7 +15,9 @@
 // Laid out like every manager list: tabs by movement type (the server
 // filters on them), the period, product and person as toolbar controls
 // whose choices show as removable chips, one summary line, the table.
-// Reconciliation is the last tab. The tab is in ?status=.
+// Reconciliation comes after the movement tabs, then the reorder
+// planner: what the movements say has to be ordered next. The tab is
+// in ?status=.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -35,6 +37,7 @@ import useSortable from "@/lib/useSortable";
 import { LEDGER_SORT } from "../features/inventory/ledgerSort";
 import usePaged, { TABLE_PAGE_SIZE } from "@/features/staff/usePaged";
 import ReconciliationPanel from "../features/inventory/ReconciliationPanel";
+import ReorderPlanner from "../features/reporting/ReorderPlanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { getLedger, getReconciliation, getLedgerActors, getManifest } from "../services/stockAPI";
 
@@ -52,7 +55,10 @@ const VIEWS = [
   { id: "adjustment",     label: "Adjustments",   types: ["adjustment"] },
   { id: "decanted",       label: "Decanting",     types: ["decanted"] },
   { id: "reconciliation", label: "Reconciliation", alert: true },
+  { id: "planning",       label: "Reorder planner" },
 ];
+// The tabs that are not a list of movements.
+const PANELS = new Set(["reconciliation", "planning"]);
 const viewById = (id) => VIEWS.find((v) => v.id === id) ?? VIEWS[0];
 
 const RANGES = [
@@ -86,7 +92,7 @@ const fmtQty = (n) => (Math.round(Number(n) * 1000) / 1000).toLocaleString("en-Z
 export default function StockLedgerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const view = viewById(searchParams.get("status"));
-  const tab = view.id === "reconciliation" ? "reconciliation" : "movements";
+  const tab = PANELS.has(view.id) ? view.id : "movements";
   const typeKey = (view.types ?? []).join(",");
 
   const [range, setRange] = useState("30");
@@ -101,6 +107,8 @@ export default function StockLedgerPage() {
   const [error, setError] = useState(null);
 
   const [products, setProducts] = useState([]);
+  // The unit of the one product chosen, for the in and out totals.
+  const chosenUnit = products.find((p) => String(p.id) === productId)?.unit ?? "";
   const [actors, setActors] = useState([]);
 
   const [recon, setRecon] = useState(null);
@@ -249,7 +257,7 @@ export default function StockLedgerPage() {
   };
 
   const changeView = (id) => {
-    if (id !== "reconciliation") setIsLoading(true);
+    if (!PANELS.has(id)) setIsLoading(true);
     setSearchParams(id === "all" ? {} : { status: id }, { replace: true });
   };
 
@@ -280,7 +288,7 @@ export default function StockLedgerPage() {
     <PageShell>
       <PageHeader
         title="Stock ledger"
-        description="Trace every stock movement and check that balances add up."
+        description="Trace every stock movement, check that balances add up and plan what to reorder."
       />
 
       <ViewTabs
@@ -336,16 +344,21 @@ export default function StockLedgerPage() {
                   </Select>
                 </ListToolbar>
 
-                {/* One line in place of four tiles: the totals for exactly
-                    what the tab and filters select, from the server. */}
+                {/* One short line. In and out only for one product: across
+                    products they add kilograms to litres to crates, which
+                    is not a number anyone can use. */}
                 <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
                   {summary ? (
                     <>
-                      In <span className="font-medium text-good">{signed(summary.totalIn)}</span>
-                      {" · "}Out <span className="font-medium text-danger">{signed(summary.totalOut)}</span>
-                      {" · "}Net <span className="font-medium text-foreground">{signed(summary.netChange)}</span>
-                      {" · "}{summary.movementCount} movement{summary.movementCount === 1 ? "" : "s"}
-                      {summary.productCount ? ` across ${summary.productCount} product${summary.productCount === 1 ? "" : "s"}` : ""}
+                      {productId ? (
+                        <>
+                          In <span className="font-medium text-good">{signed(summary.totalIn)}{chosenUnit ? ` ${chosenUnit}` : ""}</span>
+                          {" · "}Out <span className="font-medium text-danger">{signed(summary.totalOut)}{chosenUnit ? ` ${chosenUnit}` : ""}</span>
+                          {" · "}
+                        </>
+                      ) : null}
+                      {Number(summary.movementCount).toLocaleString("en-ZA")} movement{summary.movementCount === 1 ? "" : "s"}
+                      {!productId && summary.productCount ? ` across ${summary.productCount} product${summary.productCount === 1 ? "" : "s"}` : ""}
                     </>
                   ) : " "}
                 </p>
@@ -378,6 +391,12 @@ export default function StockLedgerPage() {
               <ReconciliationPanel data={recon} isLoading={reconLoading} />
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {tab === "planning" && (
+        <div className="mt-6">
+          <ReorderPlanner />
         </div>
       )}
     </PageShell>

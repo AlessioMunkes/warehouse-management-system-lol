@@ -112,6 +112,9 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, st
        -- not-collected cut-off writes; picking_slips.collection_status
        -- is never written and must not be read.
        de.status                                              AS dispatch_status,
+       -- A not-collected pallet someone has been in touch with the
+       -- centre about (migration 063).
+       de.followed_up_at,
        -- When it was last claimed or assigned, so a packer's own list
        -- can put the pallet they just took at the top.
        (SELECT MAX(pe.created_at) FROM picking_events pe
@@ -124,7 +127,7 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, st
      LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name, v.full_name, de.status
+     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name, v.full_name, de.status, de.followed_up_at
      ORDER BY ps.dispatch_date ASC, COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
   );
@@ -143,10 +146,15 @@ const getSlipById = async (id) => {
        -- itself serialises as the previous day in UTC.
        ps.dispatch_date::text AS dispatch_date_iso,
        -- The gate's outcome, as getSlips reports it.
-       (SELECT de.status FROM dispatch_events de WHERE de.picking_slip_id = ps.id) AS dispatch_status,
+       de.status AS dispatch_status,
        COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
        e.child_count,
        e.contact_name,
+       -- Who to get hold of when it was not collected.
+       e.mobile_number,
+       e.contact_phone,
+       de.followed_up_at,
+       fu.first_name          AS followed_up_by_name,
        e.last_collected_date,
        u.first_name           AS packer_name,
        u2.first_name          AS packer_name_2,
@@ -156,6 +164,8 @@ const getSlipById = async (id) => {
      LEFT JOIN users u  ON u.id = ps.assigned_to
      LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
      LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
+     LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+     LEFT JOIN users fu ON fu.id = de.followed_up_by
      WHERE ps.id = $1`,
     [id]
   ),
@@ -397,6 +407,23 @@ const addSecondPacker = async ({ slipId, packerId, actorId }) => {
 // manager freeing someone else's: it must be theirs, and nothing on it
 // may be packed yet. Once a line is confirmed or flagged the pallet has
 // food on it, and handing that on is the manager's call.
+// ── Follow up a pallet that was not collected ──────────────────
+// Records that someone has been in touch with the centre: when, and
+// who. Only on a pallet the cut-off marked not collected. Following it
+// up again (a second call) moves the time on.
+const recordFollowUp = async ({ slipId, actorId }) => {
+  const result = await pool.query(
+    `UPDATE dispatch_events
+        SET followed_up_at = now(), followed_up_by = $2
+      WHERE picking_slip_id = $1 AND status = 'not_collected'
+      RETURNING id`,
+    [slipId, actorId]
+  );
+  if (result.rows[0]) return { ok: true };
+  const exists = await pool.query(`SELECT 1 FROM picking_slips WHERE id = $1`, [slipId]);
+  return exists.rows[0] ? { notNotCollected: true } : { notFound: true };
+};
+
 const releaseSlip = async ({ slipId, actorId, beforeCommit, ownOnly = false }) => {
   const client = await pool.connect();
   try {
@@ -769,6 +796,7 @@ export default {
   CLAIMABLE_STATUSES,
   getSlips,
   getSlipById,
+  recordFollowUp,
   generateSlips,
   createSlip,
   assignSlip,

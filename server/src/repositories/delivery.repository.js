@@ -37,6 +37,7 @@ import {
   RECEIVABLE_PO_STATUSES,
   PO_STATUS_FULLY_RECEIVED,
   PO_STATUS_PARTIALLY_RECEIVED,
+  NO_OPEN_FOLLOW_UP_SQL,
 } from "../constants/purchaseOrderStatus.js";
 
 // ── The goods-in archive ──────────────────────────────────────
@@ -85,12 +86,13 @@ const getDeliveries = async ({
        dn.purchase_order_id,
        s.id                  AS supplier_id,
        s.name                AS supplier_name,
-       u.first_name          AS received_by_name,
+       TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS received_by_name,
        po.status     AS po_status,
        po.po_number,
        po.status             AS po_status,
        COALESCE(d.discrepancy_count, 0)        AS discrepancy_count,
        COALESCE(d.discrepancy_count, 0) > 0    AS has_discrepancies,
+       COALESCE(d.short_count, 0)              AS short_count,
        COALESCE(d.unresolved_count, 0)         AS unresolved_discrepancy_count,
        COALESCE(i.line_count, 0)               AS line_count,
        COUNT(*) OVER ()                        AS total_count
@@ -103,7 +105,10 @@ const getDeliveries = async ({
      LEFT JOIN LATERAL (
        SELECT
          COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0)                                   AS discrepancy_count,
-         COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0 AND dni.discrepancy_resolved = false) AS unresolved_count
+         COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0 AND dni.discrepancy_resolved = false) AS unresolved_count,
+         -- Lines that came in below what was ordered: the delivery reads
+         -- "Partially received" rather than "Completed".
+         COUNT(*) FILTER (WHERE dni.received_quantity < dni.expected_quantity)                   AS short_count
        FROM delivery_note_items dni
        WHERE dni.delivery_note_id = dn.id
      ) d ON TRUE
@@ -115,7 +120,9 @@ const getDeliveries = async ({
      WHERE ($1::date IS NULL OR dn.delivery_date >= $1::date)
        AND ($2::date IS NULL OR dn.delivery_date <= $2::date)
        AND ($3::int  IS NULL OR dn.supplier_id   = $3::int)
-       AND ($4::text IS NULL OR dn.status        = $4::text)
+       AND ($4::text IS NULL OR dn.status        = $4::text
+            OR ($4::text = 'complete' AND COALESCE(d.short_count, 0) = 0)
+            OR ($4::text = 'partial'  AND COALESCE(d.short_count, 0) > 0))
        -- Free text across the two things someone actually has in their hand:
        -- a PO number off a printed order, or the note's own record number.
        -- dn.id::text so "11" matches note 11 without a separate numeric field.
@@ -149,7 +156,7 @@ const getDeliveryById = async (id) => {
        s.name           AS supplier_name,
        s.address        AS supplier_address,
        s.contact_phone  AS supplier_phone,
-       u.first_name     AS received_by_name
+       TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS received_by_name
      FROM delivery_notes dn
      LEFT JOIN suppliers s ON s.id = dn.supplier_id
      LEFT JOIN users u ON u.id = dn.received_by
@@ -314,8 +321,11 @@ const createDelivery = async ({
     // FOR UPDATE because the two checks below are read-then-write:
     // without it, two tablets submitting the same delivery at the
     // same moment both see 'approved' and both receive the stock.
+    // rest_elsewhere: an older order whose rest was moved to a
+    // follow-up order is received against that one, not this.
     const poResult = await client.query(
-      `SELECT id, supplier_id, status FROM purchase_orders WHERE id = $1 FOR UPDATE`,
+      `SELECT po.id, po.supplier_id, po.status, NOT ${NO_OPEN_FOLLOW_UP_SQL} AS rest_elsewhere
+         FROM purchase_orders po WHERE po.id = $1 FOR UPDATE`,
       [purchaseOrderId],
     );
     const purchaseOrder = poResult.rows[0];
@@ -349,9 +359,9 @@ const createDelivery = async ({
     // 'pending' is refused too: it is open, but nobody has approved it
     // yet (RECEIVABLE_PO_STATUSES). The two lists below read the same
     // constant, so what is offered and what is accepted cannot disagree.
-    if (!isReceivablePurchaseOrder(purchaseOrder.status)) {
+    if (!isReceivablePurchaseOrder(purchaseOrder.status) || purchaseOrder.rest_elsewhere) {
       await client.query("ROLLBACK");
-      return { purchaseOrderNotOpen: true, status: purchaseOrder.status };
+      return { purchaseOrderNotOpen: true, status: purchaseOrder.status, restElsewhere: Boolean(purchaseOrder.rest_elsewhere) };
     }
 
     // status and created_at both have defaults — listing them here is
@@ -463,12 +473,12 @@ const createDelivery = async ({
     //   nothing owed   -> completed, and so is every order it was a
     //                     follow-up to (they were waiting on this one)
     //   something owed -> partially_received, with what was short kept as
-    //                     its reason. That pair IS the "follow-up
-    //                     required" flag the floor and the manager see:
-    //                     the status says part of it is in, the flag
-    //                     says the rest needs chasing. The flag clears
-    //                     when a follow-up order is raised, and the
-    //                     status stays until that order is received.
+    //                     its reason: the "Balance outstanding" label
+    //                     the floor and the manager see. The order stays
+    //                     open on the same order number, and the rest is
+    //                     received against it (this query counts every
+    //                     delivery, so the next one closes it when the
+    //                     balance is in).
     const owed = await client.query(
       `SELECT p.name, p.default_unit AS unit,
               (poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0))::numeric AS short
@@ -584,6 +594,7 @@ const getSuppliersWithOpenOrders = async () => {
      FROM suppliers s
      JOIN purchase_orders po ON po.supplier_id = s.id
      WHERE po.status = ANY($1)
+       AND ${NO_OPEN_FOLLOW_UP_SQL}
        AND s.is_active = true
      ORDER BY s.name ASC`,
     [RECEIVABLE_PO_STATUSES],
@@ -638,6 +649,7 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
      LEFT JOIN suppliers s ON s.id = po.supplier_id
      WHERE ($1::int IS NULL OR po.supplier_id = $1::int)
        AND po.status = ANY($2)
+       AND ${NO_OPEN_FOLLOW_UP_SQL}
      ORDER BY po.expected_delivery_date ASC NULLS LAST, po.id ASC`,
     [supplierId ?? null, RECEIVABLE_PO_STATUSES],
   );

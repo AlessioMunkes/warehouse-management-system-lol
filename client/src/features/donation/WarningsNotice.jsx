@@ -9,7 +9,8 @@
 // CompletionDialog: the one deliberate exception — this IS a modal,
 // because it's a real decision point (stay vs go home), not an error.
 // ─────────────────────────────────────────────────────────────
-import { fmtQty } from "@/lib/quantity";
+import { fmtQty } from "@/lib/quantity";
+
 import SuccessDialog from "../staff/SuccessDialog";
 import { OFFLINE_TITLE, offlineLine } from "../staff/successText";
 
@@ -58,6 +59,13 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
         {result.queued && (
           <p className="stf-step-sub">{offlineLine('Do not record it again.')}</p>
         )}
+
+        {result.valueZar != null && Number.isFinite(result.valueZar) ? (
+          <p className="stf-step-sub">
+            Estimated value: R{result.valueZar.toFixed(2)}
+            {result.valueEstimated ? ' (estimated from the items; a manager will verify it)' : ''}
+          </p>
+        ) : null}
 
         {pendingReview && (
           <div className="stf-notice is-warn">

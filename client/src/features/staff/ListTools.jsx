@@ -30,7 +30,9 @@ export default function ListTools({
         <i className="ti ti-search stf-search-icon" aria-hidden="true" />
         <input
           id={id}
-          className="stf-search-input"
+          // has-close: the cross shows even when the box is empty, so the
+          // hint keeps the room the cross needs.
+          className={`stf-search-input${onClose ? ' has-close' : ''}`}
           type="search"
           autoComplete="off"
           autoFocus={autoFocus}

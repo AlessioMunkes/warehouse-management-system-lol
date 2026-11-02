@@ -38,6 +38,7 @@ router.post('/:id/assign-second', auth, requireRole(...ALL_STAFF), validateIntId
 // A manager releases any claimed pallet; a packer only their own, and
 // only before packing anything on it (enforced in the service and the
 // repository).
+router.post('/:id/follow-up', auth, requireRole(...MANAGERS_UP), validateIntId, pickingController.followUpSlip);
 router.post('/:id/release',  auth, requireRole(...ALL_STAFF), validateIntId, pickingController.releaseSlip);
 // idempotent(): a phone that packed with no signal sends these later,
 // possibly twice (middleware/idempotency.middleware.js).

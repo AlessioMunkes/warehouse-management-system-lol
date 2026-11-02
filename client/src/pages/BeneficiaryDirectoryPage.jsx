@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }     from '../context/AuthContext';
 import BeneficiaryForm from '../features/beneficiaries/BeneficiaryForm';
+import KitchenList from '../features/beneficiaries/KitchenList';
 import beneficiaryAPI  from '../services/beneficiaryAPI';
 import { listCentreLocations, setCentreLocation } from '../services/impactMapAPI';
 import {
@@ -58,6 +59,9 @@ const VIEWS = [
   { id: 'thursday', label: 'Thursday',          test: (b) => b.cohort === 'thursday' },
   { id: 'pending',  label: 'Awaiting approval', alert: true, test: (b) => !b.approvedAt },
   { id: 'unplaced', label: 'No location',       test: (b) => b.isActive !== false && !hasPin(b) },
+  // Soup kitchens and the Dignity Kitchen: their own list (KitchenList),
+  // not centres on the weekly rotation.
+  { id: 'kitchens', label: 'Kitchens',          test: () => false },
 ];
 
 // The location fields a row takes from the location endpoint.
@@ -287,9 +291,12 @@ export default function BeneficiaryDirectoryPage() {
         label="Beneficiary views"
         value={tab}
         onChange={setTab}
-        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading || v.id === 'kitchens' ? null : counts[v.id] }))}
       />
 
+      {tab === 'kitchens' ? (
+        <div className="mt-6"><KitchenList canManage={canManage} /></div>
+      ) : (
       <div className="mt-6">
         <ListCard
           // Mounted through a reload: the search triggers the fetch, and
@@ -339,6 +346,7 @@ export default function BeneficiaryDirectoryPage() {
           )}
         </ListCard>
       </div>
+      )}
 
       {mode === 'list' && selected ? (
         <BeneficiaryDetail

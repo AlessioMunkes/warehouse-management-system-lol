@@ -22,9 +22,10 @@ vi.mock('../services/warehouseMapAPI', () => ({
   getWarehouseMap: vi.fn(),
   saveWarehouseLayout: vi.fn(),
   recordAreaCount: vi.fn(),
+  setAreaCapacity: vi.fn(),
 }));
 
-const { getWarehouseMap, saveWarehouseLayout, recordAreaCount } = await import('../services/warehouseMapAPI');
+const { getWarehouseMap, saveWarehouseLayout, recordAreaCount, setAreaCapacity } = await import('../services/warehouseMapAPI');
 const { default: WarehouseMapTab } = await import('../features/warehouseMap/WarehouseMapTab');
 const { default: WarehouseLayoutPage } = await import('../pages/WarehouseLayoutPage');
 
@@ -166,6 +167,29 @@ describe('WarehouseMapTab', () => {
     expect(onAdjust).toHaveBeenCalledWith(1);
   });
 
+  // A manager changes what an area holds from its panel; a worker cannot.
+  it('lets a manager change an area’s capacity from the map', async () => {
+    const user = userEvent.setup();
+    setAreaCapacity.mockImplementation(async () => getWarehouseMap());
+    render(<WarehouseMapTab canAdjust />);
+    await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    await user.click(panel.getByRole('button', { name: 'Edit capacity' }));
+    const input = panel.getByLabelText('Capacity of Dry store 1 in kg');
+    await user.clear(input);
+    await user.type(input, '250');
+    await user.click(panel.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(setAreaCapacity).toHaveBeenCalledWith(1, { capacityKg: 250 }));
+  });
+
+  it('gives a worker no capacity control', async () => {
+    const user = userEvent.setup();
+    render(<WarehouseMapTab />);
+    await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.queryByRole('button', { name: /capacity/ })).toBeNull();
+  });
+
   it('never makes a door a button', async () => {
     render(<WarehouseMapTab />);
     await screen.findByRole('button', { name: /^Dry store 1, Dry store/ });
@@ -176,9 +200,9 @@ describe('WarehouseMapTab', () => {
     const user = userEvent.setup();
     render(<WarehouseMapTab />);
     await user.click(await screen.findByRole('button', { name: /^Dry store 1, Dry store/ }));
-    await user.click(await screen.findByRole('button', { name: /Count this area/ }));
+    await user.click(await screen.findByRole('button', { name: /Manage this area/ }));
 
-    const dialog = within(await screen.findByRole('dialog', { name: 'Count Dry store 1' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Manage Dry store 1' }));
     const rice = dialog.getByLabelText('Rice');
     await user.clear(rice);
     await user.type(rice, '28');
@@ -215,7 +239,7 @@ describe('WarehouseMapTab', () => {
     const panel = within(await screen.findByRole('dialog'));
     expect(panel.getByText('2 pallets of 6 spaces · 33%')).toBeInTheDocument();
     expect(panel.getByText('Sunflower ECD')).toBeInTheDocument();
-    expect(panel.queryByRole('button', { name: /Count this area/ })).toBeNull();
+    expect(panel.queryByRole('button', { name: /Manage this area/ })).toBeNull();
   });
 
   it('shows the capacity of the warehouse and of each area under the map', async () => {

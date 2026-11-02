@@ -228,6 +228,20 @@ export default function StockDetailPanel({
         <Figure label="Reorder at" value={product.reorderAt} unit={unit} />
       </dl>
 
+      {/* The soonest expiry, always said here (the table no longer has a
+          column for it): a date, how long is left, and about how much of
+          that delivery is still on the shelf. Estimated, as the hint says. */}
+      <p className="text-sm" title={EXPIRY_ESTIMATE_HINT}>
+        <span className="text-muted-foreground">Earliest expiry: </span>
+        {product.earliestExpiry ? (
+          <>
+            <span className="font-medium">{fmtDay(product.earliestExpiry)}</span>
+            {earliest ? <span className="text-muted-foreground"> ({expiryLabel(earliest).toLowerCase()})</span> : null}
+            {product.earliestExpiryLeft > 0 ? <span className="text-muted-foreground">, about {fmtQtyUnit(product.earliestExpiryLeft, unit)} of that delivery left</span> : null}
+          </>
+        ) : <span className="text-muted-foreground">none on record</span>}
+      </p>
+
       <Section title="Balance over time" note={product.reorderAt > 0 ? 'Dashed line: reorder level' : undefined}>
         {movements.error ? (
           <p className="py-4 text-sm text-danger">{movements.error}</p>

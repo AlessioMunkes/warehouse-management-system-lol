@@ -122,6 +122,20 @@ const releaseSlip = async (req, res) => {
   }
 };
 
+// ── Follow up a pallet that was not collected ─────────────────────
+// POST /api/picking/:id/follow-up
+// Manager only. Records that the centre has been contacted.
+// Returns: the slip, with who followed it up and when.
+const followUpSlip = async (req, res) => {
+  try {
+    const slip = await pickingService.followUpSlip(req.params.id, req.user);
+    res.status(200).json({ success: true, data: slip });
+  } catch (err) {
+    console.error('[followUpSlip]', err.message);
+    sendError(res, err, 'Failed to record the follow-up.');
+  }
+};
+
 // ── Edit a pending slip ────────────────────────────────────────────
 // PATCH /api/picking/:id
 // Body: { dispatchDate?, cohort?, force?, items?: [{ productId, quantity, unit }] }
@@ -202,6 +216,7 @@ export default {
   assignSlip,
   addSecondPacker,
   releaseSlip,
+  followUpSlip,
   editSlip,
   confirmItem,
   flagItem,

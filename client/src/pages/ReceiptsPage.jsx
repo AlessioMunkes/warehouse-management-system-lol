@@ -37,6 +37,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import ReceiptsTable from '../features/receipts/ReceiptsTable';
+import DecantingSheetsTab from '../features/receipts/DecantingSheetsTab';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListCard from '@/components/ui/list-card';
@@ -50,7 +51,7 @@ import { VARIANCE_STYLE } from '@/lib/statusStyles';
 import DeliveryNotePDF from '../features/receiving/DeliveryNotePDF';
 import DispatchNotePDF from '../features/receipts/DispatchNotePDF';
 import {
-  formatDateShort, formatDateTime, DISPATCH_STATUS_LABEL, DELIVERY_STATUS_LABEL,
+  formatDateShort, formatDateTime, DISPATCH_STATUS_LABEL, deliveryStatusLabel,
 } from '../features/receipts/noteFormat';
 import receivingAPI from '../services/receivingAPI';
 import useTableView from '../features/masterdata/useTableView';
@@ -66,6 +67,8 @@ const PAGE_SIZE = 15;
 const TABS = [
   { id: 'in',  label: 'Goods in · delivery notes' },
   { id: 'out', label: 'Goods out · dispatch notes' },
+  // The paper for stock bagged on the floor (DecantingSheetsTab.jsx).
+  { id: 'decanting', label: 'Decanting sheets' },
 ];
 
 // A native select drawn like the app's Input, for the toolbar. Native
@@ -75,9 +78,8 @@ const shortDate = (value) => new Date(`${value}T00:00:00`)
   .toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
 
 const DELIVERY_STATUS_OPTIONS = [
-  { value: 'recorded', label: 'Recorded' },
-  { value: 'flagged',  label: 'Flagged' },
-  { value: 'closed',   label: 'Closed' },
+  { value: 'complete', label: 'Completed' },
+  { value: 'partial',  label: 'Partially received' },
 ];
 
 // 'awaiting' is deliberately absent: an awaiting event is a pallet still
@@ -96,6 +98,7 @@ const EMPTY_FILTERS = { from: '', to: '', entity: '', status: '', search: '' };
 const EMPTY_SORT = {
   in:  { sort: 'delivery_date', dir: 'desc' },
   out: { sort: 'collected_at',  dir: 'desc' },
+  decanting: { sort: 'created_at', dir: 'desc' },
 };
 
 export default function ReceiptsPage() {
@@ -144,6 +147,8 @@ export default function ReceiptsPage() {
   // Filter options load once per tab. Failure is non-fatal — the list still
   // works, you just lose one dropdown, so it does not set the page error.
   useEffect(() => {
+    // The decanting tab reads its own list (DecantingSheetsTab).
+    if (tab === 'decanting') return undefined;
     let cancelled = false;
     const load = tab === 'in'
       ? receivingAPI.getSupplierOptions()
@@ -180,7 +185,7 @@ export default function ReceiptsPage() {
       // Yielding first is what keeps the first setState out of the synchronous
       // effect body.
       await Promise.resolve();
-      if (cancelled) return;
+      if (cancelled || tab === 'decanting') return;
 
       setLoading(true);
       setError('');
@@ -282,14 +287,14 @@ export default function ReceiptsPage() {
     { key: 'by',       header: 'Received by', sortKey: 'received_by_name',
       render: (r) => r.received_by_name || '-' },
     {
-      key: 'status', header: 'Status', sortKey: 'status',
+      key: 'status', header: 'Status',
       render: (r) => (
         <div className="flex items-center gap-2">
-          {/* Flagged is a problem (red); recorded and closed are done
-              (green, told apart by icon and fill); a count difference
-              on its own is amber. Styles: lib/statusStyles.js. */}
-          <StatusBadge kind="delivery" status={r.status}>
-            {DELIVERY_STATUS_LABEL[r.status] || r.status}
+          {/* Completed, or Partially received when a line came in short:
+              what the delivery note says too (deliveryStatusLabel). A
+              count difference is the amber badge beside it. */}
+          <StatusBadge kind="delivery" status={Number(r.short_count) > 0 ? 'partial' : 'complete'}>
+            {deliveryStatusLabel({ shortCount: r.short_count })}
           </StatusBadge>
           {r.has_discrepancies && (
             <StatusBadge {...VARIANCE_STYLE}>
@@ -391,7 +396,7 @@ export default function ReceiptsPage() {
     <PageShell>
       <PageHeader
         title="Receipts"
-        description="Find delivery notes for goods in and dispatch notes for goods out."
+        description="Find delivery notes, dispatch notes and decanting sheets."
       />
 
       <ViewTabs
@@ -402,6 +407,7 @@ export default function ReceiptsPage() {
         tabs={TABS}
       />
 
+      {tab === 'decanting' ? <DecantingSheetsTab /> : (<>
       <ErrorBanner className="mt-4" message={openError} />
 
       <div className="mt-6">
@@ -488,6 +494,8 @@ export default function ReceiptsPage() {
           />
         </ListCard>
       </div>
+
+      </>)}
 
       {openDelivery && (
         <DeliveryNotePDF delivery={openDelivery} onClose={() => setOpenDelivery(null)} />

@@ -59,13 +59,24 @@ export const OPEN_PO_STATUSES = [
 // receiving screen says as much ("ask your manager to approve the
 // order"), and this is what makes that true.
 //
-// 'partially_received' is not here either. It now means "the rest is
-// coming on a follow-up order" (migration 043): the remainder is
-// received against that order, not this one.
+// 'partially_received' is here: a short delivery leaves the order open
+// on the same order number, and the rest is received against it when
+// it comes (the sponsor's ask: one order number until it is resolved).
+// Orders from before that, whose rest was moved to a follow-up order
+// (migration 043), are left out by the delivery queries: their rest is
+// received against the follow-up, and receiving here too would take
+// the same goods in twice. See NO_OPEN_FOLLOW_UP_SQL.
 export const RECEIVABLE_PO_STATUSES = [
   'approved',
   'in_transit',
+  'partially_received',
 ];
+
+// For a query on purchase_orders aliased `po`: true unless the order's
+// remainder is on a follow-up order still on its way.
+export const NO_OPEN_FOLLOW_UP_SQL = `NOT EXISTS (
+  SELECT 1 FROM purchase_orders fu
+   WHERE fu.follow_up_of = po.id AND fu.status NOT IN ('completed', 'returned'))`;
 
 export const CLOSED_PO_STATUSES = ['completed', 'returned'];
 
@@ -84,24 +95,21 @@ export const CLOSED_PO_STATUSES = ['completed', 'returned'];
 //   follow_up_required -> approved                       Reopen for receiving
 //                      -> completed                      Close order (accept it as it is)
 //                      -> returned
-//   partially_received -> approved                       Reopen for receiving (only while no
-//                                                        follow-up order is on its way)
-//                      -> completed                      Close order (accept it as it is)
+//   partially_received -> completed                      Close order (the rest is not coming)
 //                      -> returned
+//                      (no reopen: it is still open, and receivable)
 //   completed, returned: closed. Nothing leads out.
 //
 // Two moves are the system's own and are not in this table:
 //   receiving a delivery     -> completed, or partially_received when short
-//                               (flagged "follow-up required" until a
-//                               follow-up order is raised)
-//   raising a follow-up order -> partially_received (and completed when
-//                               that follow-up is received in full)
+//                               (labelled "Balance outstanding" until the
+//                               rest is received or the order is closed)
 export const PO_MANUAL_TRANSITIONS = {
   pending:            ['approved'],
   approved:           ['in_transit', 'follow_up_required', 'returned'],
   in_transit:         ['approved', 'follow_up_required', 'returned'],
   follow_up_required: ['approved', 'completed', 'returned'],
-  partially_received: ['approved', 'completed', 'returned'],
+  partially_received: ['completed', 'returned'],
   completed:          [],
   returned:           [],
 };
@@ -111,8 +119,8 @@ export const canMovePurchaseOrder = (from, to) => (PO_MANUAL_TRANSITIONS[from] ?
 // What a fully-received order becomes.
 export const PO_STATUS_FULLY_RECEIVED = 'completed';
 
-// Partial receipt against an order that still expects more. Not written
-// automatically yet — see the note in delivery.repository.js createDelivery.
+// Partial receipt against an order that still expects more: what a
+// short delivery leaves it as (delivery.repository.js createDelivery).
 export const PO_STATUS_PARTIALLY_RECEIVED = 'partially_received';
 
 export const isOpenPurchaseOrder = (status) => OPEN_PO_STATUSES.includes(status);
@@ -131,4 +139,5 @@ export default {
   isClosedPurchaseOrder,
   PO_MANUAL_TRANSITIONS,
   canMovePurchaseOrder,
+  NO_OPEN_FOLLOW_UP_SQL,
 };

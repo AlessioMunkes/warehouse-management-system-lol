@@ -15,6 +15,8 @@
 //               when nothing is being searched for.
 //   onSelect    (area) => void; makes each area but a door a button.
 //               Leave it off for a picture only.
+//   onClear     () => void; a click on the empty floor (not on an area,
+//               and not the end of a drag) clears the selection.
 //   today       the server's 'YYYY-MM-DD', for expiry and pallet days
 //
 // WHAT THE 3D VIEW SHOWS, on top of the colour:
@@ -90,7 +92,9 @@ const clip = (text, n) => (text.length > n ? `${text.slice(0, n - 1)}…` : text
 const pressable = (area, onSelect) => (onSelect ? {
   role: 'button',
   tabIndex: 0,
-  onClick: () => onSelect(area),
+  // Stopped here: a click that reaches the map itself is a click on the
+  // empty floor, which clears the selection (onClear).
+  onClick: (e) => { e.stopPropagation(); onSelect(area); },
   onKeyDown: (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSelect(area); }
   },
@@ -436,7 +440,7 @@ function ZoomControls({ z, frame }) {
   );
 }
 
-function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) {
+function ThreeD({ grid, areas, shared, title, className, today, matchProduct, onClear }) {
   const [cam, setCam] = useState(DEFAULT_CAMERA);
   const [showLabels, setShowLabels] = useState(true);
   const [spinning, setSpinning] = useState(false);
@@ -595,6 +599,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
         onPointerCancel={up}
         onKeyDown={keyDown}
         onClickCapture={swallowDragClick}
+        onClick={onClear}
       >
         <polygon points={floorOutline(view, grid)} className="fill-surface-2 stroke-line-strong" strokeWidth={1.25} />
         <g className="pointer-events-none" aria-hidden="true">
@@ -624,7 +629,7 @@ function ThreeD({ grid, areas, shared, title, className, today, matchProduct }) 
                 key={box.id}
                 className={cn(sg.onSelect && 'cursor-pointer')}
                 opacity={sg.dimmed ? 0.3 : 1}
-                onClick={sg.onSelect ? () => sg.onSelect(gate) : undefined}
+                onClick={sg.onSelect ? (e) => { e.stopPropagation(); sg.onSelect(gate); } : undefined}
                 onPointerEnter={(e) => s3(gate).onHover(e)}
                 onPointerLeave={s3(gate).onLeave}
               >
@@ -720,6 +725,7 @@ export default function WarehouseMap({
   selectedId = null,
   highlighted = null,
   onSelect,
+  onClear,
   title = 'Warehouse map',
   className,
   today = null,
@@ -741,14 +747,14 @@ export default function WarehouseMap({
   });
 
   if (view === '3d') {
-    return <ThreeD grid={grid} areas={areas} shared={shared} title={title} className={className} today={today} matchProduct={matchProduct} />;
+    return <ThreeD grid={grid} areas={areas} shared={shared} title={title} className={className} today={today} matchProduct={matchProduct} onClear={onClear} />;
   }
 
-  return <TopView grid={grid} areas={areas} shared={shared} noteOf={noteOf} title={title} className={className} today={today} matchProduct={matchProduct} />;
+  return <TopView grid={grid} areas={areas} shared={shared} noteOf={noteOf} title={title} className={className} today={today} matchProduct={matchProduct} onClear={onClear} />;
 }
 
 // The plan from above, fitted to what is drawn with a square of room round it.
-function TopView({ grid, areas, shared, noteOf, title, className, today, matchProduct }) {
+function TopView({ grid, areas, shared, noteOf, title, className, today, matchProduct, onClear }) {
   const svgRef = useRef(null);
   const width = grid.cols * CELL;
   const height = grid.rows * CELL;
@@ -789,6 +795,7 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
         onPointerCancel={z.onPointerUp}
         onKeyDown={(e) => { if (e.target === e.currentTarget && z.onKeyDown(e)) e.preventDefault(); }}
         onClickCapture={(e) => { if (panned.current) { panned.current = false; e.stopPropagation(); } }}
+        onClick={onClear}
       >
       <defs>
         <pattern id="wm-grid" width={CELL} height={CELL} patternUnits="userSpaceOnUse">
@@ -819,7 +826,7 @@ function TopView({ grid, areas, shared, noteOf, title, className, today, matchPr
           <rect
             key={b.id} x={b.x * CELL} y={b.y * CELL} width={b.w * CELL} height={b.h * CELL} rx={b.part === 'cab' ? 5 : 3}
             className={cn(vehicleLook(b), sg.onSelect && 'cursor-pointer')} strokeWidth={1}
-            onClick={sg.onSelect ? () => sg.onSelect(gate) : undefined}
+            onClick={sg.onSelect ? (e) => { e.stopPropagation(); sg.onSelect(gate); } : undefined}
           >
             <title>{b.centre ? `${b.centre}, here to collect` : `${gate.name}: ${figureOf(gate)}`}</title>
           </rect>

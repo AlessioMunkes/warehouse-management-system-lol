@@ -34,6 +34,8 @@ import {
 import DetailPanel from '@/components/ui/detail-panel';
 import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useState } from 'react';
 import { fmtQty } from '@/lib/quantity';
 import { fmtQtyUnit } from '@/lib/stockWording';
 import { formatCalendarDay, formatShortDate } from '@/lib/dates';
@@ -84,6 +86,26 @@ function StockTake({ product, canAdjust, onAdjust }) {
         </Button>
       ) : null}
     </div>
+  );
+}
+
+// What of this product is still to be packed: wanted on picking slips
+// nobody has finished, with how many pallets and the first collection
+// day. One line per unit the slips ask in ("12 kg", "40 each").
+function ToPackLine({ product }) {
+  const toPack = product?.toPack ?? [];
+  if (!toPack.length) return null;
+  const pallets = Math.max(...toPack.map((t) => t.pallets));
+  const first = toPack.map((t) => t.firstDay).filter(Boolean).sort()[0];
+  return (
+    <p className="mt-1 text-xs">
+      <span className="font-medium text-warn">
+        Still to pack: {toPack.map((t) => fmtQtyUnit(t.quantity, t.unit)).join(' and ')}
+      </span>
+      <span className="text-muted-foreground">
+        {' '}for {pallets} {pallets === 1 ? 'pallet' : 'pallets'}{first ? `, the earliest due ${formatCalendarDay(first)}` : ''}
+      </span>
+    </p>
   );
 }
 
@@ -252,6 +274,53 @@ function GateDay({ area, today }) {
   );
 }
 
+// A manager changes what an area holds from here, without redrawing the
+// plan: kilograms for a store, pallet spaces for staging. Blank clears it.
+function CapacityEditor({ area, onSave }) {
+  const staging = isStaging(area);
+  const current = staging ? area.palletSpaces : area.capacityKg;
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(current ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  if (!editing) {
+    return (
+      <Button type="button" size="sm" variant="outline" onClick={() => { setValue(current ?? ''); setError(null); setEditing(true); }}>
+        {current ? 'Edit capacity' : 'Set capacity'}
+      </Button>
+    );
+  }
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const amount = value === '' ? null : Number(value);
+      await onSave(staging ? { palletSpaces: amount } : { capacityKg: amount });
+      setEditing(false);
+    } catch (err) {
+      setError(err.message || 'Could not save the capacity.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          type="number" min="1" step={staging ? '1' : 'any'} inputMode={staging ? 'numeric' : 'decimal'}
+          aria-label={staging ? `Pallet spaces in ${area.name}` : `Capacity of ${area.name} in kg`}
+          placeholder="Not set" value={value} onChange={(e) => setValue(e.target.value)} className="h-8 w-32"
+        />
+        <span className="text-sm text-muted-foreground">{staging ? 'pallet spaces' : 'kg'}</span>
+        <Button type="button" size="sm" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(false)}>Cancel</Button>
+      </div>
+      {error ? <p role="alert" className="text-xs text-danger">{error}</p> : null}
+    </div>
+  );
+}
+
 // "About 240 kg of 500 kg · 48%", in the fill colour.
 function CapacityLine({ area }) {
   if (isStaging(area)) {
@@ -279,6 +348,8 @@ export default function AreaPanel({
   canCount = false,
   canAdjust = false,
   onCount,
+  // Set: a manager may change the area's capacity here.
+  onSaveCapacity = null,
   onAdjust,
   onFind,
   onClose,
@@ -319,6 +390,8 @@ export default function AreaPanel({
   }
 
   const items = (area.items ?? []).filter((i) => i.about > 0);
+  // How many of the products here are wanted on pallets not packed yet.
+  const stillNeeded = new Set(items.filter((i) => productsById.get(i.productId)?.toPack?.length).map((i) => i.productId)).size;
   const by = items.find((i) => i.countedByName)?.countedByName;
   const eyebrow = holdsStock(area)
     ? `${kindById(area.kind).label} · ${countedWhen(area.lastCountedAt)}${by && area.lastCountedAt ? ` by ${by}` : ''}`
@@ -333,11 +406,16 @@ export default function AreaPanel({
       badges={<AlertBadges area={area} today={today} />}
       actions={canCount ? (
         <Button type="button" size="sm" onClick={onCount}>
-          <ClipboardList /> Count this area
+          <ClipboardList /> Manage this area
         </Button>
       ) : null}
     >
-      {area.gate ? null : <CapacityLine area={area} />}
+      {area.gate ? null : (
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <CapacityLine area={area} />
+          {onSaveCapacity ? <CapacityEditor key={`${area.id}|${area.capacityKg}|${area.palletSpaces}`} area={area} onSave={onSaveCapacity} /> : null}
+        </div>
+      )}
 
       {area.gate ? <GateDay area={area} today={today} /> : isStaging(area) ? (
         area.pallets.length === 0
@@ -345,9 +423,15 @@ export default function AreaPanel({
           : <PalletList pallets={area.pallets} label={`Pallets in ${area.name}`} today={today} />
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {area.lastCountedAt ? 'Empty at the last count.' : 'Nothing counted here yet. Count this area to record what it holds.'}
+          {area.lastCountedAt ? 'Empty at the last count.' : 'Nothing counted here yet. Choose Manage this area to record what it holds.'}
         </p>
-      ) : (
+      ) : (<>
+        {stillNeeded > 0 ? (
+          <p className="text-sm">
+            <span className="font-medium">{stillNeeded} of these {stillNeeded === 1 ? 'product is' : 'products are'} still to be packed</span>
+            <span className="text-muted-foreground"> for pallets that have not been packed yet.</span>
+          </p>
+        ) : null}
         <ul className="divide-y rounded-lg border" aria-label={`In ${area.name}`}>
           {items.map((i) => {
             const product = productsById.get(i.productId);
@@ -374,12 +458,13 @@ export default function AreaPanel({
                   )}
                   <ExpiryBadge product={product} today={today} />
                 </div>
+                <ToPackLine product={product} />
                 {counted ? <StockTake product={product} canAdjust={canAdjust} onAdjust={onAdjust} /> : null}
               </li>
             );
           })}
         </ul>
-      )}
+      </>)}
     </DetailPanel>
   );
 }

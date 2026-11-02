@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────
 // src/tests/PlanningTools.test.jsx
 //
-// Two tools on the Operations reports page: the reorder planner and the
-// exception alerts. (The workload heatmap is a report now, drawn by
+// Two planning tools: the reorder planner (on the Stock ledger) and the
+// exception alerts (on Operations reports). (The workload heatmap is a report now, drawn by
 // OperationalChart: see OperationalChart.test.jsx.) Plus the root cause
 // analysis under the flow map. Each must show what the server worked
 // out in terms a manager can act on, and narrow or open as asked.
@@ -10,11 +10,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { rootCauses, targetTest, applyFilters, filterLabel } from '../features/reporting/flowGraph';
+import { ordersFromPlan } from '../features/reporting/ordersFromPlan';
 
 const api = vi.hoisted(() => ({ getReorderPlan: vi.fn(), getExceptionAlerts: vi.fn() }));
 vi.mock('../services/reportingAPI', () => api);
 vi.mock('../lib/excelExport', () => ({ exportExcel: vi.fn() }));
+const poApi = vi.hoisted(() => ({ createPurchaseOrder: vi.fn() }));
+vi.mock('../services/purchaseOrderAPI', () => poApi);
 
 const { default: ReorderPlanner } = await import('../features/reporting/ReorderPlanner');
 const { default: ExceptionAlerts } = await import('../features/reporting/ExceptionAlerts');
@@ -132,6 +136,42 @@ const ALERTS = {
       status: 'insufficient', signal: null, latest: 80, mean: null, lower: null, upper: null, deviation: null, baselineWeeks: 1 },
   ],
 };
+
+// ── Create purchase orders from the plan ────────────────────
+describe('creating purchase orders from the plan', () => {
+  it('makes one order per supplier, due the slowest lead time, and leaves out what has no supplier', () => {
+    const { orders, noSupplier } = ordersFromPlan([
+      item({ productId: 1, supplierId: 4, supplier: 'Cape Dry Goods', leadDays: 4, suggestedQuantity: 265 }),
+      item({ productId: 2, name: 'Beans 5 kg', supplierId: 4, supplier: 'Cape Dry Goods', leadDays: 9, suggestedQuantity: 10 }),
+      item({ productId: 3, name: 'Oil 750 ml', supplierId: 5, supplier: 'Oils Ltd', leadDays: 0, suggestedQuantity: 6 }),
+      item({ productId: 4, name: 'Salt', supplierId: null, supplier: null, suggestedQuantity: 3 }),
+      item({ productId: 5, name: 'Covered', supplierId: 4, suggestedQuantity: 0 }),
+    ], '2026-10-12');
+    expect(orders.map((o) => [o.supplier, o.lines.map((l) => l.productId), o.expectedDeliveryDate])).toEqual([
+      ['Cape Dry Goods', [1, 2], '2026-10-21'],
+      ['Oils Ltd', [3], '2026-10-13'],     // never due today
+    ]);
+    expect(noSupplier.map((i) => i.name)).toEqual(['Salt']);
+  });
+
+  it('raises the orders only once the manager confirms, as orders to approve', async () => {
+    const user = userEvent.setup();
+    api.getReorderPlan.mockResolvedValue({ data: { ...PLAN, items: [item({ supplierId: 4, unitCost: 120 }), ...PLAN.items.slice(1)] } });
+    poApi.createPurchaseOrder.mockResolvedValue({ id: 31, poNumber: 'PO-2026-0031' });
+    render(<MemoryRouter><ReorderPlanner /></MemoryRouter>);
+
+    await user.click(await screen.findByRole('button', { name: /Create purchase orders/ }));
+    expect(screen.getByText('Raise 1 order from the suggestions in this view?')).toBeInTheDocument();
+    expect(poApi.createPurchaseOrder).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Raise order' }));
+    await waitFor(() => expect(poApi.createPurchaseOrder).toHaveBeenCalledWith(expect.objectContaining({
+      supplierId: 4,
+      items: [{ productId: 1, expectedQuantity: 265, expectedWeightKg: null, unitPrice: 120 }],
+    })));
+    expect(await screen.findByRole('link', { name: 'PO-2026-0031' })).toHaveAttribute('href', '/noc/purchase-orders?id=31');
+  });
+});
 
 describe('exception alerts', () => {
   beforeEach(() => api.getExceptionAlerts.mockResolvedValue({ data: ALERTS }));

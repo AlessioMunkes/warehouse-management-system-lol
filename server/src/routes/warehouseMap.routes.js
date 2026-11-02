@@ -18,5 +18,6 @@ router.get('/', auth, requireRole(...MANAGERS_UP), mapController.getMap);
 router.put('/layout', auth, requireRole(...ADMIN_ONLY), mapController.saveLayout);
 // Gated like a stock adjustment, which a count leads to.
 router.post('/areas/:id/counts', auth, requireRole(...MANAGERS_UP), validateIntId, mapController.recordCount);
+router.patch('/areas/:id/capacity', auth, requireRole(...MANAGERS_UP), validateIntId, mapController.setCapacity);
 
 export default router;

@@ -15,6 +15,7 @@ import { useDonationDraft, validateDonationDraft } from "../features/donation/Do
 import { DONATIONS } from "../routes/paths";
 import { DonationRail } from "../features/donation/DonationRail";
 import { DonationItemsList } from "../features/donation/DonationItemsList";
+import { estimateDonationValue } from "../services/donationAPI";
 
 export function DonationDetailsPage() {
   const navigate = useNavigate();
@@ -42,6 +43,36 @@ export function DonationDetailsPage() {
       target?.scrollIntoView?.({ behavior: "smooth", block: "center" });
       target?.focus?.();
     }, 0);
+  };
+
+  // "Estimate it for me": the matched items at catalogue cost. The figure
+  // is filled in and marked as an estimate, which a manager verifies.
+  const [estimating, setEstimating] = useState(false);
+  const [estimateNote, setEstimateNote] = useState(
+    draft.valueEstimated ? "Estimated from the items. A manager will verify it." : ""
+  );
+  const estimateValue = async () => {
+    const items = draft.items.filter((i) => i.productId && Number(i.quantity) > 0);
+    if (items.length === 0) {
+      setEstimateNote("Match the items to products first, with their quantities, to estimate their value.");
+      return;
+    }
+    setEstimating(true);
+    try {
+      const { valueZar, pricedCount, itemCount } = await estimateDonationValue(draft.items);
+      if (pricedCount === 0) {
+        setEstimateNote("None of these products has a cost on record, so their value cannot be estimated. Enter it if you know it.");
+        return;
+      }
+      updateDraft({ estimatedValueZar: valueZar.toFixed(2), valueEstimated: true });
+      setEstimateNote(pricedCount === itemCount
+        ? "Estimated from the items at catalogue cost. A manager will verify it."
+        : `Estimated from ${pricedCount} of ${itemCount} items: the others have no cost on record. A manager will verify it.`);
+    } catch (err) {
+      setEstimateNote(err.message || "Could not estimate the value. Enter it if you know it.");
+    } finally {
+      setEstimating(false);
+    }
   };
 
   const handleNext = () => {
@@ -139,10 +170,16 @@ export function DonationDetailsPage() {
               optional otherwise (DonationDraftContext validates both). */}
           <div className="stf-field">
             <label htmlFor="estimated-value-zar" className="stf-field-label">Estimated value (ZAR)</label>
-            <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" value={draft.estimatedValueZar} onChange={(e) => updateDraft({ estimatedValueZar: e.target.value })} aria-invalid={Boolean(errors.value)} />
+            <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" value={draft.estimatedValueZar} onChange={(e) => { updateDraft({ estimatedValueZar: e.target.value, valueEstimated: false }); setEstimateNote(""); }} aria-invalid={Boolean(errors.value)} />
+            {/* Not known? The system works it out from the items at
+                catalogue cost, and a manager verifies it. */}
+            <button type="button" className="stf-btn stf-btn-secondary" style={{ marginTop: 8 }} onClick={estimateValue} disabled={estimating}>
+              {estimating ? "Estimating…" : "Estimate it for me"}
+            </button>
+            {estimateNote ? <span className="stf-field-hint" role="status">{estimateNote}</span> : null}
             {errors.value
               ? <span className="stf-field-hint donation-intake-error">{errors.value}</span>
-              : (
+              : estimateNote ? null : (
                 <span className="stf-field-hint">
                   {draft.donorConsentGiven === true
                     ? "Needed for the Section 18A certificate. Enter 0 if it has no value."

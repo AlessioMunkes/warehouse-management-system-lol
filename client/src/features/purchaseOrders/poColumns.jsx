@@ -14,7 +14,7 @@
 // purchase order for R 9 000 is not larger than one for R 10 000.
 // ─────────────────────────────────────────────────────────────
 import StatusBadge from '@/components/ui/status-badge';
-import { OPEN_PO_STATUSES, PO_STATUS_LABELS, needsFollowUp } from '@/services/purchaseOrderAPI';
+import { OPEN_PO_STATUSES, BALANCE_OUTSTANDING, hasBalanceOutstanding } from '@/services/purchaseOrderAPI';
 import { formatShortDate as fmtDate } from '@/lib/dates';
 
 const money = (value) =>
@@ -45,10 +45,10 @@ export const PO_COLUMNS = [
     cell: (po) => (
       <>
         <StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>
-        {/* The flag, beside the status it sits on. */}
-        {po.status === 'partially_received' && needsFollowUp(po) ? (
+        {/* The label, beside the status it sits on. */}
+        {hasBalanceOutstanding(po) ? (
           <StatusBadge kind="purchaseOrder" status="follow_up_required" className="ml-1.5">
-            {PO_STATUS_LABELS.follow_up_required}
+            {BALANCE_OUTSTANDING}
           </StatusBadge>
         ) : null}
         {/* An instalment count only means something while the order is

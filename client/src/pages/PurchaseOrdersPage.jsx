@@ -74,7 +74,7 @@ const PO_VIEWS = [
     test: (po) => po.status !== 'completed' && po.status !== 'returned' },
   { id: 'pending',            label: 'Awaiting approval', alert: true, test: (po) => po.status === 'pending' },
   { id: 'in_transit',         label: 'In transit',         test: (po) => po.status === 'in_transit' },
-  // A flag, not a status: part received with no follow-up order yet.
+  // A flag, not a status: a balance outstanding, or marked by a manager.
   { id: 'follow_up_required', label: 'Follow-up required', alert: true, test: needsFollowUp },
   { id: 'partially_received', label: 'Partially received', test: (po) => po.status === 'partially_received' },
   { id: 'closed',             label: 'Closed', test: (po) => po.status === 'completed' || po.status === 'returned' },
@@ -267,21 +267,6 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  // A second order for what came short. The first moves to Partially
-  // received; the new one opens, since it is the one to act on next.
-  const createFollowUp = async () => {
-    try {
-      const followUp = await purchaseOrderAPI.createFollowUpOrder(selected.id);
-      await loadPurchaseOrders();
-      await open(followUp.id);
-      toast({ variant: 'success', title: `${followUp.poNumber} created`, description: `Follow-up to ${selected.poNumber}.` });
-      return true;
-    } catch (err) {
-      toast({ variant: 'error', title: 'Could not create the follow-up order', description: err.message });
-      return false;
-    }
-  };
-
   const remove = async () => {
     try {
       await purchaseOrderAPI.deletePurchaseOrder(selected.id);
@@ -464,7 +449,6 @@ export default function PurchaseOrdersPage() {
           onNotInTransit={() => changeStatus('approved', null, `${selected.poNumber} is no longer in transit`)}
           onMarkReturned={(reason) => changeStatus('returned', reason, `${selected.poNumber} marked as returned`)}
           onCloseOrder={() => changeStatus('completed', null, `${selected.poNumber} closed`)}
-          onCreateFollowUp={createFollowUp}
           onOpenOrder={open}
           onSetQuickbooksRef={setQuickbooksRef}
           onResendFinanceEmail={resendFinanceEmail}

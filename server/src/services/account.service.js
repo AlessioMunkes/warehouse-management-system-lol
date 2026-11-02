@@ -36,12 +36,12 @@ const changeEmail = async (userId, { currentPassword, email } = {}) => {
   if (!next) throw fail(400, 'Enter an email address.');
   if ((account.email ?? '').toLowerCase() === next) return { email: next };
   if (await repo.findOtherUserWithEmail(next, userId)) {
-    throw fail(409, 'Another user already has this email address. Use a different one.');
+    throw fail(409, 'Another account in your role already has this email address. Use a different one.');
   }
   try {
     await repo.setEmail(userId, account.email ?? null, next);
   } catch (err) {
-    if (err?.code === '23505') throw fail(409, 'Another user already has this email address. Use a different one.');
+    if (err?.code === '23505') throw fail(409, 'Another account in your role already has this email address. Use a different one.');
     throw err;
   }
   return { email: next };

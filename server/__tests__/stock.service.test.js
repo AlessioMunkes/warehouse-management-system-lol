@@ -22,6 +22,8 @@ const repoMock = {
 };
 
 vi.mock('../src/repositories/stock.repository.js', () => ({ default: repoMock }));
+// The first expiry warning from Settings, sent with every manifest row.
+vi.mock('../src/services/settings.service.js', () => ({ default: { get: vi.fn(async () => 10) } }));
 
 const { default: stockService } = await import('../src/services/stock.service.js');
 
@@ -39,11 +41,13 @@ beforeEach(() => {
 
 // ── getManifest ───────────────────────────────────────────────
 describe('getManifest', () => {
-  it('returns the repository rows untouched', async () => {
+  it('returns the repository rows, each with the urgent-expiry days from Settings', async () => {
     const rows = [{ id: 1, name: 'Rice', quantity_on_hand: 100 }];
     repoMock.getManifest.mockResolvedValueOnce(rows);
 
-    await expect(stockService.getManifest()).resolves.toBe(rows);
+    await expect(stockService.getManifest()).resolves.toEqual([
+      { id: 1, name: 'Rice', quantity_on_hand: 100, urgent_expiry_days: 10 },
+    ]);
   });
 
   it('takes no arguments — the manifest is not filtered here', async () => {

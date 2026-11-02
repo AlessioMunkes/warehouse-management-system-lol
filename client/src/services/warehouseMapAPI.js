@@ -9,7 +9,7 @@
 // patching it. The server already sends numbers, worked out in
 // JavaScript, not NUMERIC strings.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost, apiPut } from './api';
+import { apiGet, apiPost, apiPut, apiPatch } from './api';
 
 const EMPTY = { ready: false, grid: { cols: 40, rows: 24 }, today: null, areas: [], products: [] };
 
@@ -19,6 +19,10 @@ export const getWarehouseMap = async (options) => toMap(await apiGet('/api/wareh
 
 /** areas: [{ id?, name, kind, x, y, w, h, levels }], the whole plan. */
 export const saveWarehouseLayout = async (areas) => toMap(await apiPut('/api/warehouse-map/layout', { areas }));
+
+/** One area's capacity, from the map: { capacityKg } or { palletSpaces }; null clears it. */
+export const setAreaCapacity = async (areaId, capacity) =>
+  toMap(await apiPatch(`/api/warehouse-map/areas/${areaId}/capacity`, capacity));
 
 /** lines: [{ productId, quantity }], everything seen in the area. */
 export const recordAreaCount = async (areaId, lines) =>

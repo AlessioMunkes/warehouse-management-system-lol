@@ -2,8 +2,7 @@
 // src/tests/SettingsPage.test.jsx
 //
 // The admin Settings page: sections in ?section=, the values that used
-// to be constants (saved together, only what changed), and the
-// certificate details that had an API but no screen.
+// to be constants (saved together, only what changed).
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -13,8 +12,6 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../services/settingsAPI', () => ({
   listSettings: vi.fn(),
   updateSettings: vi.fn(),
-  getCertificateSettings: vi.fn(),
-  saveCertificateSettings: vi.fn(),
 }));
 vi.mock('../services/reportingAPI', () => ({
   default: { getFactorHistory: vi.fn(async () => ({ data: [{ value: 2.5 }] })), setFactor: vi.fn() },
@@ -42,8 +39,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.listSettings.mockResolvedValue(SETTINGS);
   api.updateSettings.mockResolvedValue(SETTINGS);
-  api.getCertificateSettings.mockResolvedValue(null);
-  api.saveCertificateSettings.mockResolvedValue({ organisationName: 'Ladles of Love' });
 });
 
 describe('SettingsPage', () => {
@@ -90,23 +85,6 @@ describe('SettingsPage', () => {
   it('shows the impact factors under Reporting, with the value in force', async () => {
     renderAt('/admin/settings?section=reporting');
     expect(await screen.findByLabelText('How many meals does 1 kg feed?')).toHaveAttribute('placeholder', 'Now 2.5');
-  });
-
-  it('creates the certificate details the first time, and needs the organisation name', async () => {
-    const user = userEvent.setup();
-    renderAt('/admin/settings?section=certificates');
-
-    expect(await screen.findByText(/Enter at least the organisation name/)).toBeInTheDocument();
-    await user.type(screen.getByLabelText('PBO number'), '930012345');
-    await user.click(screen.getByRole('button', { name: 'Save certificate details' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('organisation name is required');
-    expect(api.saveCertificateSettings).not.toHaveBeenCalled();
-
-    await user.type(screen.getByLabelText('Organisation name'), 'Ladles of Love');
-    await user.click(screen.getByRole('button', { name: 'Save certificate details' }));
-    await waitFor(() => expect(api.saveCertificateSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ organisationName: 'Ladles of Love', pboNumber: '930012345' }), { exists: false },
-    ));
   });
 
   it('changes section from the email-integration address Google returns to', async () => {

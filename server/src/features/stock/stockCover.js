@@ -42,10 +42,13 @@
 //   week would fix that; it is not done yet.
 //
 // LEAD TIME, the first of these that is known:
-//   1. agreed    suppliers.expected_lead_time_days, for the supplier on
-//                the product's latest order, or else its only linked
-//                supplier, or else the longest agreed time among its
-//                linked suppliers.
+//   1. agreed    suppliers.expected_lead_time_days, for the product's
+//                preferred supplier, or else the supplier on its latest
+//                order, or else its only linked supplier, or else the
+//                longest agreed time among its linked suppliers.
+//
+// THE SUPPLIER is the same one: preferred, latest, only linked. It is
+// who the planner's Create purchase orders orders from.
 //   2. median    days from an order being raised to its first delivery,
 //                over the last year.
 //   3. assumed   DEFAULT_LEAD_DAYS.
@@ -123,15 +126,18 @@ export const drawDown = (available, perDay, arrivals = []) => {
 };
 
 const chooseSupplier = (row) => {
-  if (row.supplier_name) return { name: row.supplier_name, agreedDays: row.supplier_agreed_days ?? null };
+  if (row.preferred_supplier_name) {
+    return { id: row.preferred_supplier_id ?? null, name: row.preferred_supplier_name, agreedDays: row.preferred_agreed_days ?? null, preferred: true };
+  }
+  if (row.supplier_name) return { id: row.supplier_id ?? null, name: row.supplier_name, agreedDays: row.supplier_agreed_days ?? null };
   const linked = row.linked_suppliers ?? [];
-  if (linked.length === 1) return { name: linked[0].name, agreedDays: linked[0].agreedDays ?? null };
+  if (linked.length === 1) return { id: linked[0].id ?? null, name: linked[0].name, agreedDays: linked[0].agreedDays ?? null };
   const agreed = linked.filter((s) => s.agreedDays !== null && s.agreedDays !== undefined);
   if (agreed.length > 0) {
     const longest = agreed.reduce((a, b) => (num(b.agreedDays) > num(a.agreedDays) ? b : a));
-    return { name: longest.name, agreedDays: longest.agreedDays, ofLinked: linked.length };
+    return { id: longest.id ?? null, name: longest.name, agreedDays: longest.agreedDays, ofLinked: linked.length };
   }
-  return { name: null, agreedDays: null };
+  return { id: null, name: null, agreedDays: null };
 };
 
 export const leadTimeFor = (row, defaultLeadDays = DEFAULT_LEAD_DAYS) => {
@@ -139,7 +145,7 @@ export const leadTimeFor = (row, defaultLeadDays = DEFAULT_LEAD_DAYS) => {
   if (supplier.agreedDays !== null && supplier.agreedDays !== undefined) {
     const days = Math.max(0, Math.round(num(supplier.agreedDays)));
     return {
-      days, source: 'agreed', supplier: supplier.name,
+      days, source: 'agreed', supplier: supplier.name, supplierId: supplier.id, preferredSupplier: Boolean(supplier.preferred),
       label: supplier.ofLinked
         ? `Longest agreed of ${supplier.ofLinked} suppliers: ${days} days`
         : `Agreed with ${supplier.name}: ${days} days`,
@@ -149,9 +155,9 @@ export const leadTimeFor = (row, defaultLeadDays = DEFAULT_LEAD_DAYS) => {
   const missing = supplier.name ? `No agreed lead time for ${supplier.name}` : 'No agreed lead time';
   if (row.median_lead_days !== null && row.median_lead_days !== undefined) {
     const days = Math.max(0, Math.round(num(row.median_lead_days)));
-    return { days, source: 'median', supplier: supplier.name, label: `Median of ${plural(num(row.lead_orders), 'order')}: ${days} days`, limit: missing };
+    return { days, source: 'median', supplier: supplier.name, supplierId: supplier.id, preferredSupplier: Boolean(supplier.preferred), label: `Median of ${plural(num(row.lead_orders), 'order')}: ${days} days`, limit: missing };
   }
-  return { days: defaultLeadDays, source: 'assumed', supplier: supplier.name, label: `Assumed ${defaultLeadDays} days`, limit: `No agreed lead time or delivery history${supplier.name ? ` for ${supplier.name}` : ''}` };
+  return { days: defaultLeadDays, source: 'assumed', supplier: supplier.name, supplierId: supplier.id, preferredSupplier: Boolean(supplier.preferred), label: `Assumed ${defaultLeadDays} days`, limit: `No agreed lead time or delivery history${supplier.name ? ` for ${supplier.name}` : ''}` };
 };
 
 export const demandFor = (row, { recipeName = null, historyWeeks = HISTORY_WEEKS } = {}) => {
@@ -237,6 +243,9 @@ export const coverFor = (row, {
     leadSource: lead.source,
     leadLabel: lead.label,
     supplier: lead.supplier,
+    supplierId: lead.supplierId ?? null,
+    preferredSupplier: lead.preferredSupplier ?? false,
+    unitCost: row.unit_cost === null || row.unit_cost === undefined ? null : num(row.unit_cost),
     reorderLevel: round(num(row.reorder_threshold)),
     earliestExpiry: earliestLive(row.lots ?? [], today)?.expiryDate ?? null,
     mayExpireOn: null,

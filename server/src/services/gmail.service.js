@@ -21,6 +21,15 @@ const fail = (status, message) => {
   throw err;
 };
 
+// Google's consent screen shows "Send email on your behalf" as a box of
+// its own, and a connection made with it unticked still signs in and
+// still refreshes: only sending fails ("insufficient authentication
+// scopes"). So whether a connection can send is checked by its scope.
+export const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
+export const canSend = (scope) => String(scope ?? '').split(/\s+/).includes(GMAIL_SEND_SCOPE);
+export const NO_SEND_MESSAGE =
+  'Google was not given permission to send email. Reconnect Gmail and tick "Send email on your behalf".';
+
 const stateStore = new Map();
 
 const cleanupExpiredStates = () => {
@@ -122,6 +131,14 @@ const handleOAuthCallback = async ({ code = null, state = null, oauthError = nul
   const tokens = tokenResponse.tokens;
   if (!tokens.access_token || !tokens.refresh_token) {
     fail(502, 'Gmail OAuth token exchange returned an invalid response.');
+  }
+  // Not saved: a connection that cannot send would replace one that can,
+  // and every email after it would fail.
+  if (tokens.scope && !canSend(tokens.scope)) {
+    const err = new Error(NO_SEND_MESSAGE);
+    err.status = 400;
+    err.reason = 'no_send';
+    throw err;
   }
 
   const now = Date.now();
@@ -264,7 +281,11 @@ const checkOrganisationConnection = async () => {
   const connection = await gmailRepo.findLatestConnection();
   if (!connection) return { connected: false };
   try {
-    await getOAuth2ClientForConnection(connection);
+    const client = await getOAuth2ClientForConnection(connection);
+    // A refresh that still works says nothing about sending.
+    if (!canSend(client.credentials?.scope ?? connection.scope)) {
+      return { connected: true, working: false, email: connection.gmail_email, error: NO_SEND_MESSAGE };
+    }
     return { connected: true, working: true, email: connection.gmail_email, updatedAt: connection.updated_at };
   } catch (err) {
     return { connected: true, working: false, email: connection.gmail_email, error: err.message };

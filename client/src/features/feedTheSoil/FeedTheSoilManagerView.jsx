@@ -61,13 +61,14 @@ import {
   KitDetail,
   RecordDetail,
 } from './FeedTheSoilPanels';
+import DropPointsTab from './DropPointsTab';
 
 // Columns menu: every column but the kit code can be hidden.
 
 export default function FeedTheSoilManagerView() {
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(() => (searchParams.get('status') === 'idle' ? 'idle' : 'kits'));
-  const kitsTab = tab !== 'records';
+  const kitsTab = tab === 'kits' || tab === 'idle';
   // 'list' | 'assign' | 'log' | 'logPickKit' | 'dispatch'
   const [view, setView] = useState('list');
   const [selectedKit, setSelectedKit] = useState(null);
@@ -214,7 +215,7 @@ export default function FeedTheSoilManagerView() {
   const recordPage = usePaged(recordSort.rows, TABLE_PAGE_SIZE, `${recordSearch}|${filteredRecords.length}|${recordSort.sort?.key}|${recordSort.sort?.dir}`);
   // The page's main action follows the tab, and only on the list itself.
   const onList = view === 'list' && !selectedKit && !selectedRecord;
-  const headerAction = !onList ? null : kitsTab ? (
+  const headerAction = !onList || tab === 'sites' ? null : kitsTab ? (
     <Button type="button" onClick={() => go('assign')}>
       <Plus /> Assign a kit
     </Button>
@@ -275,6 +276,8 @@ export default function FeedTheSoilManagerView() {
             onOpenRecord={(id) => openRecord(id, { fromKit: true })}
             onClose={() => { setSelectedKit(null); loadKits(); }}
           />
+        ) : tab === 'sites' ? (
+          <DropPointsTab />
         ) : kitsTab ? (
           <ListCard
             header={(

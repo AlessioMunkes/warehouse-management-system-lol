@@ -21,7 +21,10 @@ const managerSummaryLine = (summary) => (summary
   ? [
       summary.pendingDispatchesToday > 0 ? `${summary.pendingDispatchesToday} pallet${summary.pendingDispatchesToday === 1 ? '' : 's'} due out today` : null,
       summary.deliveriesExpectedToday > 0 ? `${summary.deliveriesExpectedToday} ${summary.deliveriesExpectedToday === 1 ? 'delivery' : 'deliveries'} expected` : null,
-    ].filter(Boolean).join(', ') || 'nothing is overdue'
+    // Only what this line knows about: today's pallets and deliveries.
+    // It said "nothing is overdue" here, above a Needs attention list of
+    // overdue requests.
+    ].filter(Boolean).join(', ') || 'no pallets due out and no deliveries expected'
   : null);
 
 export default function ManagerDashboardPage() {

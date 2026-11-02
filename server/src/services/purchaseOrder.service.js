@@ -519,15 +519,6 @@ const setPurchaseOrderStatus = async (rawId, body = {}, userId = null) => {
     throw fail(400, 'Approve this order before recording a follow-up.');
   }
 
-  // The rest of a part-received order is coming on its follow-up order.
-  // Reopening it as well would let the same goods be received twice.
-  if (existing.status === 'partially_received' && status === 'approved') {
-    const coming = (existing.follow_up_orders ?? []).find((o) => o.status !== 'completed' && o.status !== 'returned');
-    if (coming) {
-      throw fail(409, `The rest of this order is on follow-up order ${coming.po_number}. Receive against that order instead.`);
-    }
-  }
-
   if (!canMovePurchaseOrder(existing.status, status)) {
     const label = (s) => PO_STATUS_WORDS[s] ?? s;
     const next = PO_MANUAL_TRANSITIONS[existing.status] ?? [];
@@ -549,45 +540,6 @@ const setPurchaseOrderStatus = async (rawId, body = {}, userId = null) => {
   if (status === 'approved' && existing.status === 'pending') afterApproval(Number(rawId), userId);
 
   return updated;
-};
-
-// ── Follow-up order ───────────────────────────────────────────
-// What a manager does about an order that came in short: a second
-// order for the remainder (see createFollowUpOrder in the repository
-// and migration 043). The expected date is theirs to give; a week from
-// today when they do not.
-const FOLLOW_UP_DAYS = 7;
-
-const createFollowUpOrder = async (rawId, body = {}, userId) => {
-  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
-
-  let expectedDeliveryDate = clean(body.expectedDeliveryDate);
-  if (expectedDeliveryDate && !isValidDateString(expectedDeliveryDate)) {
-    throw fail(400, 'Choose a real date for when the follow-up is expected.');
-  }
-  if (!expectedDeliveryDate) {
-    expectedDeliveryDate = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000)
-      .toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
-  }
-
-  const result = await repo.createFollowUpOrder(Number(rawId), userId, { expectedDeliveryDate });
-  if (!result.ok) {
-    if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
-    if (result.code === 'not_awaiting_follow_up') {
-      throw fail(409, 'A follow-up order can only be raised on an order that is flagged Follow-up required.');
-    }
-    if (result.code === 'has_follow_up') {
-      throw fail(409, `This order already has a follow-up order, ${result.poNumber}.`);
-    }
-    if (result.code === 'supplier_inactive') {
-      throw fail(409, `${result.supplierName} is no longer an active supplier. Raise a new order with another supplier instead.`);
-    }
-    if (result.code === 'nothing_outstanding') {
-      throw fail(409, 'Nothing is outstanding on this order. Reopen it or mark it complete instead.');
-    }
-    throw fail(500, 'Failed to create the follow-up order.');
-  }
-  return repo.getPurchaseOrderById(result.id);
 };
 
 // ── QuickBooks reference ─────────────────────────────────────
@@ -768,7 +720,6 @@ const deletePurchaseOrder = async (rawId, userId) => {
 
 export default {
   createPurchaseOrder,
-  createFollowUpOrder,
   listPurchaseOrders,
   getPurchaseOrder,
   setPurchaseOrderStatus,

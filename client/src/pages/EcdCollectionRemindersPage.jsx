@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BellOff, ExternalLink, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
+import { BellOff, Copy, ExternalLink, Mail, MessageCircle, RefreshCw, Send, UsersRound } from 'lucide-react';
 import collectionReminderAPI from '../services/collectionReminderAPI';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +17,7 @@ import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 import useTableView from '@/features/masterdata/useTableView';
 import useListFilters from '@/features/masterdata/useListFilters';
+import { groupReminderMessage } from '@/features/reminders/groupReminder';
 
 // Every column but the centre can be hidden. Actions is the row's
 // buttons, not data, so it always shows.
@@ -166,6 +167,21 @@ export default function EcdCollectionRemindersPage() {
 
   // Reminders, fifteen to a page.
   const reminderPage = usePaged(visible, TABLE_PAGE_SIZE, `${visible.length}|${tab}|${search}`);
+
+  // Every centre collecting tomorrow, once, for a group or broadcast list.
+  const groupMessage = reminders.length && collectionDate
+    ? groupReminderMessage([...new Set(reminders.map((r) => r.ecdName).filter(Boolean))].sort(), formatDate(collectionDate))
+    : '';
+  const [copied, setCopied] = useState(false);
+  const copyGroupMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(groupMessage);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setError('Could not copy the message. Open it in WhatsApp instead.');
+    }
+  };
   return (
     <PageShell>
       <PageHeader
@@ -214,6 +230,24 @@ export default function EcdCollectionRemindersPage() {
                 Open WhatsApp fills in the centre’s number and message. Send it from the WhatsApp account on this
                 device, then choose Mark sent.
               </p>
+              {groupMessage ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+                  <p className="flex min-w-0 flex-1 items-start gap-2 text-sm">
+                    <UsersRound aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    One reminder naming every centre collecting tomorrow, for a WhatsApp group or broadcast list.
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={copyGroupMessage}>
+                    <Copy /> {copied ? 'Copied' : 'Copy group message'}
+                  </Button>
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    title="Opens WhatsApp with the message typed in. Choose the group or broadcast list to send it to."
+                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(groupMessage)}`, '_blank', 'noopener,noreferrer')}
+                  >
+                    <ExternalLink /> Send to a group
+                  </Button>
+                </div>
+              ) : null}
             </div>
           }
           footer={!isLoading && visible.length ? <TablePager {...reminderPage} noun="reminders" alwaysShow /> : null}

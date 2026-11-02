@@ -192,7 +192,7 @@ export default function DataUpload() {
             <div className={field}>
               <Label htmlFor="u-label">Group by</Label>
               <Select value={config.labelColumn} onValueChange={(v) => update({ labelColumn: v })}>
-                <SelectTrigger id="u-label"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full" id="u-label"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {table.columns.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
@@ -202,7 +202,7 @@ export default function DataUpload() {
             <div className={field}>
               <Label htmlFor="u-agg">Show</Label>
               <Select value={config.aggregation} onValueChange={(v) => update({ aggregation: v })}>
-                <SelectTrigger id="u-agg"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full" id="u-agg"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {AGGREGATIONS.map((a) => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
                 </SelectContent>
@@ -213,7 +213,7 @@ export default function DataUpload() {
               <div className={field}>
                 <Label htmlFor="u-value">Of column</Label>
                 <Select value={config.valueColumn} onValueChange={(v) => update({ valueColumn: v })}>
-                  <SelectTrigger id="u-value"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full" id="u-value"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {table.columns.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
@@ -224,7 +224,7 @@ export default function DataUpload() {
             <div className={field}>
               <Label htmlFor="u-chart">Chart</Label>
               <Select value={config.chartType} onValueChange={(v) => update({ chartType: v })}>
-                <SelectTrigger id="u-chart"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full" id="u-chart"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {CHARTS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                 </SelectContent>

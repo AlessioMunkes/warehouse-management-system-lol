@@ -153,10 +153,32 @@ describe('PurchaseOrdersPage', () => {
 
     await user.click(await screen.findByText('PO-3'));
     const panel = within(await screen.findByRole('dialog', { name: 'PO-3' }));
-    expect(panel.getByText('Late')).toBeInTheDocument();
+    expect(panel.getAllByText('Late').length).toBeGreaterThan(0);
     await user.click(panel.getByRole('button', { name: /Reopen for receiving/ }));
 
     await waitFor(() => expect(api.setPurchaseOrderStatus).toHaveBeenCalledWith(3, 'approved', null));
+  });
+
+  // A short delivery leaves the order open on the same number: labelled,
+  // with no follow-up order to raise and nothing to reopen.
+  it('labels a part-received order Balance outstanding and keeps it on the same order', async () => {
+    const user = userEvent.setup();
+    const short = po({ id: 7, poNumber: 'PO-7', status: 'partially_received', statusLabel: 'Partially received',
+      statusReason: 'Delivered short: Rice 5 kg.', followUpOrders: [],
+      items: [{ id: 1, productName: 'Rice', expectedQuantity: 10, receivedToDate: 5, unitPrice: 20 }] });
+    api.getPurchaseOrders.mockResolvedValue([...ORDERS, short]);
+    api.getPurchaseOrder.mockImplementation(async (id) => [...ORDERS, short].find((o) => o.id === Number(id)));
+    render(<PurchaseOrdersPage />);
+
+    const row = (await screen.findByText('PO-7')).closest('tr');
+    expect(within(row).getByText('Balance outstanding')).toBeInTheDocument();
+
+    await user.click(screen.getByText('PO-7'));
+    const panel = within(await screen.findByRole('dialog', { name: 'PO-7' }));
+    expect(panel.getByText(/stays open as PO-7: receive the rest against it/)).toBeInTheDocument();
+    expect(panel.queryByRole('button', { name: /follow-up order/i })).toBeNull();
+    expect(panel.queryByRole('button', { name: /Reopen for receiving/ })).toBeNull();
+    expect(panel.getByRole('button', { name: /Close order/ })).toBeInTheDocument();
   });
 
   it('approves a pending order', async () => {

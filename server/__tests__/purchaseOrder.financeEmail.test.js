@@ -323,6 +323,8 @@ describe('safeFinanceEmailError', () => {
     ['No Gmail connection found. Please connect Gmail first.', 'Ask an admin to connect Gmail in Settings, then resend.'],
     ['Failed to refresh Gmail access token. Please reconnect Gmail.', 'Ask an admin to connect Gmail in Settings, then resend.'],
     ['invalid_grant', 'Ask an admin to connect Gmail in Settings, then resend.'],
+    // Connected with "Send email on your behalf" left unticked.
+    ['Request had insufficient authentication scopes.', 'Ask an admin to connect Gmail in Settings, then resend.'],
     ['getaddrinfo ENOTFOUND gmail.googleapis.com', "The email service didn't respond. Try again."],
     ['fetch failed', "The email service didn't respond. Try again."],
     ['Gmail API send failed.', "The email didn't send. Try again."],

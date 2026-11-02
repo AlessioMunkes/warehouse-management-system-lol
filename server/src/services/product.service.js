@@ -138,6 +138,17 @@ const parseLocationId = (raw) => {
   return validateId(raw, 'Storage location ID');
 };
 
+// Blank clears it. Whether the supplier exists is the foreign key's call.
+const parseSupplierId = (raw) => {
+  if (raw === undefined || raw === null || raw === '') return null;
+  return validateId(raw, 'Supplier ID');
+};
+
+// Both foreign keys answer 23503; say which one.
+const missingReference = (err) => (/supplier/i.test(`${err.constraint ?? ''} ${err.detail ?? ''}`)
+  ? 'That supplier does not exist.'
+  : 'That storage location does not exist.');
+
 const listProducts = async ({ includeInactive, search } = {}) =>
   productRepo.listProducts({
     // Query params arrive as strings: '?includeInactive=true'.
@@ -175,6 +186,7 @@ const createProduct = async (data = {}) => {
     defaultLocationId: parseLocationId(data.defaultLocationId),
     reorderThreshold:  parseThreshold(data.reorderThreshold),
     unitCost:          parseUnitCost(data.unitCost),
+    preferredSupplierId: parseSupplierId(data.preferredSupplierId),
   };
 
   const existing = await productRepo.findByNameOrSku(row.name, row.stockKeepingUnit);
@@ -192,7 +204,7 @@ const createProduct = async (data = {}) => {
     // Nullable FK to storage_locations. Shape is checked above by
     // parseLocationId; whether the row exists is the constraint's call —
     // it can also vanish between the request and this insert regardless.
-    if (err.code === '23503') fail(400, 'That storage location does not exist.');
+    if (err.code === '23503') fail(400, missingReference(err));
     throw err;
   }
 };
@@ -227,6 +239,7 @@ const updateProduct = async (id, data = {}) => {
   if (has('storageType'))       patch.storageType       = parseStorageType(data.storageType);
   if (has('defaultLocationId')) patch.defaultLocationId = parseLocationId(data.defaultLocationId);
   if (has('reorderThreshold'))  patch.reorderThreshold  = parseThreshold(data.reorderThreshold);
+  if (has('preferredSupplierId')) patch.preferredSupplierId = parseSupplierId(data.preferredSupplierId);
 
   if (!Object.keys(patch).length) {
     fail(400, 'Nothing to update. Send at least one field.');
@@ -251,7 +264,7 @@ const updateProduct = async (id, data = {}) => {
     return updated;
   } catch (err) {
     if (err.code === '23505') fail(409, 'A product with that name or SKU already exists.');
-    if (err.code === '23503') fail(400, 'That storage location does not exist.');
+    if (err.code === '23503') fail(400, missingReference(err));
     throw err;
   }
 };

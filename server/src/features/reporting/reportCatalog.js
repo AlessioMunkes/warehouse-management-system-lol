@@ -100,6 +100,8 @@ export const DIMENSIONS = {
   reason:            { id: 'reason',            label: 'Reason',              chart: 'hbar' },
   routing_status:    { id: 'routing_status',    label: 'Routing status',      chart: 'bar'  },
   event:             { id: 'event',             label: 'Event',               chart: 'hbar' },
+  // Volunteer hours only: warehouse guests or volunteer events.
+  source:            { id: 'source',            label: 'Where it was given',  chart: 'bar'  },
   product_category:  { id: 'product_category',  label: 'Product category',    chart: 'bar'  },
   storage_type:      { id: 'storage_type',      label: 'Storage type',        chart: 'bar'  },
   // Busy days: seven bars Monday to Sunday, or a week × day heatmap.
@@ -253,14 +255,14 @@ export const METRICS = {
   adults_reached: {
     id: 'adults_reached', label: 'Adults reached', temporal: 'range',
     description:
-      'Estimated adults served through soup kitchens. Converted from kilograms ' +
-      'dispatched to soup kitchens using a factor the manager can edit, the same ' +
-      'way meals enabled works. Dignity kitchens and ECDs are not counted here.',
+      'Adults served at soup kitchens and the Dignity Kitchen, counted as meals: each ' +
+      'collected pallet is as many adults as its kitchen feeds per collection (set on ' +
+      'Beneficiaries, Kitchens). ECDs are not counted here.',
     repoFn: 'adultsReached', unit: 'adults',
-    dimensions: ['none', 'month', 'week', 'cohort'],
+    dimensions: ['none', 'month', 'week', 'beneficiary', 'ecd_centre'],
     filters: ['cohort'],
-    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_adults_served',
-    caveat: 'Estimate based on the kilograms-to-adults-served factor on record. Soup kitchens only.',
+    defaultChart: 'line', impactOnly: true,
+    caveat: 'One meal per adult. Pallets for a kitchen with no adult count on Beneficiaries are not counted.',
   },
 
   // Same shape as adults_reached (real kg dispatched -> a manager-set
@@ -320,13 +322,13 @@ export const METRICS = {
   compost_processed: {
     id: 'compost_processed', label: 'Compost processed', temporal: 'range',
     description:
-      'Kilograms of compost collected through Feed the Soil, logged against a ' +
-      'community member\'s collection kit each time it is weighed in. Can be seen as a ' +
-      'running total, a monthly trend, or broken down by the suburb each kit is assigned to.',
+      'Kilograms of compost collected through Feed the Soil: kits weighed in at the ' +
+      'warehouse, and compost logged by QR code at a drop-off site such as a pop-up stand. ' +
+      'Can be seen as a running total, a monthly trend, or broken down by region.',
     repoFn: 'compostProcessed', unit: 'kg',
     dimensions: ['region', 'none', 'month'], filters: [],
     defaultChart: 'bar', impactOnly: true,
-    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet. Region is the kit owner\'s registered suburb, not where the compost ends up.',
+    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet, and every site drop-off staff have not rejected. Region is the kit owner\'s registered suburb, or the drop-off site\'s, not where the compost ends up.',
   },
 
   // ══ Dispatch ═══════════════════════════════════════════════
@@ -833,14 +835,15 @@ export const METRICS = {
   volunteer_hours: {
     id: 'volunteer_hours', label: 'Volunteer hours', temporal: 'range',
     description:
-      'Hours contributed by volunteers on site. Aggregate only; this report cannot ' +
-      'be broken down by individual volunteer.',
+      'Hours given by volunteers: guests packing in the warehouse (sign-in to ' +
+      'sign-out) and volunteers checked in at volunteer events (the length of their ' +
+      'timeslot). Aggregate only; this report cannot be broken down by individual volunteer.',
     repoFn: 'volunteerHours', unit: 'hours',
-    dimensions: ['month', 'week', 'none', 'day'], filters: [],
+    dimensions: ['month', 'week', 'none', 'day', 'source'], filters: [],
     defaultChart: 'line',
     // Sessions with no sign-out have no duration. Counting them as
     // zero would understate; excluding them and saying so is honest.
-    caveat: 'Excludes sessions where the volunteer never signed out.',
+    caveat: 'Excludes guest visits with no sign-out. A visit idle for four hours is signed out when the guest last did something.',
   },
 };
 

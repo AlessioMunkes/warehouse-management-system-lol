@@ -38,6 +38,10 @@ export const STATUS_STYLES = {
     returned:           s('bad', Undo2, true),
   },
   delivery: {
+    // What a delivery reads as (noteFormat.js deliveryStatusLabel), the
+    // same looks as a purchase order's completed and partially received.
+    complete: s('good', CheckCheck, true),
+    partial:  s('warn', PackageOpen, true),
     recorded: s('good', FileCheck),
     closed:   s('good', Lock, true),
     flagged:  s('bad', Flag, true),

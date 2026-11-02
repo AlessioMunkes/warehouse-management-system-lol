@@ -22,6 +22,7 @@ const repoMock = {
   assignSlip:           vi.fn(),
   addSecondPacker:      vi.fn(),
   releaseSlip:          vi.fn(),
+  recordFollowUp:       vi.fn(),
   editSlip:             vi.fn(),
   setItemStatus:        vi.fn(),
   completeSlip:         vi.fn(),
@@ -154,6 +155,51 @@ describe('getSlipById', () => {
   it('raises 404 when the slip is missing', async () => {
     repoMock.getSlipById.mockResolvedValueOnce(null);
     await expectStatus(pickingService.getSlipById(999), 404);
+  });
+
+  // A pallet nobody came for: what a manager needs to follow it up.
+  it('gives a not-collected pallet a follow-up message and a WhatsApp link to the centre', async () => {
+    repoMock.getSlipById.mockResolvedValueOnce({
+      ...SLIP, dispatch_status: 'not_collected', dispatch_date_iso: TUESDAY_DATE,
+      ecd_name: 'Little Stars', contact_name: 'Thandi', mobile_number: '082 555 0101',
+    });
+    const slip = await pickingService.getSlipById(1);
+    expect(slip.follow_up.message).toMatch(/^Hello Thandi,/);
+    expect(slip.follow_up.message).toContain("Little Stars's food from Ladles of Love was ready for collection on Tuesday 4 August");
+    expect(slip.follow_up.whatsappNumber).toBe('+27825550101');
+    expect(slip.follow_up.whatsappLink).toBe(`https://wa.me/27825550101?text=${encodeURIComponent(slip.follow_up.message)}`);
+  });
+
+  it('falls back to the office phone, and gives no link without a mobile number', async () => {
+    const base = { ...SLIP, dispatch_status: 'not_collected', dispatch_date_iso: TUESDAY_DATE, ecd_name: 'Little Stars' };
+    repoMock.getSlipById.mockResolvedValueOnce({ ...base, contact_phone: '0825550102' });
+    expect((await pickingService.getSlipById(1)).follow_up.whatsappNumber).toBe('+27825550102');
+
+    repoMock.getSlipById.mockResolvedValueOnce({ ...base, mobile_number: null, contact_phone: null });
+    const slip = await pickingService.getSlipById(1);
+    expect(slip.follow_up.whatsappLink).toBeNull();
+    expect(slip.follow_up.message).toMatch(/^Hello,/);
+  });
+
+  it('gives a collected pallet no follow-up', async () => {
+    repoMock.getSlipById.mockResolvedValueOnce({ ...SLIP, dispatch_status: 'collected' });
+    expect((await pickingService.getSlipById(1)).follow_up).toBeUndefined();
+  });
+});
+
+// ── followUpSlip ──────────────────────────────────────────────
+describe('followUpSlip', () => {
+  it('records the follow-up and answers with the slip', async () => {
+    repoMock.recordFollowUp.mockResolvedValueOnce({ ok: true });
+    await expect(pickingService.followUpSlip('1', MANAGER)).resolves.toBe(SLIP);
+    expect(repoMock.recordFollowUp).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id });
+  });
+
+  it('refuses a pallet that was not marked not collected, and one that does not exist', async () => {
+    repoMock.recordFollowUp.mockResolvedValueOnce({ notNotCollected: true });
+    await expectStatus(pickingService.followUpSlip(1, MANAGER), 409);
+    repoMock.recordFollowUp.mockResolvedValueOnce({ notFound: true });
+    await expectStatus(pickingService.followUpSlip(999, MANAGER), 404);
   });
 });
 

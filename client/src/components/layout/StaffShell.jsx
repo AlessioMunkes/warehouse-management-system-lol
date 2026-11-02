@@ -27,6 +27,7 @@ import StaffTabBar from './StaffTabBar';
 import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';
 import useGoBack from './useGoBack';
+import { STAFF_TABS } from './staffTasks';
 import useSpareSlipAlert from '../../features/staff/useSpareSlipAlert';
 import usePressFlash from '../../features/staff/usePressFlash';
 import useKeepAwake from '../../features/staff/useKeepAwake';
@@ -59,7 +60,7 @@ export default function StaffShell({
   children,
 }) {
   const navigate = useNavigate();
-  const goBack = useGoBack();
+  const historyBack = useGoBack();
   const { pathname } = useLocation();
   const { title, sub } = splitCrumb(crumb);
 
@@ -67,6 +68,20 @@ export default function StaffShell({
   // sidebar. Log out, "reduce movement" and the bell are in the top bar.
   const { user } = useAuth() ?? {};
   const showTabBar = !user || user.role === 'warehouse_worker';
+
+  // BACK GOES UP, NOT SIDEWAYS. With a tab bar, the tasks are side by
+  // side: from Dispatch, back went to whichever tab was open before it
+  // (Receiving), which read as the wrong screen. So for a worker, back
+  // from a task's own screen is Home, and back from a screen inside a
+  // task (Dispatch's history) is that task. Anything else, and managers
+  // (who have no tab bar), go back through the browser's history.
+  const parentTab = STAFF_TABS.find((tab) => !tab.exact && pathname.startsWith(`${tab.to}/`));
+  const isTabRoot = STAFF_TABS.some((tab) => !tab.exact && tab.to === pathname);
+  const goBack = () => {
+    if (showTabBar && isTabRoot) navigate(STAFF.home);
+    else if (showTabBar && parentTab) navigate(parentTab.to);
+    else historyBack();
+  };
 
   // Only workers are told about new pallets here; managers already get
   // picking-slip notifications through their bell.

@@ -131,6 +131,25 @@ describe('EcdCollectionRemindersPage', () => {
     await waitFor(() => expect(within(littleStarsRow).getAllByText('Sent').length).toBeGreaterThanOrEqual(2));
   });
 
+  // The same reminder once, for a WhatsApp group or broadcast list.
+  it('builds one group message naming every centre, to copy or open in WhatsApp', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    render(<EcdCollectionRemindersPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Copy group message/ }));
+    const message = writeText.mock.calls[0][0];
+    expect(message).toMatch(/^Hello everyone,/);
+    expect(message).toContain('• Little Stars\n• No Phone ECD\n• Retry ECD');
+    expect(await screen.findByRole('button', { name: /Copied/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Send to a group/ }));
+    expect(open).toHaveBeenCalledWith(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    open.mockRestore();
+  });
+
   it('only shows email retry when the loaded reminder advertises support', async () => {
     render(<EcdCollectionRemindersPage />);
 

@@ -123,7 +123,7 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
         <ScanFlash signal={reader.scanned} label="Scanned" />
         <form onSubmit={save} className="contents">
           <DialogHeader>
-            <DialogTitle>Count {area.name}</DialogTitle>
+            <DialogTitle>Manage {area.name}</DialogTitle>
             <DialogDescription>Enter what you see in this area. Take off anything that is no longer here.</DialogDescription>
           </DialogHeader>
 
@@ -132,7 +132,7 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
               Nothing recorded here yet. Add a product below.
             </p>
           ) : (
-            <ul className="max-h-72 divide-y overflow-y-auto rounded-lg border" aria-label="Counted products">
+            <ul className="max-h-[min(18rem,35dvh)] divide-y overflow-y-auto rounded-lg border" aria-label="Counted products">
               {lines.map((l) => (
                 <li key={l.productId} className="flex items-center gap-2 px-3 py-2">
                   <label htmlFor={`count-${l.productId}`} className="min-w-0 flex-1 truncate text-sm font-medium">{l.name}</label>
@@ -224,7 +224,9 @@ export default function CountAreaDialog({ area, products, onSave, onClose, isSav
 
           {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
 
-          <DialogFooter>
+          {/* Pinned to the bottom of the dialog, so Save is always in
+              reach however long the list of products grows. */}
+          <DialogFooter className="sticky -bottom-6 z-10 -mx-6 -mb-6 border-t bg-popover px-6 pt-3 pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
             <Button type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save count'}</Button>
           </DialogFooter>

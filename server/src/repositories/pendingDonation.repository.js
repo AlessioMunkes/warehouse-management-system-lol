@@ -28,6 +28,8 @@ const createPendingDonation = async (data = {}, client = pool) => {
     donorTaxReference: payload.donorTaxReference ?? payload.donor_tax_reference ?? null,
     donorConsentGiven: payload.donorConsentGiven ?? payload.donor_consent_given ?? null,
     estimatedValueZar: payload.estimatedValueZar ?? payload.estimated_value_zar ?? null,
+    // The system worked the value out from the items (migration 064).
+    valueEstimated: (payload.valueEstimated ?? payload.value_estimated) === true,
     donationCategory: payload.donationCategory ?? payload.donation_category ?? null,
     programmeId: payload.programmeId ?? payload.programme_id ?? null,
     notes: payload.notes ?? null,
@@ -53,8 +55,9 @@ const createPendingDonation = async (data = {}, client = pool) => {
        draft_snapshot,
        idempotency_key,
        created_by,
+       value_estimated,
        status
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'draft')
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'draft')
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
      RETURNING *;`,
     [
@@ -71,6 +74,7 @@ const createPendingDonation = async (data = {}, client = pool) => {
       row.draftSnapshot,
       row.idempotencyKey,
       row.createdBy,
+      row.valueEstimated,
     ]
   );
 

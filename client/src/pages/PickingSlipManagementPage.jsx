@@ -29,7 +29,7 @@ import beneficiaryAPI from '../services/beneficiaryAPI';
 import productAPI from '../services/productAPI';
 import {
   fetchPickingSlips, fetchPickingSlip, fetchAssignableWorkers,
-  assignSlip, releaseSlip, addSecondPacker,
+  assignSlip, releaseSlip, addSecondPacker, followUpSlip,
 } from '../services/pickingAPI';
 import { Button } from '@/components/ui/button';
 import ViewTabs from '@/components/ui/view-tabs';
@@ -358,6 +358,7 @@ export default function PickingSlipManagementPage() {
           onAssign={(workerId) => act((id) => assignSlip(id, workerId))}
           onRelease={() => act((id) => releaseSlip(id))}
           onAddSecond={(workerId) => act((id) => addSecondPacker(id, workerId))}
+          onFollowUp={() => act((id) => followUpSlip(id))}
           onEdit={() => setMode('edit')}
           onPrintLabel={() => printSlips([open])}
           onClose={() => setOpen(null)}

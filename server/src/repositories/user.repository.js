@@ -112,14 +112,27 @@ const findUserByUsername = async (username, { excludeId = null } = {}) => {
 };
 
 // Same case-insensitive reasoning as findUserByUsername. Used by
-// userInvite.service.js (stop inviting an address that already belongs
-// to an account) and user.service.js (stop two accounts sharing one).
-const findUserByEmail = async (email) => {
+// userInvite.service.js (stop inviting an address that already has an
+// account in that role) and user.service.js (stop two accounts in one
+// role sharing one). An address may be on one account of each role
+// (migration 065), so pass the role being checked.
+const findUserByEmail = async (email, { role = null } = {}) => {
   const { rows } = await pool.query(
-    `SELECT id, username, email FROM users WHERE lower(email) = lower($1)`,
-    [email]
+    `SELECT id, username, email, role FROM users
+      WHERE lower(email) = lower($1) AND ($2::text IS NULL OR role = $2::text)
+      ORDER BY id`,
+    [email, role]
   );
   return rows[0] ?? null;
+};
+
+// Every account on an address, for a password reset: one link each.
+const findUsersByEmail = async (email) => {
+  const { rows } = await pool.query(
+    `SELECT id, username, email, role FROM users WHERE lower(email) = lower($1) ORDER BY id`,
+    [email]
+  );
+  return rows;
 };
 
 // ── Write ─────────────────────────────────────────────────────
@@ -294,6 +307,7 @@ export default {
   getUserById,
   findUserByUsername,
   findUserByEmail,
+  findUsersByEmail,
   insertUser,
   updateUser,
   setUserActive,

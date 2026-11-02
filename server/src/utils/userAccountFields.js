@@ -64,7 +64,7 @@ export const validRole = (value) => {
 
 // Optional email for an account. Blank / null clears it (null); a value
 // is trimmed and lowercased so the case-insensitive unique index
-// (idx_users_email_unique, LOWER(email)) and what is stored agree. The
+// (idx_users_email_role_unique, LOWER(email) per role) and what is stored agree. The
 // format check matches the invite flow's: enough to catch typos, not
 // RFC 5322.
 export const validOptionalEmail = (value) => {

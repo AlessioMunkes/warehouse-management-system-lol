@@ -8,7 +8,7 @@
 // they cannot disagree.
 //
 // An area's alerts, most urgent first:
-//   bad    over capacity; stock expired or expiring within 14 days;
+//   bad    over capacity; stock expired or expiring within the urgent days (Settings);
 //          pallets whose collection day has passed
 //   warn   80% full or more; stock expiring within 30 days
 //   info   pallets to be collected today

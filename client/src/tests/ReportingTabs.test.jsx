@@ -33,7 +33,6 @@ vi.mock('../features/reporting/OperationalChart', () => stub('the chart'));
 vi.mock('../features/reporting/OperationalInsight', () => stub('the insight'));
 vi.mock('../features/reporting/ProcessMap', () => stub('the process map'));
 vi.mock('../features/reporting/DataUpload', () => stub('the spreadsheet chart'));
-vi.mock('../features/reporting/ReorderPlanner', () => stub('the reorder planner'));
 vi.mock('../features/reporting/ExceptionAlerts', () => ({
   default: ({ onOpenReport }) => <button type="button" onClick={() => onOpenReport('dispatch_volume')}>open flagged report</button>,
 }));
@@ -59,13 +58,19 @@ beforeEach(() => {
 });
 
 describe('the tabs on Operations reports', () => {
-  it('has a tab for each planning tool, drawn only when opened', async () => {
+  it('draws the process map only when opened, and keeps it after', async () => {
     await show();
-    expect(screen.queryByText('the reorder planner')).not.toBeInTheDocument();
-    await userEvent.click(tab('Reorder planner'));
-    expect(screen.getByText('the reorder planner')).toBeVisible();
+    expect(screen.queryByText('the process map')).not.toBeInTheDocument();
+    await userEvent.click(tab('Process map'));
+    expect(screen.getByText('the process map')).toBeVisible();
     await userEvent.click(tab('Exception alerts'));
-    expect(screen.getByText('the reorder planner')).not.toBeVisible();
+    expect(screen.getByText('the process map')).not.toBeVisible();
+  });
+
+  // The reorder planner is on the Stock ledger now.
+  it('has no Reorder planner tab', async () => {
+    await show();
+    expect(screen.queryByRole('tab', { name: 'Reorder planner' })).toBeNull();
   });
 
   // Workload is a report the AI draws as a heatmap now, not a tab.

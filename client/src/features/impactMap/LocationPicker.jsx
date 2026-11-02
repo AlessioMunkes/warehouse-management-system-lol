@@ -37,9 +37,13 @@ export default function LocationPicker({ lat, lng, onChange, label = 'Place the 
 
   useEffect(() => {
     const map = L.map(containerRef.current, { scrollWheelZoom: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
+      // The server sends Referrer-Policy: no-referrer, and OpenStreetMap
+      // refuses tiles asked for with no Referer (403 "Access blocked").
+      // The tiles alone send our origin, never the path.
+      referrerPolicy: 'strict-origin-when-cross-origin',
     }).addTo(map);
     map.setView(CAPE_TOWN, 10);
     map.on('click', (e) => changeRef.current({ lat: round6(e.latlng.lat), lng: round6(e.latlng.lng) }));

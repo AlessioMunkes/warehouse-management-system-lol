@@ -53,6 +53,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import donationManagementAPI from '../services/donationManagementAPI';
+import DonationValueCell from '../features/donationManagement/DonationValueCell';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 
@@ -88,6 +89,14 @@ export default function Section18AManagementPage() {
   const [dateTo, setDateTo] = useState('');
   const [queueSort, setQueueSort] = useState('date-asc');
   const initialLoadDone = useRef(false);
+
+  // The value, verified or corrected by a manager; the row then says so.
+  const verifyValue = async (id, value) => {
+    const updated = await donationManagementAPI.verifyDonationValue(id, value);
+    const certificates = await donationManagementAPI.getSection18AQueue();
+    setCertificateQueue(certificates);
+    return updated;
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -282,18 +291,16 @@ export default function Section18AManagementPage() {
                     : item.createdAt
                       ? new Date(item.createdAt).toLocaleDateString()
                       : item.date || '-';
-                  const formattedAmount = item.estimated_value_zar != null
-                    ? `R${Number(item.estimated_value_zar).toFixed(2)}`
-                    : item.amount != null
-                      ? `R${item.amount}`
-                      : '-';
-
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.reference || item.id}</TableCell>
                       {qShow('donor') ? <TableCell>{item.donorName || item.donor_name || '-'}</TableCell> : null}
                       {qShow('date') ? <TableCell className="text-muted-foreground">{formattedDate}</TableCell> : null}
-                      {qShow('amount') ? <TableCell className="text-right tabular-nums">{formattedAmount}</TableCell> : null}
+                      {qShow('amount') ? (
+                        <TableCell className="text-right">
+                          <DonationValueCell donation={item} onVerify={verifyValue} />
+                        </TableCell>
+                      ) : null}
                     </TableRow>
                   );
                 })}

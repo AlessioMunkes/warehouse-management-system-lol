@@ -144,7 +144,7 @@ describe('notices', () => {
     });
     expect(createNotification).toHaveBeenCalledWith(client, {
       type: 'purchase_order_needs_attention',
-      title: 'Follow-up required: PO-3 was delivered short',
+      title: 'Balance outstanding: PO-3 was delivered short',
       body: 'Delivered short: Sugar 10 kg.',
       entityType: 'purchase_order', entityId: 3,
     });

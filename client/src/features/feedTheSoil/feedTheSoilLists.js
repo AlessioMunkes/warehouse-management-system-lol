@@ -68,4 +68,6 @@ export const TABS = [
   { id: 'kits',    label: 'Kits' },
   { id: 'idle',    label: 'Idle kits', alert: true },
   { id: 'records', label: 'Records' },
+  // Pop-up stands and other sites, with their QR posters (migration 069).
+  { id: 'sites',   label: 'Drop-off sites' },
 ];

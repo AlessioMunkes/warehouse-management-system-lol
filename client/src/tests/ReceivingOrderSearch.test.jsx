@@ -144,7 +144,7 @@ describe('receiving: Guided\'s order list (cross-supplier)', () => {
     within(select).getByRole('option', { name: /PO-0074/ });
 
     await user.click(screen.getByRole('button', { name: 'Search orders' }));
-    await user.type(screen.getByLabelText(/Search by order number/), '86');
+    await user.type(screen.getByLabelText(/Order number, supplier or date/), '86');
     expect(within(select).getByRole('option', { name: /PO-0086/ })).toBeInTheDocument();
     expect(within(select).queryByRole('option', { name: /PO-0074/ })).not.toBeInTheDocument();
   });
@@ -157,7 +157,7 @@ describe('receiving: Guided\'s order list (cross-supplier)', () => {
     within(select).getByRole('option', { name: /PO-0074/ });
 
     await user.click(screen.getByRole('button', { name: 'Search orders' }));
-    await user.type(screen.getByLabelText(/Search by order number/), '16 august');
+    await user.type(screen.getByLabelText(/Order number, supplier or date/), '16 august');
     expect(within(select).getByRole('option', { name: /PO-0074/ })).toBeInTheDocument();
     expect(within(select).queryByRole('option', { name: /PO-0086/ })).not.toBeInTheDocument();
   });
@@ -310,7 +310,7 @@ describe('receiving: what Form used to leave out', () => {
     expect(within(select).getByRole('option', { name: /PO-2026-0086/ })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Search orders' }));
-    await user.type(screen.getByLabelText(/Search by order number/), 'PO-2026-0074');
+    await user.type(screen.getByLabelText(/Order number, supplier or date/), 'PO-2026-0074');
     expect(within(select).queryByRole('option', { name: /PO-2026-0086/ })).not.toBeInTheDocument();
   });
 

@@ -37,7 +37,7 @@ export const safeFinanceEmailError = (raw) => {
   if (SAFE.has(text)) return text;
   if (LEGACY[text]) return LEGACY[text];
 
-  if (/gmail connection|connect gmail|reconnect|not connected|invalid_grant|unauthori[sz]ed|credential|access token|oauth/i.test(text)) {
+  if (/gmail connection|connect gmail|reconnect|not connected|invalid_grant|unauthori[sz]ed|credential|access token|oauth|insufficient authentication scopes/i.test(text)) {
     return FINANCE_EMAIL_ERRORS.notConnected;
   }
   if (/ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|network|fetch failed|socket|timed? ?out|could not reach|getaddrinfo/i.test(text)) {

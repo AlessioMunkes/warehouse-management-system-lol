@@ -35,6 +35,7 @@ export const PAGE_LOADERS = {
   inviteAccept:     () => import('../pages/InviteAcceptPage'),
   resetPassword:    () => import('../pages/ResetPasswordPage'),
   slipPreview:      () => import('../pages/SlipPreviewPage'),
+  ftsDropOff:       () => import('../pages/FtsDropOffPage'),
   privacy:          () => import('../pages/PrivacyPolicyPage'),
   terms:            () => import('../pages/TermsOfServicePage'),
 
@@ -111,6 +112,8 @@ export const PAGES = {
   inviteAccept:     <L.inviteAccept />,
   resetPassword:    <L.resetPassword />,
   slipPreview:      <L.slipPreview />,
+  ftsDropOff:       <L.ftsDropOff />,
+  ftsDropOffAny:    <L.ftsDropOff />,
   privacy:          <L.privacy />,
   terms:            <L.terms />,
 

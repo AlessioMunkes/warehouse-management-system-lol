@@ -50,7 +50,7 @@ export function ReviewSummary({ draft }) {
             <span className="stf-row-meta">
               {draft.estimatedValueZar === "" || draft.estimatedValueZar === null || draft.estimatedValueZar === undefined
                 ? "Not given"
-                : `R${draft.estimatedValueZar}`}
+                : `R${draft.estimatedValueZar}${draft.valueEstimated ? " (estimated, a manager will verify it)" : ""}`}
             </span>
           </div>
         </div>

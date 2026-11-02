@@ -199,7 +199,7 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
   const { rows } = await pool.query(
     `SELECT ${PO_COLUMNS},
             s.name AS supplier_name,
-            u.first_name AS created_by_name,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS created_by_name,
             (SELECT COUNT(*) FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id)::int AS line_count,
             -- Lines whose full expected quantity has arrived, summed
@@ -245,12 +245,12 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
 const getPurchaseOrderById = async (id) => {
   // The three reads do not depend on each other, so they go together:
   // one wait on the database instead of three in a row.
-  const [{ rows }, { rows: items }, { rows: deliveries }] = await Promise.all([
+  const [{ rows }, { rows: items }, { rows: deliveries }, { rows: statusChanges }] = await Promise.all([
     pool.query(
     `SELECT ${PO_COLUMNS},
             s.name AS supplier_name,
             s.is_active AS supplier_is_active,
-            u.first_name AS created_by_name,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS created_by_name,
             qom.qbo_id AS quickbooks_po_id,
             -- The order this one is a follow-up to, and any raised to
             -- follow it (migration 043).
@@ -291,16 +291,12 @@ const getPurchaseOrderById = async (id) => {
     [id]
   ),
 
-  // Every delivery actually recorded against this PO, oldest first —
-  // real events for the PO detail's timeline (order raised, then one
-  // entry per delivery, then wherever status sits today), not a
-  // fabricated status history. There is no per-transition log of past
-  // status changes (only status_changed_at, the most recent one), so
-  // the timeline is built from what's actually there: this table plus
-  // the PO's own created_at/status_changed_at.
+  // Every delivery actually recorded against this PO, oldest first:
+  // real events for the PO detail's timeline, with the status changes
+  // read below.
     pool.query(
     `SELECT dn.id, dn.delivery_date, COALESCE(dn.delivered_at, dn.created_at) AS recorded_at, dn.status, dn.driver_name,
-            u.first_name AS received_by_name,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS received_by_name,
             COALESCE(disc.discrepancy_count, 0) > 0 AS has_discrepancies
        FROM delivery_notes dn
        LEFT JOIN users u ON u.id = dn.received_by
@@ -313,6 +309,21 @@ const getPurchaseOrderById = async (id) => {
       ORDER BY dn.delivery_date ASC, dn.id ASC`,
     [id]
   ),
+
+  // Every status change a person made (approve, in transit, returned,
+  // and so on), from the audit trail updatePurchaseOrderStatus writes:
+  // who made it and when. Changes made by receiving are not here; the
+  // delivery itself is on the timeline.
+    pool.query(
+    `SELECT al.after_data->>'status' AS status, al.reason, al.created_at,
+            TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')) AS actor_name
+       FROM audit_log al
+       LEFT JOIN users u ON u.id = al.actor_id
+      WHERE al.entity_type = 'purchase_order' AND al.entity_id = $1
+        AND al.action = 'status_changed'
+      ORDER BY al.created_at ASC, al.id ASC`,
+    [id]
+  ),
   ]);
 
   const purchaseOrder = rows[0];
@@ -320,7 +331,7 @@ const getPurchaseOrderById = async (id) => {
   // Whatever is stored, only a short safe message leaves the repository.
   purchaseOrder.finance_email_error = safeFinanceEmailError(purchaseOrder.finance_email_error);
 
-  return { ...purchaseOrder, items, deliveries };
+  return { ...purchaseOrder, items, deliveries, status_changes: statusChanges };
 };
 
 // ── Status transition ────────────────────────────────────────
@@ -758,93 +769,8 @@ const recordFinanceEmailAttempt = async (id, { status, error, attemptedAt }) => 
   );
 };
 
-// ── Follow-up order ───────────────────────────────────────────
-// A second order for what came short on `parentId` (migration 043):
-// same supplier, the outstanding quantity of each short line at the
-// same unit price, already approved (it is the goods a manager already
-// signed off, not a new purchase). The first order moves to
-// 'partially_received' and waits for this one.
-//
-// One transaction, the first order locked throughout, so two managers
-// pressing the button together cannot raise two follow-ups.
-const createFollowUpOrder = async (parentId, userId, { expectedDeliveryDate }) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const { rows: parents } = await client.query(
-      `SELECT po.id, po.po_number, po.supplier_id, po.status, s.is_active AS supplier_is_active, s.name AS supplier_name
-         FROM purchase_orders po JOIN suppliers s ON s.id = po.supplier_id
-        WHERE po.id = $1
-          FOR UPDATE OF po`,
-      [parentId]
-    );
-    const parent = parents[0];
-    const stop = async (result) => { await client.query('ROLLBACK'); return result; };
-    if (!parent) return stop({ ok: false, code: 'not_found' });
-    // Flagged for follow-up: part received (the usual way in), or marked
-    // by a manager before anything arrived.
-    if (parent.status !== 'partially_received' && parent.status !== 'follow_up_required') {
-      return stop({ ok: false, code: 'not_awaiting_follow_up', status: parent.status });
-    }
-    if (!parent.supplier_is_active) return stop({ ok: false, code: 'supplier_inactive', supplierName: parent.supplier_name });
-
-    const { rows: open } = await client.query(
-      `SELECT po_number FROM purchase_orders
-        WHERE follow_up_of = $1 AND status NOT IN ('completed', 'returned') LIMIT 1`,
-      [parentId]
-    );
-    if (open[0]) return stop({ ok: false, code: 'has_follow_up', poNumber: open[0].po_number });
-
-    // What is still owed, line by line, to the three places an order
-    // line holds.
-    const { rows: owed } = await client.query(
-      `SELECT poi.product_id, poi.unit_price,
-              ROUND(poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0), 3) AS quantity
-         FROM purchase_order_items poi
-         LEFT JOIN delivery_note_items dni ON dni.purchase_order_item_id = poi.id
-        WHERE poi.purchase_order_id = $1
-        GROUP BY poi.id, poi.product_id, poi.unit_price, poi.expected_quantity
-       HAVING poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0) > 0
-        ORDER BY poi.id ASC`,
-      [parentId]
-    );
-    if (owed.length === 0) return stop({ ok: false, code: 'nothing_outstanding' });
-
-    const { rows: created } = await client.query(
-      `INSERT INTO purchase_orders
-         (supplier_id, created_by, status, expected_delivery_date, notes, follow_up_of, status_changed_at)
-       VALUES ($1, $2, 'approved', $3, $4, $5, NOW())
-       RETURNING id`,
-      [parent.supplier_id, userId, expectedDeliveryDate,
-       `Follow-up to ${parent.po_number}: what was short on its delivery.`, parentId]
-    );
-    await client.query(
-      `INSERT INTO purchase_order_items (purchase_order_id, product_id, expected_quantity, expected_weight_kg, unit_price)
-       SELECT $1::int, p, q, NULL, u
-         FROM unnest($2::int[], $3::numeric[], $4::numeric[]) AS t(p, q, u)`,
-      [created[0].id, owed.map((l) => l.product_id), owed.map((l) => l.quantity), owed.map((l) => l.unit_price)]
-    );
-    await client.query(
-      `UPDATE purchase_orders
-          SET status = 'partially_received', status_reason = NULL, status_changed_at = NOW()
-        WHERE id = $1`,
-      [parentId]
-    );
-
-    await client.query('COMMIT');
-    return { ok: true, id: created[0].id };
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-};
-
 export default {
   createPurchaseOrder,
-  createFollowUpOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
   updatePurchaseOrderStatus,

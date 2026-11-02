@@ -11,7 +11,7 @@ import { sendError } from '../utils/httpError.js';
 const EMAIL_INTEGRATION_PATH = '/admin/email-integration';
 
 const buildEmailIntegrationRedirect = (gmailStatus) => {
-  const safeStatus = gmailStatus === 'connected' ? 'connected' : 'error';
+  const safeStatus = ['connected', 'no_send'].includes(gmailStatus) ? gmailStatus : 'error';
   const pathWithQuery = `${EMAIL_INTEGRATION_PATH}?gmail=${safeStatus}`;
   // The same address every other link uses. With none set, the relative
   // path still works when the app and server share an origin.
@@ -59,7 +59,8 @@ const callback = async (req, res) => {
   } catch (err) {
     // Message only: a Google client error carries the OAuth request.
     console.error('[gmail] OAuth callback failed:', err.message);
-    return res.redirect(302, buildEmailIntegrationRedirect('error'));
+    // "Send email on your behalf" left unticked has its own message.
+    return res.redirect(302, buildEmailIntegrationRedirect(err.reason === 'no_send' ? 'no_send' : 'error'));
   }
 };
 
