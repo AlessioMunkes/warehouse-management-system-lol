@@ -28,6 +28,8 @@
 // IN ENGLISH NOTHING RUNS: no observer, and phrases.js is not loaded.
 // ─────────────────────────────────────────────────────────────
 
+import { loadTranslationOverrides, phraseOverrides, subscribeOverrides } from './index';
+
 const ATTRIBUTES = ['placeholder', 'aria-label', 'title', 'alt'];
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'CODE', 'PRE', 'NOSCRIPT']);
 const COLUMN = { af: 1, xh: 2 };
@@ -36,13 +38,30 @@ const COLUMN = { af: 1, xh: 2 };
 // Whole phrases by their English; phrases with {} as patterns, longest
 // first so the most specific one wins.
 let tables = null;
+let phrasesTable = null;
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-export const buildTables = (phrases) => {
+// `own` is the admin's wording from Settings → Translations, by
+// language and English: { af: { 'Cancel': '…' }, xh: {…} }. It replaces
+// that column of the row; an English phrase the table does not have is
+// added.
+export const buildTables = (phrases, own = {}) => {
   const exact = new Map();
   const patterns = [];
-  for (const row of phrases) {
+  const rows = phrases.map((row) => [...row]);
+  const byEnglish = new Map(rows.map((row) => [row[0], row]));
+  for (const [lang, column] of Object.entries(COLUMN)) {
+    for (const [english, text] of Object.entries(own[lang] ?? {})) {
+      if (!byEnglish.has(english)) {
+        const row = [english, null, null];
+        rows.push(row);
+        byEnglish.set(english, row);
+      }
+      byEnglish.get(english)[column] = text;
+    }
+  }
+  for (const row of rows) {
     const english = row[0];
     if (!english.includes('{}')) { exact.set(english, row); continue; }
     const source = english.split('{}').map(escapeRe).join('(.+?)');
@@ -57,11 +76,11 @@ export const translatePhrase = (english, language, table = tables) => {
   const column = COLUMN[language];
   if (!column || !table) return null;
   const hit = table.exact.get(english);
-  if (hit) return hit[column];
+  if (hit) return hit[column] ?? null;
   if (!/[A-Za-z]/.test(english)) return null;
   for (const { re, row } of table.patterns) {
     const found = re.exec(english);
-    if (!found) continue;
+    if (!found || !row[column]) continue;
     let n = 0;
     // What was filled in is carried across; if it is itself a phrase
     // ("Decanting / What you are working with") it is translated too.
@@ -187,8 +206,10 @@ export const startFloorTranslation = async (code) => {
   const mine = ticket;
   if (!COLUMN[code]) { halt(); return; }
   if (!tables) {
+    await loadTranslationOverrides();
     const { PHRASES } = await import('./phrases');
-    tables = buildTables(PHRASES);
+    phrasesTable = PHRASES;
+    tables = buildTables(PHRASES, { af: phraseOverrides('af'), xh: phraseOverrides('xh') });
   }
   if (mine !== ticket) return;
   halt();
@@ -201,3 +222,14 @@ export const startFloorTranslation = async (code) => {
     attributes: true, attributeFilter: ATTRIBUTES,
   });
 };
+
+// The admin's wording changed (or arrived): rebuild the table and, if a
+// language is showing, put the page into it again.
+subscribeOverrides(() => {
+  if (!phrasesTable) return;
+  tables = buildTables(phrasesTable, { af: phraseOverrides('af'), xh: phraseOverrides('xh') });
+  if (language !== 'en') {
+    const showing = language;
+    startFloorTranslation(showing).catch(() => {});
+  }
+});

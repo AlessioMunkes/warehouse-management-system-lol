@@ -75,6 +75,7 @@ import certificateSettingsRouter from './src/routes/certificateSettings.routes.j
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
 import communicationsRouter from './src/routes/communications.routes.js';
 import settingsRouter from './src/routes/settings.routes.js';
+import translationRouter from './src/routes/translation.routes.js';
 import calendarRouter from './src/routes/calendar.routes.js';
 import recipeRouter from './src/routes/recipe.routes.js';
 import photoRouter from './src/routes/photo.routes.js';
@@ -273,6 +274,7 @@ app.use('/api/certificate-settings', certificateSettingsRouter);
 app.use('/api/collection-kits', collectionKitRouter);
 app.use('/api/communications', communicationsRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/translations', translationRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api/recipes', recipeRouter);
 // Photos a worker takes of a flagged item or a delivery.

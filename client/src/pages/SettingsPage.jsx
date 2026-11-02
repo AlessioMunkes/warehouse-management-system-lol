@@ -20,7 +20,9 @@
 //   Reporting                how kilograms become people fed (the
 //                            impact factors). Targets are each
 //                            manager's own, on Operations Reports.
-//   Accounts                 how long an invite link lasts
+//   Accounts                 how long a sign-in and an invite link last
+//   Translations             the floor's Afrikaans and isiXhosa wording,
+//                            changed by the admin (TranslationsSection)
 //
 // The section is in ?section=. /admin/email-integration opens this
 // page on Email — it is where Google's sign-in sends the admin back to.
@@ -38,6 +40,7 @@ import GmailSettingsPage from './GmailSettingsPage';
 import AppSettingsSection from '../features/settings/AppSettingsSection';
 import ConnectionsSection from '../features/settings/ConnectionsSection';
 import RecipesSection from '../features/settings/RecipesSection';
+import TranslationsSection from '../features/settings/TranslationsSection';
 import ImpactFactorsForm from '../features/reporting/ImpactFactorsForm';
 import { listSettings } from '../services/settingsAPI';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
@@ -51,6 +54,7 @@ const SECTIONS = [
   { id: 'recipes',       label: 'Recipes' },
   { id: 'reporting',     label: 'Reporting' },
   { id: 'accounts',      label: 'Accounts' },
+  { id: 'translations',  label: 'Translations' },
 ];
 
 const VALUE_SECTIONS = {
@@ -91,7 +95,7 @@ export default function SettingsPage({ defaultSection = 'email' }) {
     // Narrower than the list screens: this page is forms, and a form
     // line stretched across 6xl is hard to read.
     <PageShell width="max-w-4xl">
-      <PageHeader title="Settings" description="Set up email, reminders, stock rules, recipes and accounts." />
+      <PageHeader title="Settings" description="Set up email, reminders, stock rules, recipes, accounts and the floor's wording." />
 
       <ViewTabs className="mt-5" label="Settings sections" value={section} onChange={changeSection} tabs={SECTIONS} />
 
@@ -116,6 +120,8 @@ export default function SettingsPage({ defaultSection = 'email' }) {
         ) : null}
 
         {section === 'recipes' ? <RecipesSection settings={settings} onSettingsSaved={setSettings} /> : null}
+
+        {section === 'translations' ? <TranslationsSection /> : null}
 
         {section === 'reporting' ? (
           <Card>

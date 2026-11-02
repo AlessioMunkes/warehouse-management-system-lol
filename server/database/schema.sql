@@ -1164,6 +1164,15 @@ CREATE TABLE public."suppliers" (
   "archived_by" integer
 );
 
+CREATE TABLE public."translation_overrides" (
+  "language" character varying(5) NOT NULL,
+  "kind" character varying(10) NOT NULL,
+  "source" text NOT NULL,
+  "text" text NOT NULL,
+  "updated_by" integer,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE public."user_invites" (
   "id" integer DEFAULT nextval('user_invites_id_seq'::regclass) NOT NULL,
   "email" text NOT NULL,
@@ -1363,6 +1372,11 @@ ALTER TABLE public."storage_locations" ADD CONSTRAINT "storage_locations_pkey" P
 ALTER TABLE public."supplier_products" ADD CONSTRAINT "supplier_products_pkey" PRIMARY KEY (supplier_id, product_id);
 ALTER TABLE public."supplier_prospects" ADD CONSTRAINT "supplier_prospects_pkey" PRIMARY KEY (id);
 ALTER TABLE public."suppliers" ADD CONSTRAINT "suppliers_pkey" PRIMARY KEY (id);
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_pkey" PRIMARY KEY (language, kind, source);
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_language_check" CHECK (((language)::text = ANY ((ARRAY['af'::character varying, 'xh'::character varying])::text[])));
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_kind_check" CHECK (((kind)::text = ANY ((ARRAY['key'::character varying, 'phrase'::character varying])::text[])));
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_source_check" CHECK (((length(source) >= 1) AND (length(source) <= 500)));
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_text_check" CHECK (((length(btrim(text)) >= 1) AND (length(btrim(text)) <= 1000)));
 ALTER TABLE public."user_invites" ADD CONSTRAINT "user_invites_pkey" PRIMARY KEY (id);
 ALTER TABLE public."users" ADD CONSTRAINT "users_pkey" PRIMARY KEY (id);
 ALTER TABLE public."vms_sync" ADD CONSTRAINT "vms_sync_pkey" PRIMARY KEY (sync_id);
@@ -1526,6 +1540,7 @@ ALTER TABLE public."warehouse_areas" ADD CONSTRAINT "warehouse_areas_pallet_spac
 
 -- -- Foreign keys -------------------------------------------
 ALTER TABLE public."app_settings" ADD CONSTRAINT "app_settings_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id);
+ALTER TABLE public."translation_overrides" ADD CONSTRAINT "translation_overrides_updated_by_fkey" FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."assistant_queries" ADD CONSTRAINT "assistant_queries_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE public."attendance" ADD CONSTRAINT "attendance_booking_id_fkey" FOREIGN KEY (booking_id) REFERENCES volunteer_bookings(booking_id);
 ALTER TABLE public."barcode_scan_events" ADD CONSTRAINT "barcode_scan_events_product_id_fkey" FOREIGN KEY (product_id) REFERENCES products(id);
@@ -1982,6 +1997,7 @@ ALTER TABLE public."storage_locations" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."supplier_products" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."supplier_prospects" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."suppliers" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public."translation_overrides" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."user_invites" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."users" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."vms_sync" ENABLE ROW LEVEL SECURITY;
@@ -2095,7 +2111,8 @@ INSERT INTO public.schema_migrations (id, notes) VALUES
   ('069_fts_drop_points', 'In schema.sql'),
   ('070_fts_dropoff_any_place', 'In schema.sql'),
   ('2026_08_02_schema_gap_migration', 'In schema.sql'),
-  ('2026_08_13_donations', 'In schema.sql');
+  ('2026_08_13_donations', 'In schema.sql'),
+  ('002_translation_overrides', 'In schema.sql');
 
 -- -- First admin (optional) ---------------------------------
 -- Someone has to be able to sign in. Fill in the four values and run the
