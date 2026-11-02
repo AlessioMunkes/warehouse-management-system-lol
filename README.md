@@ -41,6 +41,7 @@ server/                 Express API
 
 docs/
   *.pdf                 The handover notes and the how-to-use guide
+  handover-secrets-and-go-live.md   Keys, access, and the testing-to-production checklist
 
 render.yaml             Deployment to Render
 .github/workflows/      Lint, build and test on every push
@@ -72,17 +73,22 @@ You need Node.js 22 and a Postgres database (the project uses Supabase).
 cd server
 copy env.example .env        # then fill it in: DATABASE_URL and JWT_SECRET at least
 npm install
+npm run check-env            # says what is set, missing or wrong (never shows a value)
 npm run dev                  # http://localhost:5000
 
 cd client
-copy env.local.example .env.local
-npm install
+npm install                  # client/env.local.example lists optional build settings
 npm run dev                  # http://localhost:5173
 ```
 
-`server/env.example` explains every setting. The AI help panel and the reporting question box
-need `GEMINI_API_KEY`; phone notifications need the three `VAPID_` keys; without them those
-features are switched off and everything else works.
+`server/env.example` explains every setting, in order: required, production, optional
+features, tuning. Only `DATABASE_URL` and `JWT_SECRET` are required; each optional group
+(Gmail, Gemini AI, QuickBooks, phone notifications) switches its feature on, and without it
+everything else works. Business values (rounding, bands, reminder times, wording) are not in
+any env file: an admin changes them under Settings.
+
+Where the real keys are kept, who signs into what, and the testing-to-production checklist:
+[docs/handover-secrets-and-go-live.md](docs/handover-secrets-and-go-live.md).
 
 ## The database
 
@@ -150,6 +156,7 @@ When you add or change a route, that test fails until the file is updated: that 
 | Script | What it does |
 |---|---|
 | `npm run migrate` | Applies new database changes from `database/migrations/` (see The database) |
+| `npm run check-env` | Checks the server's environment: what is set, missing or wrong. Never prints a value |
 | `npm run export-database` | Writes `server/database/schema.sql` from the database in `.env`. Only reads |
 | `npm run warehouse-admin` | Looks up and manages people across warehouses, when running more than one |
 | `seedWesternCapeSupply.mjs` | Loads the sponsor's supply sheet: centres, products, standing orders |

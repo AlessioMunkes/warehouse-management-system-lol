@@ -113,7 +113,9 @@ app.use(clientIp());
 const port = process.env.PORT || 5000;
 // Origins allowed to call the API with the auth cookie.
 //   - dev:                 the Vite server on 5173/5174
-//   - CLIENT_ORIGIN:       an explicit override (e.g. a custom domain)
+//   - APP_BASE_URL:        the address people open the app on, so a
+//                          custom domain needs only this one setting
+//   - CLIENT_ORIGIN:       an explicit extra origin (older setups)
 //   - RENDER_EXTERNAL_URL: set by Render itself to this service's own
 //                          https URL. The client is served from that
 //                          same origin, and Chrome still sends an Origin
@@ -125,6 +127,7 @@ const allowedClientOrigins = new Set([
   ...(process.env.NODE_ENV === 'production'
     ? []
     : ['http://localhost:5173', 'http://localhost:5174']),
+  process.env.APP_BASE_URL?.trim().replace(/\/+$/, ''),
   process.env.CLIENT_ORIGIN,
   process.env.RENDER_EXTERNAL_URL,
 ].filter(Boolean));

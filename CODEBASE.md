@@ -290,9 +290,11 @@ wording. One flat folder per area, with no folders inside.
 ### Configuration
 
 Every setting the server reads from its environment is listed, with its default, in
-`server/env.example`; the client's are in `client/env.local.example`. Values an admin can
-change while the app runs (expiry warnings, reminder times, unit sizes) are in Settings
-instead, defined in `features/settings/settingsDefinitions.js`.
+`server/env.example`; the client's are in `client/env.local.example`.
+`npm run check-env` (`scripts/check-env.mjs`, checks in `scripts/lib/envCheck.js`) reports on an
+environment without printing values. Values an admin can change while the app runs (expiry
+warnings, reminder times, unit sizes, recipe rounding) are in Settings instead, defined in
+`features/settings/settingsDefinitions.js`.
 
 ### Database
 
